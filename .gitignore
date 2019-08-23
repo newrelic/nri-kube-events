@@ -1,0 +1,5 @@
+.idea
+cmd/nr-kube-events/config.yaml
+bin/
+deploy/local.yaml
+.DS_STORE

@@ -1,0 +1,124 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nr-kube-events
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: nr-kube-events
+rules:
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: nr-kube-events
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: nr-kube-events
+subjects:
+  - kind: ServiceAccount
+    name: nr-kube-events
+    namespace: default
+---
+apiVersion: v1
+data:
+  config.yaml: |-
+    sinks:
+    - name: stdout
+    - name: newRelicInfra
+      config:
+        agentEndpoint: http://localhost:8001/v1/data
+        clusterName: <ADD YOUR CLUSTER NAME>
+        agentHTTPTimeout: 30s
+kind: ConfigMap
+metadata:
+  name: nr-kube-events
+  namespace: default
+---
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: nr-kube-events
+  namespace: default
+  labels:
+    app: nr-kube-events
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nr-kube-events
+  template:
+    metadata:
+      labels:
+        app: nr-kube-events
+    spec:
+      containers:
+        - name: kube-events
+          image: newrelic/nri-kube-events:1.0.0
+          resources:
+            limits:
+              memory: "128Mi"
+              cpu: "500m"
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+          imagePullPolicy: IfNotPresent
+          args: ["-config", "/app/config/config.yaml", "-loglevel", "debug"]
+          volumeMounts:
+            - name: config-volume
+              mountPath: /app/config
+          # Custom attributes are added as environment variables. They must
+          # follow the naming convention NRI_KUBE_EVENTS_<key>=<val>.
+          # For example, to add an attribute called `myCustomAttribute` with
+          # value `"foo"` to every event:
+          #
+          # env:
+          #   - name: NRI_KUBE_EVENTS_myCustomAttribute
+          #     value: "foo"
+        - name: infra-agent
+          image: newrelic/k8s-events-forwarder:1.5.31
+          resources:
+            limits:
+              memory: 128Mi
+              cpu: 500m
+            requests:
+              memory: 128Mi
+              cpu: 100m
+          securityContext:
+            privileged: false
+            runAsUser: 1000 # nr-kube-events
+            runAsGroup: 2000 # nr-kube-events
+            runAsNonRoot: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+          ports:
+            - containerPort: 8001
+          env:
+            - name: "NRIA_LICENSE_KEY"
+              value: "<ADD YOUR LICENSE KEY>"
+          #- name: "NRIA_VERBOSE"
+          #  value: "1"
+          volumeMounts:
+            - mountPath: /var/db/newrelic-infra/data
+              name: tmpfs-data
+            - mountPath: /var/db/newrelic-infra/user_data
+              name: tmpfs-user-data
+            - mountPath: /tmp
+              name: tmpfs-tmp
+      serviceAccountName: nr-kube-events
+      volumes:
+        - name: config-volume
+          configMap:
+            name: nr-kube-events
+        - name: tmpfs-data
+          emptyDir: {}
+        - name: tmpfs-user-data
+          emptyDir: {}
+        - name: tmpfs-tmp
+          emptyDir: {}
