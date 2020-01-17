@@ -8,7 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/newrelic/nr-kube-events/pkg/events"
+	"github.com/newrelic/nri-kube-events/pkg/events"
 	"github.com/sirupsen/logrus"
 )
 

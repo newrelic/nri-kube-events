@@ -18,16 +18,16 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/newrelic/nr-kube-events/pkg/events"
-	"github.com/newrelic/nr-kube-events/pkg/sinks"
+	"github.com/newrelic/nri-kube-events/pkg/events"
+	"github.com/newrelic/nri-kube-events/pkg/sinks"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
 
 const (
-	integrationName    = "nr-kube-events"
-	integrationVersion = "0.0.1"
+	integrationName    = "nri-kube-events"
+	integrationVersion = "1.0.0"
 )
 
 var (
@@ -117,7 +117,7 @@ func createEventsInformer(stopChan <-chan struct{}) (cache.SharedIndexInformer, 
 	// wait for the internal cache to sync. This is the only time the cache will be filled,
 	// since we've set resync to 0. This behaviour is very important,
 	// because we will delete the cache to prevent duplicate events from being sent.
-	// If we remove this cache-deletion and you restart nr-kube-events, we will sent lots of duplicated events
+	// If we remove this cache-deletion and you restart nri-kube-events, we will sent lots of duplicated events
 	sharedInformers.WaitForCacheSync(stopChan)
 
 	// There doesn't seem to be a way to start a SharedInformer without local cache,

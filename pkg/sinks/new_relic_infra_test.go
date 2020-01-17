@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/newrelic/nr-kube-events/pkg/events"
+	"github.com/newrelic/nri-kube-events/pkg/events"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"

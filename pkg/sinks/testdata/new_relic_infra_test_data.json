@@ -1,7 +1,7 @@
 {
   "name": "kube_events",
   "protocol_version": "3",
-  "integration_version": "0.0.1",
+  "integration_version": "1.3.0",
   "data": [
     {
       "entity": {
@@ -24,7 +24,7 @@
             "event.metadata.labels.test_label2": "test_value2",
             "event.metadata.name": "test",
             "clusterName": "test-cluster",
-            "eventRouterVersion": "0.0.1",
+            "eventRouterVersion": "1.3.0",
             "verb": "ADDED",
             "event.message": "The event message",
             "myCustomAttribute": "attrValue"

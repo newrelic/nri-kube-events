@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/newrelic/nr-kube-events/pkg/sinks"
+	"github.com/newrelic/nri-kube-events/pkg/sinks"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"

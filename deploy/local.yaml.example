@@ -1,29 +1,29 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: nr-kube-events
+  name: nri-kube-events
   namespace: default
 ---
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: nr-kube-events
+  name: nri-kube-events
 rules:
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["get", "watch", "list"]
 ---
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: nr-kube-events
+  name: nri-kube-events
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: nr-kube-events
+  name: nri-kube-events
 subjects:
   - kind: ServiceAccount
-    name: nr-kube-events
+    name: nri-kube-events
     namespace: default
 ---
 apiVersion: v1
@@ -38,29 +38,30 @@ data:
         agentHTTPTimeout: 30s
 kind: ConfigMap
 metadata:
-  name: nr-kube-events
+  name: nri-kube-events
   namespace: default
 ---
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nr-kube-events
+  name: nri-kube-events
   namespace: default
   labels:
-    app: nr-kube-events
+    app: nri-kube-events
+    app.kubernetes.io/name: nri-kube-events
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: nr-kube-events
+      app.kubernetes.io/name: nri-kube-events
   template:
     metadata:
       labels:
-        app: nr-kube-events
+        app.kubernetes.io/name: nri-kube-events
     spec:
       containers:
         - name: kube-events
-          image: newrelic/nri-kube-events:0.0.2 
+          image: newrelic/nri-kube-events:1.2.0
           resources:
             limits:
               memory: "128Mi"
@@ -74,7 +75,7 @@ spec:
             - name: config-volume
               mountPath: /app/config
         - name: infra-agent
-          image: newrelic/k8s-events-forwarder:1.5.31
+          image: newrelic/k8s-events-forwarder:1.11.45
           resources:
             limits:
               memory: 128Mi
@@ -84,8 +85,8 @@ spec:
               cpu: 100m
           securityContext:
             privileged: false
-            runAsUser: 1000 # nr-kube-events
-            runAsGroup: 2000 # nr-kube-events
+            runAsUser: 1000 # nri-kube-events
+            runAsGroup: 2000 # nri-kube-events
             runAsNonRoot: false
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -105,15 +106,14 @@ spec:
               name: tmpfs-user-data
             - mountPath: /tmp
               name: tmpfs-tmp
-      serviceAccountName: nr-kube-events
+      serviceAccountName: nri-kube-events
       volumes:
         - name: config-volume
           configMap:
-            name: nr-kube-events
+            name: nri-kube-events
         - name: tmpfs-data
           emptyDir: {}
         - name: tmpfs-user-data
           emptyDir: {}
         - name: tmpfs-tmp
           emptyDir: {}
-

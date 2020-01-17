@@ -4,7 +4,7 @@ pipeline {
   agent {
     node {
       label 'fsi-build-tests'
-      customWorkspace "${ws}/nr-kube-events"
+      customWorkspace "${ws}/nri-kube-events"
     }
   }
   options {

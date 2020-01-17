@@ -24,7 +24,7 @@ import (
 	sdkArgs "github.com/newrelic/infra-integrations-sdk/args"
 	sdkEvent "github.com/newrelic/infra-integrations-sdk/data/event"
 	sdkIntegration "github.com/newrelic/infra-integrations-sdk/integration"
-	"github.com/newrelic/nr-kube-events/pkg/events"
+	"github.com/newrelic/nri-kube-events/pkg/events"
 	"github.com/pkg/errors"
 )
 
@@ -35,7 +35,7 @@ func init() {
 const (
 	newRelicNamespace          = "k8s"
 	newRelicCategory           = "kubernetes"
-	newRelicEventrouterVersion = "0.0.1"
+	newRelicEventrouterVersion = "1.3.0"
 	newRelicSDKName            = "kube_events"
 	defaultAgentHTTPTimeout    = time.Second * 10
 )

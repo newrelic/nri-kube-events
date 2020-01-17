@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/newrelic/nr-kube-events/pkg/events"
+	"github.com/newrelic/nri-kube-events/pkg/events"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )

@@ -5,7 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## Unreleased
+## 1.3.0
+### Changed
+- Update newrelic/k8s-events-forwarder to version `1.12.0`.
 
+## 1.2.0
+### Changed
+- Update newrelic/k8s-events-forwarder to version `1.11.45`.
+
+## 1.1.0
+### Changed
+- Update base image to alpine `3.11`.
+- Update newrelic/k8s-events-forwarder to version `1.11.24`.
+- Move manifest from `apps/v1beta2` to `apps/v1`
+- Sync labels in helm chart and manifest. Use `nri-kube-events` in all cases.
+  **IMPORTANT:** If you prevously installed `nr-kube-events` using the manifest you should uninstall it first with the OLD manifest before applying the new one. Users of our wizard can upgrade normally.
+
+## 1.0.0
+### Added
 - Add custom attributes support. Custom attributes are added via environment
   variables of the form `NRI_KUBE_EVENTS_<key>=<val>`.

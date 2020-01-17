@@ -1,7 +1,7 @@
 apiVersion: skaffold/v2alpha1
 kind: Config
 metadata:
-  name: nr-kube-events
+  name: nri-kube-events
 build:
   artifacts:
     - image: quay.io/newrelic/nri-kube-events

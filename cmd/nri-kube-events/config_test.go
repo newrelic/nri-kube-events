@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/newrelic/nr-kube-events/pkg/sinks"
+	"github.com/newrelic/nri-kube-events/pkg/sinks"
 )
 
 func TestConfigParse(t *testing.T) {

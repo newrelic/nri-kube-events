@@ -3,9 +3,9 @@
 NATIVEOS	 := $(shell go version | awk -F '[ /]' '{print $$4}')
 NATIVEARCH	 := $(shell go version | awk -F '[ /]' '{print $$5}')
 TOOLS_DIR    := ./bin/dev-tools
-INTEGRATION  = nr-kube-events
+INTEGRATION  = nri-kube-events
 GOLANGCILINT_VERSION = 1.17.1
-IMAGE_NAME = newrelic/nr-kube-events
+IMAGE_NAME = newrelic/nri-kube-events
 BUILD_TARGET ?= bin/$(INTEGRATION)
 
 all: build
@@ -33,7 +33,7 @@ lint: $(TOOLS_DIR)/golangci-lint
 
 compile:
 	@echo "=== $(INTEGRATION) === [ compile ]: Building $(INTEGRATION)..."
-	@go build -o $(BUILD_TARGET) ./cmd/nr-kube-events
+	@go build -o $(BUILD_TARGET) ./cmd/nri-kube-events
 
 test:
 	@echo "=== $(INTEGRATION) === [ test ]: Running unit tests..."
@@ -57,4 +57,7 @@ docker-lint/dockerfile:
 	@echo "=== $(INTEGRATION) === [ docker-lint ]: Linting Docker image..."
 	@docker run --rm -i hadolint/hadolint < Dockerfile
 
-.PHONY: all build clean fmt lint compile test docker-build docker-test docker-lint docker-lint/dockerfile
+buildThirdPartyNotice:
+	@go list -m -json all | go-licence-detector -rules ./assets/licence/rules.json  -noticeTemplate ./assets/licence/THIRD_PARTY_NOTICES.md.tmpl -noticeOut THIRD_PARTY_NOTICES.md -includeIndirect -overrides ./assets/licence/overrides
+
+.PHONY: all build clean fmt lint compile test docker-build docker-test docker-lint docker-lint/dockerfile buildThirdPartyNotice
