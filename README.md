@@ -136,7 +136,7 @@ practices. Like all official New Relic open source projects, there's a related
 Community topic in the New Relic Explorers Hub. You can find this project's
 topic/threads here:
 
->Add the url for the support thread here
+https://discuss.newrelic.com/t/new-relic-kube-events-integration/109094
 
 ## Contributing
 Full details about how to contribute to Contributions to improve New Relic
