@@ -5,7 +5,7 @@ NATIVEARCH	 := $(shell go version | awk -F '[ /]' '{print $$5}')
 TOOLS_DIR    := ./bin/dev-tools
 INTEGRATION  = nri-kube-events
 GOLANGCILINT_VERSION = 1.17.1
-IMAGE_NAME = newrelic/nri-kube-events
+DOCKER_IMAGE_NAME ?= newrelic/nri-kube-events
 BUILD_TARGET ?= bin/$(INTEGRATION)
 
 all: build
@@ -40,18 +40,18 @@ test:
 	@go test -race ./...
 
 docker-test:
-	@docker build . --target base-env -t $(IMAGE_NAME)_test
+	@docker build . --target base-env -t $(DOCKER_IMAGE_NAME)_test
 	@echo "=== $(INTEGRATION) === [ docker-test ]: Running unit tests in Docker..."
-	@docker run -t $(IMAGE_NAME)_test make test
+	@docker run -t $(DOCKER_IMAGE_NAME)_test make test
 
 docker-lint:
-	@docker build . --target base-env -t $(IMAGE_NAME)_lint
+	@docker build . --target base-env -t $(DOCKER_IMAGE_NAME)_lint
 	@echo "=== $(INTEGRATION) === [ docker-lint ]: Validating source code running golangci-lint in Docker..."
-	@docker run -t $(IMAGE_NAME)_lint make lint
+	@docker run -t $(DOCKER_IMAGE_NAME)_lint make lint
 
 docker-build:
 	@echo "=== $(INTEGRATION) === [ docker-build ]: Building final Docker image..."
-	@docker build . --target final -t $(IMAGE_NAME)
+	@docker build . --target final -t $(DOCKER_IMAGE_NAME)
 
 docker-lint/dockerfile:
 	@echo "=== $(INTEGRATION) === [ docker-lint ]: Linting Docker image..."
