@@ -1,4 +1,4 @@
-name: lint and test code
+name: Lint and test code
 on:
   push:
     tags:
@@ -7,8 +7,8 @@ on:
       - master
   pull_request:
 jobs:
-  test:
-    name: test
+  lint-test:
+    name: lint and test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -16,5 +16,7 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: '^1.14.4'
-      - name: Run unit tests
+      - name: Lint
+        run: make
+      - name: Test
         run: make test
