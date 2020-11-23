@@ -12,6 +12,7 @@ env:
   DOCKER_IMAGE: newrelic/nri-kube-events
   RELEASE_VERSION: ${{ github.event.release.tag_name }}
   S3_PATH: s3://nr-downloads-main/infrastructure_agent
+  PRERELEASE: ${{ github.event.release.prerelease }}
 
 jobs:
   publish:
@@ -39,7 +40,6 @@ jobs:
 
       - name: Build and push
         env:
-          PRERELEASE: ${{ github.event.release.prerelease }}
           DOCKER_IMAGE_NAME: ${{ env.DOCKER_IMAGE }}:${{ env.RELEASE_VERSION }}
         run: |
           make docker-build
@@ -60,4 +60,9 @@ jobs:
       - name: Upload manifest to S3
         run: |
           aws s3 cp deploy/nri-kube-events.yaml $S3_PATH/integrations/kubernetes/nri-kube-events-${{ env.RELEASE_VERSION }}.yaml"
-          aws s3 cp deploy/nri-kube-events.yaml $S3_PATH/integrations/kubernetes/nri-kube-events-latest.yaml"
+          
+          # push 'latest' if NOT pre-release
+          if [[ -z "$PRERELEASE" || "false" == "$PRERELEASE" ]]; then
+            aws s3 cp deploy/nri-kube-events.yaml $S3_PATH/integrations/kubernetes/nri-kube-events-latest.yaml"
+          fi
+          
