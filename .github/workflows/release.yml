@@ -59,9 +59,5 @@ jobs:
       - name: Upload manifest to S3
         run: |
           aws s3 cp deploy/nri-kube-events.yaml $S3_PATH/integrations/kubernetes/nri-kube-events-${{ env.RELEASE_VERSION }}.yaml"
-          
-          # push 'latest' if NOT pre-release
-          if [[ -z "$PRERELEASE" || "false" == "$PRERELEASE" ]]; then
-            aws s3 cp deploy/nri-kube-events.yaml $S3_PATH/integrations/kubernetes/nri-kube-events-latest.yaml"
-          fi
-          
+          aws s3 cp deploy/nri-kube-events.yaml $S3_PATH/integrations/kubernetes/nri-kube-events-latest.yaml"
+
