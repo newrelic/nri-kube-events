@@ -42,12 +42,12 @@ jobs:
           DOCKER_IMAGE_NAME: ${{ env.DOCKER_IMAGE }}:${{ env.RELEASE_VERSION }}
         run: |
           make docker-build
-          echo "docker push $DOCKER_IMAGE_NAME"
+          docker push $DOCKER_IMAGE_NAME
 
           # push 'latest' if NOT pre-release
           if [[ -z "$PRERELEASE" || "false" == "$PRERELEASE" ]]; then
             docker tag $DOCKER_IMAGE_NAME $DOCKER_IMAGE:latest
-            echo "docker push $DOCKER_IMAGE:latest"
+            docker push $DOCKER_IMAGE:latest
           fi
 
       - uses: aws-actions/configure-aws-credentials@v1

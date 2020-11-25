@@ -4,7 +4,7 @@ NATIVEOS	 := $(shell go version | awk -F '[ /]' '{print $$4}')
 NATIVEARCH	 := $(shell go version | awk -F '[ /]' '{print $$5}')
 TOOLS_DIR    := ./bin/dev-tools
 INTEGRATION  = nri-kube-events
-GOLANGCILINT_VERSION = 1.17.1
+GOLANGCILINT_VERSION = 1.33.0
 DOCKER_IMAGE_NAME ?= newrelic/nri-kube-events
 BUILD_TARGET ?= bin/$(INTEGRATION)
 
