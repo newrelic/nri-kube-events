@@ -2,9 +2,7 @@ name: Release
 on:
   release:
     types:
-      # works for building pre-releases
-      - published
-      # works for releases and changing from pre-release to release
+      - prereleased
       - released
 
 env: 
