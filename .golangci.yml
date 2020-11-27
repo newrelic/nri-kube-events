@@ -1,14 +1,13 @@
 linters:
+  disable-all: true
   enable:
-    - govet
-    - golint
     - goimports
+    - golint
+    - govet
     - unused
     - goconst
     - errcheck
-  enable-all: false
-  disable-all: true
-  fast: false
+  fast: true
 
 # all available settings of specific linters
 linters-settings:

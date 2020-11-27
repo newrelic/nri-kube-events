@@ -29,7 +29,7 @@ fmt:
 
 lint: $(TOOLS_DIR)/golangci-lint
 	@echo "=== $(INTEGRATION) === [ lint ]: Validating source code running golangci-lint..."
-	@${TOOLS_DIR}/golangci-lint run
+	@${TOOLS_DIR}/golangci-lint run --verbose --timeout 2m
 
 compile:
 	@echo "=== $(INTEGRATION) === [ compile ]: Building $(INTEGRATION)..."
