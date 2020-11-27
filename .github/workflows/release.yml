@@ -41,13 +41,12 @@ jobs:
         run: |
           make docker-build
           docker push $DOCKER_IMAGE_NAME
-
-          # push 'latest' if NOT pre-release
-          if [[ -z "$PRERELEASE" || "false" == "$PRERELEASE" ]]; then
+      - name: Tag and push latest
+        if: ${{ ! github.event.release.prerelease }}
+        run: |
             docker tag $DOCKER_IMAGE_NAME $DOCKER_IMAGE:latest
             docker push $DOCKER_IMAGE:latest
-          fi
-
+        
       - uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.COREINT_AWS_ACCESS_KEY_ID }}
