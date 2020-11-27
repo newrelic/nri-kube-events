@@ -15,6 +15,6 @@ jobs:
         with:
           go-version: '^1.14.4'
       - name: Lint
-        run: make
+        run: make lint
       - name: Test
         run: make test
