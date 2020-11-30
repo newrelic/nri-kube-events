@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 1.3.2
+### Changed
+- Moving pipelines to Github Actions.
+
+
 ## 1.3.0
 ### Changed
 - Update newrelic/k8s-events-forwarder to version `1.12.0`.

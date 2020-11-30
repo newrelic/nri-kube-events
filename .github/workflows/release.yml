@@ -10,7 +10,6 @@ env:
   DOCKER_IMAGE: newrelic/nri-kube-events
   RELEASE_VERSION: ${{ github.event.release.tag_name }}
   S3_PATH: s3://nr-downloads-main/infrastructure_agent
-  PRERELEASE: ${{ github.event.release.prerelease }}
 
 jobs:
   publish:
@@ -36,16 +35,14 @@ jobs:
           password: ${{ secrets.FSI_DOCKERHUB_TOKEN }}
 
       - name: Build and push
-        env:
-          DOCKER_IMAGE_NAME: ${{ env.DOCKER_IMAGE }}:${{ env.RELEASE_VERSION }}
         run: |
-          make docker-build
-          docker push $DOCKER_IMAGE_NAME
+          DOCKER_IMAGE_NAME=$DOCKER_IMAGE:$RELEASE_VERSION make docker-build
+          docker push $DOCKER_IMAGE:$RELEASE_VERSION
       - name: Tag and push latest
         if: ${{ ! github.event.release.prerelease }}
         run: |
-            docker tag $DOCKER_IMAGE_NAME $DOCKER_IMAGE:latest
-            docker push $DOCKER_IMAGE:latest
+          docker tag $DOCKER_IMAGE:$RELEASE_VERSION $DOCKER_IMAGE:latest
+          docker push $DOCKER_IMAGE:latest
         
       - uses: aws-actions/configure-aws-credentials@v1
         with:
