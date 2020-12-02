@@ -5,8 +5,7 @@ on:
       - prereleased
       - released
 
-env: 
- 
+env:
   DOCKER_IMAGE: newrelic/nri-kube-events
   RELEASE_VERSION: ${{ github.event.release.tag_name }}
   S3_PATH: s3://nr-downloads-main/infrastructure_agent
@@ -28,8 +27,13 @@ jobs:
           echo "RELEASE_VERSION=$RELEASE_VERSION-pre" >> $GITHUB_ENV
           echo "S3_PATH=$S3_PATH/test" >> $GITHUB_ENV
 
+      # -pre suffix is stripped from safety checks. This will not be necessary when we automate the yaml generation.
+      - name: Check consistency of deployment yamls
+        run: |
+          grep -e "$DOCKER_IMAGE:${RELEASE_VERSION/-pre}" deploy/nri-kube-events.yaml
+
       - name: Login to DockerHub
-        uses: docker/login-action@v1 
+        uses: docker/login-action@v1
         with:
           username: ${{ secrets.FSI_DOCKERHUB_USERNAME }}
           password: ${{ secrets.FSI_DOCKERHUB_TOKEN }}
@@ -43,13 +47,13 @@ jobs:
         run: |
           docker tag $DOCKER_IMAGE:$RELEASE_VERSION $DOCKER_IMAGE:latest
           docker push $DOCKER_IMAGE:latest
-        
+
       - uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.COREINT_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.COREINT_AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
-      
+
       - name: Upload manifest to S3
         run: |
           aws s3 cp deploy/nri-kube-events.yaml $S3_PATH/integrations/kubernetes/nri-kube-events-$RELEASE_VERSION.yaml
