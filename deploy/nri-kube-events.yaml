@@ -61,7 +61,7 @@ spec:
     spec:
       containers:
         - name: kube-events
-          image: newrelic/nri-kube-events:1.3.0
+          image: newrelic/nri-kube-events:1.3.2
           resources:
             limits:
               memory: "128Mi"
