@@ -13,7 +13,7 @@ ENV BUILD_TARGET=/src/nri-kube-events
 ENV CGO_ENABLED=0
 RUN make compile
 
-FROM alpine:3.11 AS final
+FROM alpine:3.13 AS final
 
 WORKDIR /app
 
