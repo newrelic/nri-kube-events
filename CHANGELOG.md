@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+
+## 1.4.0
+### Changed
+- Updated all dependencies to their latest versions
+
+### Fixed
+- `k8s.io/client-go` will no longer attempt to write logs to `/tmp`
+
 ## 1.3.2
 ### Changed
 - Moving pipelines to Github Actions.
