@@ -50,6 +50,7 @@ jobs:
           echo "DOCKER_IMAGE_TAG=$DOCKER_IMAGE_TAG-pre" >> $GITHUB_ENV
           echo "S3_PATH=$S3_PATH/test" >> $GITHUB_ENV
 
+      # TODO TODO UNCOMMENT
       # -pre suffix is stripped from safety checks. This will not be necessary when we automate the yaml generation.
 #      - name: Check consistency of deployment yamls
 #        run: |
@@ -82,6 +83,7 @@ jobs:
             -t $DOCKER_IMAGE_NAME:latest \
             .
 
+#       TODO TODO UNCOMMENT
 #      - uses: aws-actions/configure-aws-credentials@v1
 #        with:
 #          aws-access-key-id: ${{ secrets.COREINT_AWS_ACCESS_KEY_ID }}
