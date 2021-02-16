@@ -1,20 +1,11 @@
-FROM golang:1.13.5 AS base-env
+FROM alpine:3.13
 
-WORKDIR /src/
-
-COPY go.mod go.sum ./
-RUN go mod download
-
-COPY . .
-
-FROM base-env AS build-env
+# Set by docker automatically
+# If building with `docker build`, make sure to set GOOS/GOARCH explicitly when calling make:
+# `make compile GOOS=something GOARCH=something`
+# Otherwise the makefile will not append them to the binary name and docker build wil fail.
 ARG TARGETOS
 ARG TARGETARCH
-ENV BUILD_TARGET=/src/nri-kube-events
-ENV CGO_ENABLED=0
-RUN make compile GOOS=${TARGETOS} GOARCH=${TARGETARCH}
-
-FROM alpine:3.13 AS final
 
 WORKDIR /app
 
@@ -23,9 +14,9 @@ RUN apk add --no-cache --upgrade \
     && addgroup -g 2000 nri-kube-events \
     && adduser -D -H -u 1000 -G nri-kube-events nri-kube-events
 USER nri-kube-events
-
-COPY --from=build-env /src/nri-kube-events .
 EXPOSE 8080
+
+ADD bin/nri-kube-events-${TARGETOS}-${TARGETARCH} ./
 
 # Enable custom attributes decoration in the infra SDK
 ENV METADATA=true
