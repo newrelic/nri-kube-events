@@ -2,16 +2,17 @@ FROM golang:1.13.5 AS base-env
 
 WORKDIR /src/
 
-COPY go.mod .
-COPY go.sum .
+COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
 
 FROM base-env AS build-env
+ARG TARGETOS
+ARG TARGETARCH
 ENV BUILD_TARGET=/src/nri-kube-events
 ENV CGO_ENABLED=0
-RUN make compile
+RUN make compile GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 
 FROM alpine:3.13 AS final
 
