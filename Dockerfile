@@ -21,5 +21,5 @@ ADD bin/nri-kube-events-${TARGETOS}-${TARGETARCH} ./
 # Enable custom attributes decoration in the infra SDK
 ENV METADATA=true
 
-ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["./nri-kube-events", "--config", "config.yaml", "-promaddr", "0.0.0.0:8080"]
+ENTRYPOINT ["/sbin/tini", "--", "./nri-kube-events"]
+CMD ["--config", "config.yaml", "-promaddr", "0.0.0.0:8080"]
