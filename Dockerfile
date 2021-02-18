@@ -13,11 +13,12 @@ RUN apk add --no-cache --upgrade \
     tini ca-certificates \
     && addgroup -g 2000 nri-kube-events \
     && adduser -D -H -u 1000 -G nri-kube-events nri-kube-events
-USER nri-kube-events
 EXPOSE 8080
 
 ADD --chmod=755 bin/nri-kube-events-${TARGETOS}-${TARGETARCH} ./
 RUN mv nri-kube-events-${TARGETOS}-${TARGETARCH} nri-kube-events
+
+USER nri-kube-events
 
 # Enable custom attributes decoration in the infra SDK
 ENV METADATA=true
