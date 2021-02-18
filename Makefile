@@ -11,6 +11,7 @@ BUILD_TARGET ?= bin/$(INTEGRATION)
 # GOOS and GOARCH will likely come from env
 GOOS ?=
 GOARCH ?=
+CGO_ENABLED ?= 0
 
 ifneq ($(strip $(GOOS)), )
 BUILD_TARGET := $(BUILD_TARGET)-$(GOOS)
@@ -46,7 +47,7 @@ lint: $(TOOLS_DIR)/golangci-lint
 compile:
 	@echo "=== $(INTEGRATION) === [ compile ]: Building $(INTEGRATION)..."
 	go mod download
-	go build -o $(BUILD_TARGET) ./cmd/nri-kube-events
+	CGO_ENABLED=$(CGO_ENABLED) go build -o $(BUILD_TARGET) ./cmd/nri-kube-events
 
 test:
 	@echo "=== $(INTEGRATION) === [ test ]: Running unit tests..."
