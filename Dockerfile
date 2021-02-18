@@ -16,7 +16,8 @@ RUN apk add --no-cache --upgrade \
 USER nri-kube-events
 EXPOSE 8080
 
-ADD --chmod=755 bin/nri-kube-events-${TARGETOS}-${TARGETARCH} ./nri-kube-events
+ADD --chmod=755 bin/nri-kube-events-${TARGETOS}-${TARGETARCH} ./
+RUN mv nri-kube-events-${TARGETOS}-${TARGETARCH} nri-kube-events
 
 # Enable custom attributes decoration in the infra SDK
 ENV METADATA=true
