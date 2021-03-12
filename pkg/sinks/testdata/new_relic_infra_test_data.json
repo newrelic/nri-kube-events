@@ -20,11 +20,13 @@
             "event.involvedObject.namespace": "test_namespace",
             "event.metadata.finalizers[0]": "1",
             "event.metadata.finalizers[1]": "2",
+            "event.lastTimestamp":            "2021-03-12T10:55:43Z",
             "event.metadata.labels.test_label1": "test_value1",
             "event.metadata.labels.test_label2": "test_value2",
             "event.metadata.name": "test",
             "clusterName": "test-cluster",
             "eventRouterVersion": "1.4.0",
+            "timestamp":          "1615546543000",
             "verb": "ADDED",
             "event.message": "The event message",
             "myCustomAttribute": "attrValue"

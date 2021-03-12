@@ -4,14 +4,14 @@ package sinks
 
 import (
 	"encoding/json"
+	"github.com/newrelic/nri-kube-events/pkg/events"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
-
-	"github.com/newrelic/nri-kube-events/pkg/events"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
@@ -117,7 +117,11 @@ func TestNewRelicSinkIntegration(t *testing.T) {
 			"agentEndpoint": testServer.URL,
 		},
 	}
+	// This time is fixed since it is the one added in expected data
+	now, _ := time.Parse(time.RFC3339, "2021-03-12T10:55:43Z")
+
 	sink, _ := createNewRelicInfraSink(config)
+
 	err = sink.HandleEvent(events.KubeEvent{
 		Verb: "ADDED",
 		Event: &v1.Event{
@@ -136,6 +140,7 @@ func TestNewRelicSinkIntegration(t *testing.T) {
 				Namespace: "test_namespace",
 				Name:      "TestPod",
 			},
+			LastTimestamp: metav1.Time{now},
 		}})
 	if err != nil {
 		t.Errorf("unexpected error handling event: %v", err)
@@ -181,6 +186,9 @@ func TestNewRelicInfraSink_HandleEvent_AddEventError(t *testing.T) {
 }
 
 func TestFlattenStruct(t *testing.T) {
+	// This time is fixed since it is the one added in expected data
+	now, _ := time.Parse(time.RFC3339, "2021-03-12T10:55:43Z")
+
 	got, _ := flattenStruct(events.KubeEvent{Verb: "UPDATE", Event: &v1.Event{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test",
@@ -188,13 +196,15 @@ func TestFlattenStruct(t *testing.T) {
 				"test_label1": "test_value1",
 				"test_label2": "test_value2",
 			},
-			Finalizers: []string{"1", "2"},
+			Finalizers:        []string{"1", "2"},
+			CreationTimestamp: metav1.Time{now},
 		},
 		Count: 10,
 		InvolvedObject: v1.ObjectReference{
 			Kind:      "Pod",
 			Namespace: "test_namespace",
 		},
+		LastTimestamp: metav1.Time{now},
 	}})
 
 	want := map[string]interface{}{
@@ -206,6 +216,7 @@ func TestFlattenStruct(t *testing.T) {
 		"event.involvedObject.namespace":    "test_namespace",
 		"event.metadata.finalizers[0]":      "1",
 		"event.metadata.finalizers[1]":      "2",
+		"event.lastTimestamp":               "2021-03-12T10:55:43Z",
 		"verb":                              "UPDATE",
 	}
 

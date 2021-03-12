@@ -75,7 +75,7 @@ spec:
             - name: config-volume
               mountPath: /app/config
         - name: infra-agent
-          image: newrelic/k8s-events-forwarder:1.11.45
+          image: newrelic/k8s-events-forwarder:1.15.2
           resources:
             limits:
               memory: 128Mi

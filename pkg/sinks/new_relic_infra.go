@@ -236,6 +236,23 @@ func disposeBody(response *http.Response) {
 func (ns *newRelicInfraSink) decorateEvent(flattenedEvent map[string]interface{}) {
 	flattenedEvent["eventRouterVersion"] = newRelicEventrouterVersion
 	flattenedEvent["clusterName"] = ns.clusterName
+
+	// we are setting lastTimestamp since if an events gets repeated the fistTimestamp and the creation timestamp is not modified
+	if t, ok := flattenedEvent["event.lastTimestamp"]; ok {
+		if s, ok := t.(string); ok {
+			t, err := time.Parse(time.RFC3339, s)
+			if err == nil {
+				flattenedEvent["timestamp"] = strconv.FormatInt(t.Unix()*1000, 10)
+			}
+		}
+	} else if t, ok := flattenedEvent["event.metadata.creationTimestamp"]; ok {
+		if s, ok := t.(string); ok {
+			t, err := time.Parse(time.RFC3339, s)
+			if err == nil {
+				flattenedEvent["timestamp"] = strconv.FormatInt(t.Unix()*1000, 10)
+			}
+		}
+	}
 }
 
 func flattenStruct(v interface{}) (map[string]interface{}, error) {
