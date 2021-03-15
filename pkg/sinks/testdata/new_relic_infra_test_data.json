@@ -26,7 +26,7 @@
             "event.metadata.name": "test",
             "clusterName": "test-cluster",
             "eventRouterVersion": "1.4.0",
-            "timestamp":          "1615546543000",
+            "timestamp": "1615546543000",
             "verb": "ADDED",
             "event.message": "The event message",
             "myCustomAttribute": "attrValue"

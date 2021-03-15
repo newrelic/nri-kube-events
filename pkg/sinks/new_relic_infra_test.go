@@ -216,6 +216,7 @@ func TestFlattenStruct(t *testing.T) {
 		"event.involvedObject.namespace":    "test_namespace",
 		"event.metadata.finalizers[0]":      "1",
 		"event.metadata.finalizers[1]":      "2",
+		"event.metadata.creationTimestamp":  "2021-03-12T10:55:43Z",
 		"event.lastTimestamp":               "2021-03-12T10:55:43Z",
 		"verb":                              "UPDATE",
 	}
