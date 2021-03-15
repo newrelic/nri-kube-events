@@ -4,7 +4,6 @@ package sinks
 
 import (
 	"encoding/json"
-	"github.com/newrelic/nri-kube-events/pkg/events"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/newrelic/nri-kube-events/pkg/events"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -140,7 +140,7 @@ func TestNewRelicSinkIntegration(t *testing.T) {
 				Namespace: "test_namespace",
 				Name:      "TestPod",
 			},
-			LastTimestamp: metav1.Time{now},
+			LastTimestamp: metav1.NewTime(now),
 		}})
 	if err != nil {
 		t.Errorf("unexpected error handling event: %v", err)
@@ -197,14 +197,14 @@ func TestFlattenStruct(t *testing.T) {
 				"test_label2": "test_value2",
 			},
 			Finalizers:        []string{"1", "2"},
-			CreationTimestamp: metav1.Time{now},
+			CreationTimestamp: metav1.NewTime(now),
 		},
 		Count: 10,
 		InvolvedObject: v1.ObjectReference{
 			Kind:      "Pod",
 			Namespace: "test_namespace",
 		},
-		LastTimestamp: metav1.Time{now},
+		LastTimestamp: metav1.NewTime(now),
 	}})
 
 	want := map[string]interface{}{
