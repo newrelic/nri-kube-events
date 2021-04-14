@@ -27,7 +27,7 @@ import (
 
 const (
 	integrationName    = "nri-kube-events"
-	integrationVersion = "1.0.0"
+	integrationVersion = "1.5.0"
 )
 
 var (

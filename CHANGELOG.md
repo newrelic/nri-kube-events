@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 
+## 1.5.0
+### Changed
+- Docker images now support multiple architectures (linux/amd64, linux/arm64)
+
 ## 1.4.0
 ### Changed
 - Updated all dependencies to their latest versions

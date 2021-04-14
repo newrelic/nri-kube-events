@@ -8,6 +8,19 @@ GOLANGCILINT_VERSION = 1.33.0
 DOCKER_IMAGE_NAME ?= newrelic/nri-kube-events
 BUILD_TARGET ?= bin/$(INTEGRATION)
 
+# GOOS and GOARCH will likely come from env
+GOOS ?=
+GOARCH ?=
+CGO_ENABLED ?= 0
+
+ifneq ($(strip $(GOOS)), )
+BUILD_TARGET := $(BUILD_TARGET)-$(GOOS)
+endif
+
+ifneq ($(strip $(GOARCH)), )
+BUILD_TARGET := $(BUILD_TARGET)-$(GOARCH)
+endif
+
 all: build
 
 build: clean lint test compile
@@ -33,7 +46,8 @@ lint: $(TOOLS_DIR)/golangci-lint
 
 compile:
 	@echo "=== $(INTEGRATION) === [ compile ]: Building $(INTEGRATION)..."
-	@go build -o $(BUILD_TARGET) ./cmd/nri-kube-events
+	go mod download
+	CGO_ENABLED=$(CGO_ENABLED) go build -o $(BUILD_TARGET) ./cmd/nri-kube-events
 
 test:
 	@echo "=== $(INTEGRATION) === [ test ]: Running unit tests..."
