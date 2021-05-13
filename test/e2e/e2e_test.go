@@ -100,7 +100,7 @@ func TestPodCreation(t *testing.T) {
 			},
 		},
 		{
-			Summary:  "Successfully pulled image \"" + testpod.Spec.Containers[0].Image + "\" in ",
+			Summary:  "Successfully pulled image \"" + testpod.Spec.Containers[0].Image + "\"",
 			Category: "kubernetes",
 			Attributes: map[string]interface{}{
 				"event.metadata.name":             testpod.Name + ".",
@@ -110,7 +110,7 @@ func TestPodCreation(t *testing.T) {
 				"event.involvedObject.apiVersion": "",
 				"event.involvedObject.kind":       "Pod",
 				"event.involvedObject.name":       testpod.Name,
-				"event.message":                   "Successfully pulled image \"" + testpod.Spec.Containers[0].Image + "\" in ",
+				"event.message":                   "Successfully pulled image \"" + testpod.Spec.Containers[0].Image + "\"",
 				"event.type":                      "Normal",
 				"verb":                            "ADDED",
 			},
