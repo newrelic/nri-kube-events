@@ -83,8 +83,13 @@ func (mas *MockedAgentSink) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		log.Fatalf("error getting request body")
 	}
 
-	mas.receivedEvents = append(mas.receivedEvents, ev.Data[0].Events...)
+	if len(ev.Data) == 0 {
+		log.Warnf("received payload with no data: %s", string(body))
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
+	mas.receivedEvents = append(mas.receivedEvents, ev.Data[0].Events...)
 	rw.WriteHeader(http.StatusNoContent) // The the agent does
 }
 
@@ -102,6 +107,14 @@ func (mas *MockedAgentSink) Has(testEvent *sdkEvent.Event) bool {
 	}
 
 	return false
+}
+
+// ForgetEvents erases all the recorded events.
+func (mas *MockedAgentSink) ForgetEvents() {
+	mas.mtx.Lock()
+	defer mas.mtx.Unlock()
+
+	mas.receivedEvents = nil
 }
 
 // Wait blocks until betweenEvents time has passed since the last received event, or up to max time has passed since the call.

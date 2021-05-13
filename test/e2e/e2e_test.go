@@ -21,6 +21,10 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+// We must have a global MockedAgentSink because the infrastructure-sdk attempts to register global flags when the
+// agent sink is created, which results in a panic if multiple instantiations are attempted.
+var globalMockedAgentSink *e2e.MockedAgentSink
+
 // TestPodCreation checks that events related to pod creation are received.
 func TestPodCreation(t *testing.T) {
 	client, agentMock := initialize(t)
@@ -247,11 +251,15 @@ func initialize(t *testing.T) (*kubernetes.Clientset, *e2e.MockedAgentSink) {
 		_ = eventsInformer.GetStore().Delete(obj)
 	}
 
-	agentMock := e2e.NewMockedAgentSink()
-	router := events.NewRouter(eventsInformer, map[string]events.Sink{"mock": agentMock})
+	if globalMockedAgentSink == nil {
+		globalMockedAgentSink = e2e.NewMockedAgentSink()
+	}
+	globalMockedAgentSink.ForgetEvents()
+
+	router := events.NewRouter(eventsInformer, map[string]events.Sink{"mock": globalMockedAgentSink})
 	go router.Run(nil)
 
-	return client, agentMock
+	return client, globalMockedAgentSink
 }
 
 // restConfig attempts to build a k8s config from the environment, or the default kubeconfig path
