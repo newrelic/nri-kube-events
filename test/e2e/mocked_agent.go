@@ -109,6 +109,17 @@ func (mas *MockedAgentSink) Has(testEvent *sdkEvent.Event) bool {
 	return false
 }
 
+// Events returns the list of events the mock has captured.
+func (mas *MockedAgentSink) Events() []sdkEvent.Event {
+	mas.mtx.RLock()
+	defer mas.mtx.RUnlock()
+
+	retEvents := make([]sdkEvent.Event, len(mas.receivedEvents))
+	copy(retEvents, mas.receivedEvents)
+
+	return retEvents
+}
+
 // ForgetEvents erases all the recorded events.
 func (mas *MockedAgentSink) ForgetEvents() {
 	mas.mtx.Lock()

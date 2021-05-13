@@ -29,6 +29,7 @@ var globalMockedAgentSink *e2e.MockedAgentSink
 func TestPodCreation(t *testing.T) {
 	client, agentMock := initialize(t)
 
+	t.Log("Creating test namespace...")
 	ns, err := client.CoreV1().Namespaces().Create(context.Background(), &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "e2e-" + strings.ToLower(t.Name()) + "-",
@@ -43,6 +44,7 @@ func TestPodCreation(t *testing.T) {
 		_ = client.CoreV1().Namespaces().Delete(context.Background(), ns.Name, metav1.DeleteOptions{})
 	}()
 
+	t.Log("Creating test pod...")
 	testpod, err := client.CoreV1().Pods(ns.Name).Create(context.Background(), &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "nginx-e2e",
@@ -61,6 +63,7 @@ func TestPodCreation(t *testing.T) {
 		return
 	}
 
+	t.Log("Waiting for events to show up...")
 	agentMock.Wait(10*time.Second, 1*time.Minute)
 	for _, event := range []sdkEvent.Event{
 		// All strings are matched in a very relaxed way, using strings.Contains(real, test)
@@ -152,6 +155,8 @@ func TestPodCreation(t *testing.T) {
 		e := json.NewEncoder(os.Stderr)
 		t.Log("Expected:")
 		_ = e.Encode(event)
+		t.Log("Have:")
+		_ = e.Encode(agentMock.Events())
 		t.Fatalf("Event was not captured")
 	}
 }
@@ -159,6 +164,7 @@ func TestPodCreation(t *testing.T) {
 func TestPodDeletion(t *testing.T) {
 	client, agentMock := initialize(t)
 
+	t.Log("Creating test namespace...")
 	ns, err := client.CoreV1().Namespaces().Create(context.Background(), &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "e2e-" + strings.ToLower(t.Name()) + "-",
@@ -173,6 +179,7 @@ func TestPodDeletion(t *testing.T) {
 		_ = client.CoreV1().Namespaces().Delete(context.Background(), ns.Name, metav1.DeleteOptions{})
 	}()
 
+	t.Log("Creating test pod...")
 	testpod, err := client.CoreV1().Pods(ns.Name).Create(context.Background(), &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "nginx-e2e-killable",
@@ -199,6 +206,7 @@ func TestPodDeletion(t *testing.T) {
 		return
 	}
 
+	t.Log("Waiting for events to show up...")
 	agentMock.Wait(15*time.Second, 1*time.Minute)
 	for _, event := range []sdkEvent.Event{
 		{
