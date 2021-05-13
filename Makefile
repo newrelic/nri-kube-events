@@ -49,9 +49,14 @@ compile-multiarch:
 	$(MAKE) compile GOOS=linux GOARCH=arm
 	$(MAKE) compile GOOS=linux GOARCH=arm64
 
-test:
+test: test-unit
+test-unit:
 	@echo "=== $(INTEGRATION) === [ test ]: Running unit tests..."
-	@go test -race ./...
+	@go test -v -race $$(go list ./... | grep -v '/test/e2e')
+
+test-e2e:
+	@echo "=== $(INTEGRATION) === [ test ]: Running e2e tests..."
+	@go test -v ./test/e2e
 
 docker:
 	$(MAKE) compile GOOS=linux GOARCH=amd64
@@ -63,4 +68,4 @@ docker-multiarch: compile-multiarch
 buildThirdPartyNotice:
 	@go list -m -json all | go-licence-detector -rules ./assets/licence/rules.json  -noticeTemplate ./assets/licence/THIRD_PARTY_NOTICES.md.tmpl -noticeOut THIRD_PARTY_NOTICES.md -includeIndirect -overrides ./assets/licence/overrides
 
-.PHONY: all build clean fmt validate compile test docker-build docker-test buildThirdPartyNotice
+.PHONY: all build clean fmt validate compile compile-multiarch test test-unit docker docker-multiarch buildThirdPartyNotice
