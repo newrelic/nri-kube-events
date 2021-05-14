@@ -1,4 +1,4 @@
-name: Lint and test code
+name: Build, lint and test
 on:
   push:
     branches:
@@ -47,7 +47,7 @@ jobs:
           only-new-issues: true
 
   test:
-    name: test
+    name: Run unit tests
     runs-on: ubuntu-latest
     needs: [ build ]
     steps:
