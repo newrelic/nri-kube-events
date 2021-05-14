@@ -8,6 +8,10 @@ jobs:
   build:
     name: Build integration for
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [ linux ]
+        goarch: [ amd64, arm64, arm ]
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-go@v2
@@ -20,8 +24,11 @@ jobs:
           restore-keys: |
             gomod-
       - name: Build integration
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
         run: |
-          make compile-multiarch
+          make compile
 
   static-analysis:
     name: Run all static analysis checks
