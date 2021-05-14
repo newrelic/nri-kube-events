@@ -4,7 +4,8 @@ NATIVEOS	 := $(shell go version | awk -F '[ /]' '{print $$4}')
 NATIVEARCH	 := $(shell go version | awk -F '[ /]' '{print $$5}')
 TOOLS_DIR    := ./bin/dev-tools
 INTEGRATION  = nri-kube-events
-GOLANGCILINT_VERSION = 1.33.0
+GOFLAGS       = -mod=readonly
+GOLANGCI_LINT = github.com/golangci/golangci-lint/cmd/golangci-lint
 DOCKER_IMAGE_NAME ?= newrelic/nri-kube-events
 BUILD_TARGET ?= bin/$(INTEGRATION)
 
@@ -23,14 +24,7 @@ endif
 
 all: build
 
-build: clean lint test compile
-
-$(TOOLS_DIR):
-	@mkdir -p $@
-
-$(TOOLS_DIR)/golangci-lint: $(TOOLS_DIR)
-	@echo "=== $(INTEGRATION) === [ install-linter ]:  Downloading 'golangci-lint'"
-	@wget -O - -q https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | BINDIR=$(TOOLS_DIR) sh -s v$(GOLANGCILINT_VERSION) > /dev/null 2>&1
+build: clean validate test compile
 
 clean:
 	@echo "=== $(INTEGRATION) === [ clean ]: Removing binaries and coverage file..."
@@ -40,9 +34,11 @@ fmt:
 	@echo "=== $(INTEGRATION) === [ fmt ]: Running Gofmt...."
 	@go fmt ./...
 
-lint: $(TOOLS_DIR)/golangci-lint
-	@echo "=== $(INTEGRATION) === [ lint ]: Validating source code running golangci-lint..."
-	@${TOOLS_DIR}/golangci-lint run --verbose --timeout 2m
+validate:
+	@printf "=== $(INTEGRATION) === [ validate ]: running golangci-lint & semgrep... "
+	@go run  $(GOFLAGS) $(GOLANGCI_LINT) run --verbose
+	@[ -f .semgrep.yml ] && semgrep_config=".semgrep.yml" || semgrep_config="p/golang" ; \
+	docker run --rm -v "${PWD}:/src:ro" --workdir /src returntocorp/semgrep -c "$$semgrep_config"
 
 compile:
 	@echo "=== $(INTEGRATION) === [ compile ]: Building $(INTEGRATION)..."
@@ -67,4 +63,4 @@ docker-multiarch: compile-multiarch
 buildThirdPartyNotice:
 	@go list -m -json all | go-licence-detector -rules ./assets/licence/rules.json  -noticeTemplate ./assets/licence/THIRD_PARTY_NOTICES.md.tmpl -noticeOut THIRD_PARTY_NOTICES.md -includeIndirect -overrides ./assets/licence/overrides
 
-.PHONY: all build clean fmt lint compile test docker-build docker-test docker-lint docker-lint/dockerfile buildThirdPartyNotice
+.PHONY: all build clean fmt validate compile test docker-build docker-test docker-lint docker-lint/dockerfile buildThirdPartyNotice
