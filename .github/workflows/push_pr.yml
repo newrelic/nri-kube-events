@@ -23,15 +23,31 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: |
           make compile
-  lint-test:
-    name: lint and test
+
+  static-analysis:
+    name: Run all static analysis checks
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: newrelic/newrelic-infra-checkers@v1
+      - name: Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          auditOn: push
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v2
+        continue-on-error: ${{ github.event_name != 'pull_request' }}
+        with:
+          only-new-issues: true
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    needs: [build]
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-go@v2
         with:
           go-version: '1.16'
-      - name: Lint
-        run: make lint
       - name: Test
         run: make test
