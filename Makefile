@@ -63,4 +63,4 @@ docker-multiarch: compile-multiarch
 buildThirdPartyNotice:
 	@go list -m -json all | go-licence-detector -rules ./assets/licence/rules.json  -noticeTemplate ./assets/licence/THIRD_PARTY_NOTICES.md.tmpl -noticeOut THIRD_PARTY_NOTICES.md -includeIndirect -overrides ./assets/licence/overrides
 
-.PHONY: all build clean fmt validate compile test docker-build docker-test docker-lint docker-lint/dockerfile buildThirdPartyNotice
+.PHONY: all build clean fmt validate compile test docker-build docker-test buildThirdPartyNotice
