@@ -32,7 +32,7 @@ type MockedAgentSink struct {
 func NewMockedAgentSink() *MockedAgentSink {
 	mockedAgentSink := &MockedAgentSink{
 		mtx:               &sync.RWMutex{},
-		eventReceivedChan: make(chan struct{}, 8),
+		eventReceivedChan: make(chan struct{}, 128),
 	}
 	mockedAgentSink.httpServer = httptest.NewServer(mockedAgentSink)
 
