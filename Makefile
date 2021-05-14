@@ -46,30 +46,23 @@ lint: $(TOOLS_DIR)/golangci-lint
 
 compile:
 	@echo "=== $(INTEGRATION) === [ compile ]: Building $(INTEGRATION)..."
-	go mod download
 	CGO_ENABLED=$(CGO_ENABLED) go build -o $(BUILD_TARGET) ./cmd/nri-kube-events
+
+compile-multiarch:
+	$(MAKE) compile GOOS=linux GOARCH=amd64
+	$(MAKE) compile GOOS=linux GOARCH=arm
+	$(MAKE) compile GOOS=linux GOARCH=arm64
 
 test:
 	@echo "=== $(INTEGRATION) === [ test ]: Running unit tests..."
 	@go test -race ./...
 
-docker-test:
-	@docker build . --target base-env -t $(DOCKER_IMAGE_NAME)_test
-	@echo "=== $(INTEGRATION) === [ docker-test ]: Running unit tests in Docker..."
-	@docker run -t $(DOCKER_IMAGE_NAME)_test make test
+docker:
+	$(MAKE) compile GOOS=linux GOARCH=amd64
+	DOCKER_BUILDKIT=1 docker build . -t $(DOCKER_IMAGE_NAME)
 
-docker-lint:
-	@docker build . --target base-env -t $(DOCKER_IMAGE_NAME)_lint
-	@echo "=== $(INTEGRATION) === [ docker-lint ]: Validating source code running golangci-lint in Docker..."
-	@docker run -t $(DOCKER_IMAGE_NAME)_lint make lint
-
-docker-build:
-	@echo "=== $(INTEGRATION) === [ docker-build ]: Building final Docker image..."
-	@docker build . --target final -t $(DOCKER_IMAGE_NAME)
-
-docker-lint/dockerfile:
-	@echo "=== $(INTEGRATION) === [ docker-lint ]: Linting Docker image..."
-	@docker run --rm -i hadolint/hadolint < Dockerfile
+docker-multiarch: compile-multiarch
+	@docker buildx build . -t $(DOCKER_IMAGE_NAME)
 
 buildThirdPartyNotice:
 	@go list -m -json all | go-licence-detector -rules ./assets/licence/rules.json  -noticeTemplate ./assets/licence/THIRD_PARTY_NOTICES.md.tmpl -noticeOut THIRD_PARTY_NOTICES.md -includeIndirect -overrides ./assets/licence/overrides
