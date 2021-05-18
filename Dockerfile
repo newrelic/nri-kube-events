@@ -20,7 +20,8 @@ RUN mv nri-kube-events-${TARGETOS}-${TARGETARCH} nri-kube-events
 
 USER nri-kube-events
 
-# Enable custom attributes decoration in the infra SDK
+# Enable decorating events from NRI_ env vars, such as `foo: bar` from NRI_FOO=bar.
+# https://github.com/newrelic/infra-integrations-sdk/blob/master/docs/toolset/args.md#bundled-arguments
 ENV METADATA=true
 
 ENTRYPOINT ["/sbin/tini", "--", "./nri-kube-events"]
