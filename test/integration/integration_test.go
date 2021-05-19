@@ -32,19 +32,23 @@ func Test_Sink_receives_common_Pod_creation_events(t *testing.T) {
 	client, agentMock := initialize(t)
 
 	t.Log("Creating test namespace...")
-	ns, err := client.CoreV1().Namespaces().Create(context.Background(), &v1.Namespace{
+	ns := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "e2e-" + strings.ToLower(t.Name()) + "-",
+			GenerateName: "e2e-" + nsName(t),
 		},
-	}, metav1.CreateOptions{})
+	}
+	ns, err := client.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 	if err != nil {
-		t.Logf("could not create %s namespace: %v", ns, err)
+		t.Fatalf("could not create test namespace '%s': %v", ns, err)
 	}
 
-	defer func() {
+	t.Cleanup(func() {
 		t.Log("Cleaning up test namespace...")
-		_ = client.CoreV1().Namespaces().Delete(context.Background(), ns.Name, metav1.DeleteOptions{})
-	}()
+		err := client.CoreV1().Namespaces().Delete(context.Background(), ns.Name, metav1.DeleteOptions{})
+		if err != nil {
+			t.Logf("could not delete test namespace '%s': %v", ns.Name, err)
+		}
+	})
 
 	t.Log("Creating test pod...")
 	testpod, err := client.CoreV1().Pods(ns.Name).Create(context.Background(), &v1.Pod{
@@ -61,8 +65,7 @@ func Test_Sink_receives_common_Pod_creation_events(t *testing.T) {
 		},
 	}, metav1.CreateOptions{})
 	if err != nil {
-		t.Errorf("could not create test pod: %v", err)
-		return
+		t.Fatalf("could not create test pod: %v", err)
 	}
 
 	t.Log("Waiting for events to show up...")
@@ -167,19 +170,23 @@ func Test_Sink_receives_common_Pod_deletion_events(t *testing.T) {
 	client, agentMock := initialize(t)
 
 	t.Log("Creating test namespace...")
-	ns, err := client.CoreV1().Namespaces().Create(context.Background(), &v1.Namespace{
+	ns := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "e2e-" + strings.ToLower(t.Name()) + "-",
+			GenerateName: "e2e-" + nsName(t),
 		},
-	}, metav1.CreateOptions{})
+	}
+	ns, err := client.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 	if err != nil {
-		t.Logf("could not create %s namespace: %v", ns, err)
+		t.Fatalf("could not create %s namespace: %v", ns, err)
 	}
 
-	defer func() {
+	t.Cleanup(func() {
 		t.Log("Cleaning up test namespace...")
-		_ = client.CoreV1().Namespaces().Delete(context.Background(), ns.Name, metav1.DeleteOptions{})
-	}()
+		err := client.CoreV1().Namespaces().Delete(context.Background(), ns.Name, metav1.DeleteOptions{})
+		if err != nil {
+			t.Logf("could not delete test namespace '%s': %v", ns.Name, err)
+		}
+	})
 
 	t.Log("Creating test pod...")
 	testpod, err := client.CoreV1().Pods(ns.Name).Create(context.Background(), &v1.Pod{
@@ -196,16 +203,14 @@ func Test_Sink_receives_common_Pod_deletion_events(t *testing.T) {
 		},
 	}, metav1.CreateOptions{})
 	if err != nil {
-		t.Errorf("could not create test pod: %v", err)
-		return
+		t.Fatalf("could not create test pod: %v", err)
 	}
 
 	time.Sleep(7 * time.Second)
 
 	err = client.CoreV1().Pods(ns.Name).Delete(context.Background(), testpod.Name, metav1.DeleteOptions{})
 	if err != nil {
-		t.Errorf("could not create test pod: %v", err)
-		return
+		t.Fatalf("could not create test pod: %v", err)
 	}
 
 	t.Log("Waiting for events to show up...")
@@ -237,6 +242,13 @@ func Test_Sink_receives_common_Pod_deletion_events(t *testing.T) {
 		e.Encode(event) // nolint:errcheck
 		t.Fatalf("Event was not captured")
 	}
+}
+
+// nsName performs basic sanitization on the test name to convert it to an acceptable namespace name.
+func nsName(t *testing.T) string {
+	t.Helper()
+
+	return "e2e-" + strings.NewReplacer("_", "-").Replace(strings.ToLower(t.Name()))
 }
 
 // initialize returns a kubernets client and a mocked agent sink ready to receive events
