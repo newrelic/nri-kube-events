@@ -27,8 +27,8 @@ import (
 // agent sink is created, which results in a panic if multiple instantiations are attempted.
 var testSinkInstance *e2e.TestAgentSink
 
-// TestPodCreation checks that events related to pod creation are received.
-func TestPodCreation(t *testing.T) {
+// Test_Sink_receives_common_Pod_creation_events checks that events related to pod creation are received.
+func Test_Sink_receives_common_Pod_creation_events(t *testing.T) {
 	client, agentMock := initialize(t)
 
 	t.Log("Creating test namespace...")
@@ -163,7 +163,7 @@ func TestPodCreation(t *testing.T) {
 	}
 }
 
-func TestPodDeletion(t *testing.T) {
+func Test_Sink_receives_common_Pod_deletion_events(t *testing.T) {
 	client, agentMock := initialize(t)
 
 	t.Log("Creating test namespace...")
