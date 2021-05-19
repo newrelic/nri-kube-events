@@ -34,24 +34,24 @@ func Test_Sink_receives_common_Pod_creation_events(t *testing.T) {
 	t.Log("Creating test namespace...")
 	ns := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "e2e-" + nsName(t),
+			GenerateName: nsName(t),
 		},
 	}
-	ns, err := client.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+	ns, err := client.CoreV1().Namespaces().Create(contextFromTestDeadline(t), ns, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("could not create test namespace '%s': %v", ns, err)
 	}
 
 	t.Cleanup(func() {
 		t.Log("Cleaning up test namespace...")
-		err := client.CoreV1().Namespaces().Delete(context.Background(), ns.Name, metav1.DeleteOptions{})
+		err := client.CoreV1().Namespaces().Delete(contextFromTestDeadline(t), ns.Name, metav1.DeleteOptions{})
 		if err != nil {
 			t.Logf("could not delete test namespace '%s': %v", ns.Name, err)
 		}
 	})
 
 	t.Log("Creating test pod...")
-	testpod, err := client.CoreV1().Pods(ns.Name).Create(context.Background(), &v1.Pod{
+	testpod, err := client.CoreV1().Pods(ns.Name).Create(contextFromTestDeadline(t), &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "nginx-e2e",
 		},
@@ -172,24 +172,24 @@ func Test_Sink_receives_common_Pod_deletion_events(t *testing.T) {
 	t.Log("Creating test namespace...")
 	ns := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "e2e-" + nsName(t),
+			GenerateName: nsName(t),
 		},
 	}
-	ns, err := client.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+	ns, err := client.CoreV1().Namespaces().Create(contextFromTestDeadline(t), ns, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("could not create %s namespace: %v", ns, err)
 	}
 
 	t.Cleanup(func() {
 		t.Log("Cleaning up test namespace...")
-		err := client.CoreV1().Namespaces().Delete(context.Background(), ns.Name, metav1.DeleteOptions{})
+		err := client.CoreV1().Namespaces().Delete(contextFromTestDeadline(t), ns.Name, metav1.DeleteOptions{})
 		if err != nil {
 			t.Logf("could not delete test namespace '%s': %v", ns.Name, err)
 		}
 	})
 
 	t.Log("Creating test pod...")
-	testpod, err := client.CoreV1().Pods(ns.Name).Create(context.Background(), &v1.Pod{
+	testpod, err := client.CoreV1().Pods(ns.Name).Create(contextFromTestDeadline(t), &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "nginx-e2e-killable",
 		},
@@ -208,7 +208,7 @@ func Test_Sink_receives_common_Pod_deletion_events(t *testing.T) {
 
 	time.Sleep(7 * time.Second)
 
-	err = client.CoreV1().Pods(ns.Name).Delete(context.Background(), testpod.Name, metav1.DeleteOptions{})
+	err = client.CoreV1().Pods(ns.Name).Delete(contextFromTestDeadline(t), testpod.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("could not create test pod: %v", err)
 	}
@@ -249,6 +249,16 @@ func nsName(t *testing.T) string {
 	t.Helper()
 
 	return "e2e-" + strings.NewReplacer("_", "-").Replace(strings.ToLower(t.Name()))
+}
+
+func contextFromTestDeadline(t *testing.T) context.Context {
+	deadline, hasDeadline := t.Deadline()
+	if !hasDeadline {
+		return context.Background()
+	}
+
+	ctx, _ := context.WithDeadline(context.Background(), deadline)
+	return ctx
 }
 
 // initialize returns a kubernets client and a mocked agent sink ready to receive events
