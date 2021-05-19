@@ -90,7 +90,7 @@ func (tas *TestAgentSink) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	tas.receivedEvents = append(tas.receivedEvents, ev.Data[0].Events...)
-	rw.WriteHeader(http.StatusNoContent) // The the agent does
+	rw.WriteHeader(http.StatusNoContent) // Return 204 as the infra-agent does
 }
 
 // Has relaxedly checks whether the mocked agent has received an event.
