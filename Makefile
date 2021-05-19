@@ -52,11 +52,11 @@ compile-multiarch:
 test: test-unit
 test-unit:
 	@echo "=== $(INTEGRATION) === [ test ]: Running unit tests..."
-	@go test -v -race $$(go list ./... | grep -v '/test/e2e')
+	@go test -v -race ./...
 
-test-e2e:
-	@echo "=== $(INTEGRATION) === [ test ]: Running e2e tests..."
-	@go test -v ./test/e2e
+test-integration:
+	@echo "=== $(INTEGRATION) === [ test ]: Running integration tests..."
+	@go test -v ./test/integration -tags integration
 
 docker:
 	$(MAKE) compile GOOS=linux GOARCH=amd64

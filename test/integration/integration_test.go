@@ -1,3 +1,5 @@
+// +build integration
+
 // Package e2e_test implements simple integration test against a local cluster, whose config is loaded from the kubeconfig file.
 package e2e_test
 
