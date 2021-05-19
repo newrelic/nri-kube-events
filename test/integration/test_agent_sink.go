@@ -77,10 +77,14 @@ func (tas *TestAgentSink) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	defer r.Body.Close() // nolint:errcheck
-	body, _ := ioutil.ReadAll(r.Body)
-	err := json.Unmarshal(body, &ev)
+	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Fatalf("error getting request body")
+		log.Fatalf("error reading request body: %v", err)
+	}
+
+	err = json.Unmarshal(body, &ev)
+	if err != nil {
+		log.Fatalf("error unmarshalling request body: %v", err)
 	}
 
 	if len(ev.Data) == 0 {
