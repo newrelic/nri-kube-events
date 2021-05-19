@@ -19,8 +19,8 @@ import (
 // Must be in sync with unexported name in pkg/sinks/new_relic_infra.go:32.
 const newRelicInfraSinkID = "newRelicInfra"
 
-// MockedAgentSink is an instrumented infra-agent sink for testing e2e reception and processing.
-type MockedAgentSink struct {
+// TestAgentSink is an instrumented infra-agent sink for testing e2e reception and processing.
+type TestAgentSink struct {
 	agentSink         events.Sink
 	httpServer        *httptest.Server
 	eventReceivedChan chan struct{}
@@ -28,9 +28,9 @@ type MockedAgentSink struct {
 	mtx               *sync.RWMutex
 }
 
-// NewMockedAgentSink returns an instrumented infra-agent sink for testing.
-func NewMockedAgentSink() *MockedAgentSink {
-	mockedAgentSink := &MockedAgentSink{
+// NewTestAgentSink returns an instrumented infra-agent sink for testing.
+func NewTestAgentSink() *TestAgentSink {
+	mockedAgentSink := &TestAgentSink{
 		mtx:               &sync.RWMutex{},
 		eventReceivedChan: make(chan struct{}, 128),
 	}
@@ -60,15 +60,15 @@ func NewMockedAgentSink() *MockedAgentSink {
 }
 
 // HandleEvent sends a notification to the event received channel and then forwards it to the underlying sink.
-func (mas *MockedAgentSink) HandleEvent(kubeEvent events.KubeEvent) error {
-	mas.eventReceivedChan <- struct{}{}
-	return mas.agentSink.HandleEvent(kubeEvent)
+func (tas *TestAgentSink) HandleEvent(kubeEvent events.KubeEvent) error {
+	tas.eventReceivedChan <- struct{}{}
+	return tas.agentSink.HandleEvent(kubeEvent)
 }
 
 // ServeHTTP handles a request that would be for the infra-agent and stores the unmarshalled event.
-func (mas *MockedAgentSink) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
-	mas.mtx.Lock()
-	defer mas.mtx.Unlock()
+func (tas *TestAgentSink) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+	tas.mtx.Lock()
+	defer tas.mtx.Unlock()
 
 	var ev struct {
 		Data []struct {
@@ -89,17 +89,17 @@ func (mas *MockedAgentSink) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mas.receivedEvents = append(mas.receivedEvents, ev.Data[0].Events...)
+	tas.receivedEvents = append(tas.receivedEvents, ev.Data[0].Events...)
 	rw.WriteHeader(http.StatusNoContent) // The the agent does
 }
 
 // Has relaxedly checks whether the mocked agent has received an event.
-func (mas *MockedAgentSink) Has(testEvent *sdkEvent.Event) bool {
-	mas.mtx.RLock()
-	defer mas.mtx.RUnlock()
+func (tas *TestAgentSink) Has(testEvent *sdkEvent.Event) bool {
+	tas.mtx.RLock()
+	defer tas.mtx.RUnlock()
 
-	for i := range mas.receivedEvents {
-		receivedEvent := &mas.receivedEvents[i]
+	for i := range tas.receivedEvents {
+		receivedEvent := &tas.receivedEvents[i]
 
 		if isEventSubset(receivedEvent, testEvent) {
 			return true
@@ -110,34 +110,34 @@ func (mas *MockedAgentSink) Has(testEvent *sdkEvent.Event) bool {
 }
 
 // Events returns the list of events the mock has captured.
-func (mas *MockedAgentSink) Events() []sdkEvent.Event {
-	mas.mtx.RLock()
-	defer mas.mtx.RUnlock()
+func (tas *TestAgentSink) Events() []sdkEvent.Event {
+	tas.mtx.RLock()
+	defer tas.mtx.RUnlock()
 
-	retEvents := make([]sdkEvent.Event, len(mas.receivedEvents))
-	copy(retEvents, mas.receivedEvents)
+	retEvents := make([]sdkEvent.Event, len(tas.receivedEvents))
+	copy(retEvents, tas.receivedEvents)
 
 	return retEvents
 }
 
 // ForgetEvents erases all the recorded events.
-func (mas *MockedAgentSink) ForgetEvents() {
-	mas.mtx.Lock()
-	defer mas.mtx.Unlock()
+func (tas *TestAgentSink) ForgetEvents() {
+	tas.mtx.Lock()
+	defer tas.mtx.Unlock()
 
-	mas.receivedEvents = nil
+	tas.receivedEvents = nil
 }
 
 // Wait blocks until betweenEvents time has passed since the last received event, or up to max time has passed since the call.
 // Returns false if we had to exhaust max.
-func (mas *MockedAgentSink) Wait(betweenEvents, max time.Duration) bool {
+func (tas *TestAgentSink) Wait(betweenEvents, max time.Duration) bool {
 	eventTimer := time.NewTimer(betweenEvents)
 	maxTimer := time.NewTimer(max)
 
 	for {
 		select {
 		// Reset betweenEvents timer whenever an event is received
-		case <-mas.eventReceivedChan:
+		case <-tas.eventReceivedChan:
 			if !eventTimer.Stop() {
 				<-eventTimer.C
 			}

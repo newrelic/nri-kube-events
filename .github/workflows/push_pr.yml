@@ -64,8 +64,8 @@ jobs:
       - name: Test
         run: make test-unit
 
-  test-e2e:
-    name: Run e2e/integration tests
+  test-integration:
+    name: Run integration tests
     runs-on: ubuntu-latest
     needs: [ build ]
     timeout-minutes: 10
@@ -95,4 +95,4 @@ jobs:
         run: |
           docker pull nginx
       - name: Run e2e tests
-        run: make test-e2e
+        run: make test-integration

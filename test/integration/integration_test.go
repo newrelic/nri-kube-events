@@ -12,7 +12,7 @@ import (
 
 	sdkEvent "github.com/newrelic/infra-integrations-sdk/data/event"
 	"github.com/newrelic/nri-kube-events/pkg/events"
-	"github.com/newrelic/nri-kube-events/test/e2e"
+	"github.com/newrelic/nri-kube-events/test/integration"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
@@ -21,9 +21,9 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// We must have a global MockedAgentSink because the infrastructure-sdk attempts to register global flags when the
+// We must have a global TestAgentSink because the infrastructure-sdk attempts to register global flags when the
 // agent sink is created, which results in a panic if multiple instantiations are attempted.
-var globalMockedAgentSink *e2e.MockedAgentSink
+var testSinkInstance *e2e.TestAgentSink
 
 // TestPodCreation checks that events related to pod creation are received.
 func TestPodCreation(t *testing.T) {
@@ -238,7 +238,7 @@ func TestPodDeletion(t *testing.T) {
 }
 
 // initialize returns a kubernets client and a mocked agent sink ready to receive events
-func initialize(t *testing.T) (*kubernetes.Clientset, *e2e.MockedAgentSink) {
+func initialize(t *testing.T) (*kubernetes.Clientset, *e2e.TestAgentSink) {
 	t.Helper()
 
 	conf, err := restConfig()
@@ -259,15 +259,15 @@ func initialize(t *testing.T) (*kubernetes.Clientset, *e2e.MockedAgentSink) {
 		_ = eventsInformer.GetStore().Delete(obj)
 	}
 
-	if globalMockedAgentSink == nil {
-		globalMockedAgentSink = e2e.NewMockedAgentSink()
+	if testSinkInstance == nil {
+		testSinkInstance = e2e.NewTestAgentSink()
 	}
-	globalMockedAgentSink.ForgetEvents()
+	testSinkInstance.ForgetEvents()
 
-	router := events.NewRouter(eventsInformer, map[string]events.Sink{"mock": globalMockedAgentSink})
+	router := events.NewRouter(eventsInformer, map[string]events.Sink{"mock": testSinkInstance})
 	go router.Run(nil)
 
-	return client, globalMockedAgentSink
+	return client, testSinkInstance
 }
 
 // restConfig attempts to build a k8s config from the environment, or the default kubeconfig path
