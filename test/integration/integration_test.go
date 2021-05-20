@@ -248,7 +248,7 @@ func Test_Sink_receives_common_Pod_deletion_events(t *testing.T) {
 func nsName(t *testing.T) string {
 	t.Helper()
 
-	return "e2e-" + strings.NewReplacer("_", "-").Replace(strings.ToLower(t.Name()))
+	return "e2e-" + strings.ReplaceAll(strings.ToLower(t.Name()), "_", "-")
 }
 
 func contextFromTestDeadline(t *testing.T) context.Context {
