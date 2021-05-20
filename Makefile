@@ -56,7 +56,7 @@ test-unit:
 
 test-integration:
 	@echo "=== $(INTEGRATION) === [ test ]: Running integration tests..."
-	@go test -v ./test/integration -tags integration
+	@go test -v -tags integration  ./test/integration
 
 docker:
 	$(MAKE) compile GOOS=linux GOARCH=amd64

@@ -94,7 +94,7 @@ func (tas *TestAgentSink) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	tas.receivedEvents = append(tas.receivedEvents, ev.Data[0].Events...)
-	rw.WriteHeader(http.StatusNoContent) // Return 204 as the infra-agent does
+	rw.WriteHeader(http.StatusNoContent) // Return 204 as the infra-agent does.
 }
 
 // Has relaxedly checks whether the mocked agent has received an event.
@@ -140,18 +140,18 @@ func (tas *TestAgentSink) Wait(betweenEvents, max time.Duration) bool {
 
 	for {
 		select {
-		// Reset betweenEvents timer whenever an event is received
+		// Reset betweenEvents timer whenever an event is received.
 		case <-tas.eventReceivedChan:
 			if !eventTimer.Stop() {
 				<-eventTimer.C
 			}
 			eventTimer.Reset(betweenEvents)
 
-		// Return false if max timeout is reached
+		// Return false if max timeout is reached.
 		case <-maxTimer.C:
 			return false
 
-		// Return true when small timeout is reached
+		// Return true when small timeout is reached.
 		case <-eventTimer.C:
 			return true
 		}
@@ -169,9 +169,9 @@ func isEventSubset(old, new *sdkEvent.Event) bool {
 		return false
 	}
 
-	// Check new map is a subset of old map
+	// Check new map is a subset of old map.
 	for nk, nv := range new.Attributes {
-		// Check the old event contains all keys of the new one
+		// Check the old event contains all keys of the new one.
 		ov, found := old.Attributes[nk]
 		if !found {
 			return false
@@ -183,7 +183,7 @@ func isEventSubset(old, new *sdkEvent.Event) bool {
 		}
 
 		// If both are strings, check the old contains the new (partial matching).
-		// Otherwise, just check for equality
+		// Otherwise, just check for equality.
 		switch nvs := nv.(type) {
 		case string:
 			ovs := ov.(string)
