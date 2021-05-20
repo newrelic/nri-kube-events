@@ -298,12 +298,12 @@ func initialize(t *testing.T) (*kubernetes.Clientset, *integration.TestAgentSink
 func restConfig() (*rest.Config, error) {
 	config, err := rest.InClusterConfig()
 	if err == nil {
-		return config, err
+		return config, nil
 	}
 
 	config, err = clientcmd.BuildConfigFromFlags("", path.Join(os.ExpandEnv("$HOME"), ".kube", "config"))
 	if err == nil {
-		return config, err
+		return config, nil
 	}
 
 	return nil, err
