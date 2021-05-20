@@ -1,7 +1,7 @@
 // +build integration
 
-// Package e2e_test implements simple integration test against a local cluster, whose config is loaded from the kubeconfig file.
-package e2e_test
+// Package integration_test implements simple integration test against a local cluster, whose config is loaded from the kubeconfig file.
+package integration_test
 
 import (
 	"context"
@@ -25,7 +25,7 @@ import (
 
 // We must have a global TestAgentSink because the infrastructure-sdk attempts to register global flags when the
 // agent sink is created, which results in a panic if multiple instantiations are attempted.
-var testSinkInstance *e2e.TestAgentSink
+var testSinkInstance *integration.TestAgentSink
 
 // Test_Sink_receives_common_Pod_creation_events checks that events related to pod creation are received.
 func Test_Sink_receives_common_Pod_creation_events(t *testing.T) {
@@ -262,7 +262,7 @@ func contextFromTestDeadline(t *testing.T) context.Context {
 }
 
 // initialize returns a kubernets client and a mocked agent sink ready to receive events
-func initialize(t *testing.T) (*kubernetes.Clientset, *e2e.TestAgentSink) {
+func initialize(t *testing.T) (*kubernetes.Clientset, *integration.TestAgentSink) {
 	t.Helper()
 
 	conf, err := restConfig()
@@ -284,7 +284,7 @@ func initialize(t *testing.T) (*kubernetes.Clientset, *e2e.TestAgentSink) {
 	}
 
 	if testSinkInstance == nil {
-		testSinkInstance = e2e.NewTestAgentSink()
+		testSinkInstance = integration.NewTestAgentSink()
 	}
 	testSinkInstance.ForgetEvents()
 
