@@ -3,9 +3,8 @@ module github.com/newrelic/nri-kube-events
 go 1.16
 
 require (
-	github.com/golangci/golangci-lint v1.40.0
+	github.com/golangci/golangci-lint v1.40.1
 	github.com/google/go-cmp v0.5.5
-	github.com/imdario/mergo v0.3.11 // indirect
 	github.com/newrelic/infra-integrations-sdk v3.6.7+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.10.0
