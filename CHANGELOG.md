@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 1.5.0
+### Changed
+- Docker images now support multiple architectures (linux/amd64, linux/arm64)
 
 ## 1.5.0
 ### Changed
@@ -20,7 +23,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## 1.3.2
 ### Changed
 - Moving pipelines to Github Actions.
-
 
 ## 1.3.0
 ### Changed
