@@ -19,10 +19,12 @@ jobs:
           go-version: '1.16'
       - uses: actions/cache@v2
         with:
-          path: ~/go/pkg/mod
-          key: gomod-${{ hashFiles('**/go.sum') }}
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            gomod-
+            ${{ runner.os }}-go-
       - name: Build integration
         env:
           GOOS: ${{ matrix.goos }}
@@ -58,10 +60,12 @@ jobs:
           go-version: '1.16'
       - uses: actions/cache@v2
         with:
-          path: ~/go/pkg/mod
-          key: gomod-${{ hashFiles('**/go.sum') }}
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            gomod-
+            ${{ runner.os }}-go-
       - name: Test
         run: make test-unit
 
@@ -88,10 +92,12 @@ jobs:
           github token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/cache@v2
         with:
-          path: ~/go/pkg/mod
-          key: gomod-${{ hashFiles('**/go.sum') }}
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            gomod-
+            ${{ runner.os }}-go-
       - name: Cache docker images
         run: |
           docker pull nginx
