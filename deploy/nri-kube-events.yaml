@@ -83,7 +83,7 @@ spec:
           #   - name: NRI_KUBE_EVENTS_myCustomAttribute
           #     value: "foo"
         - name: infra-agent
-          image: newrelic/k8s-events-forwarder:1.19.2
+          image: newrelic/k8s-events-forwarder:1.19.4
           resources:
             limits:
               memory: 128Mi
