@@ -35,7 +35,7 @@ func init() {
 const (
 	newRelicNamespace          = "k8s"
 	newRelicCategory           = "kubernetes"
-	newRelicEventrouterVersion = "1.5.0"
+	newRelicEventrouterVersion = "1.5.2"
 	newRelicSDKName            = "kube_events"
 	defaultAgentHTTPTimeout    = time.Second * 10
 )
