@@ -78,7 +78,7 @@ jobs:
       max-parallel: 4
       fail-fast: false
       matrix:
-        kubernetes-version: [ "v1.16.15", "v1.17.17", "v1.18.18", "v1.19.10", "v1.20.6", "v1.21.0", "v1.22.0" ]
+        kubernetes-version: [ "v1.16.15", "v1.17.17", "v1.18.20", "v1.19.14", "v1.20.10", "v1.21.4", "v1.22.0" ]
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-go@v2
