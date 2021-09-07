@@ -140,6 +140,16 @@ our corporate CLA, which is required if your contribution is on behalf of a
 company, or if you have any questions, please drop us an email at
 opensource@newrelic.com.
 
+**A note about vulnerabilities**
+
+As noted in our [security policy](../../security/policy), New Relic is committed to the privacy and security of our customers and their data. We believe that providing coordinated disclosure by security researchers and engaging with the security community are important means to achieve our security goals.
+
+If you believe you have found a security vulnerability in this project or any of New Relic's products or websites, we welcome and greatly appreciate you reporting it to New Relic through [HackerOne](https://hackerone.com/newrelic).
+
+If you would like to contribute to this project, please review [these guidelines](./CONTRIBUTING.md).
+
+To all contributors, we thank you!  Without your contribution, this project would not be what it is today.
+
 ## License
 The New Relic integration for Kubernetes events is licensed under the [Apache
 2.0](http://apache.org/licenses/LICENSE-2.0.txt) License.
