@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 1.6.0
+### Changed
+
+- Adds Kubernetes 1.22 dependencies updates
+
+## 1.5.1
+### Changed
+
+- Kubernetes client dependencies have been upgraded to ensure compatibility with the latest versions
+
 ## 1.5.0
 ### Changed
 - Docker images now support multiple architectures (linux/amd64, linux/arm64)

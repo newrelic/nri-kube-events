@@ -61,7 +61,7 @@ spec:
     spec:
       containers:
         - name: kube-events
-          image: newrelic/nri-kube-events:1.4.0
+          image: newrelic/nri-kube-events:1.6.0
           resources:
             limits:
               memory: "128Mi"
@@ -75,7 +75,7 @@ spec:
             - name: config-volume
               mountPath: /app/config
         - name: infra-agent
-          image: newrelic/k8s-events-forwarder:1.11.45
+          image: newrelic/k8s-events-forwarder:1.20.2
           resources:
             limits:
               memory: 128Mi
