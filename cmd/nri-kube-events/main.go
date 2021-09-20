@@ -27,7 +27,7 @@ import (
 
 const (
 	integrationName    = "nri-kube-events"
-	integrationVersion = "1.5.0"
+	integrationVersion = "1.6.0"
 )
 
 var (
@@ -100,7 +100,6 @@ func listenForStopSignal() <-chan struct{} {
 // createEventsInformer creates a SharedIndexInformer that will listen for Events.
 // Only events happening after creation will be returned, existing events are discarded.
 func createEventsInformer(stopChan <-chan struct{}) (cache.SharedIndexInformer, error) {
-
 	clientset, err := getClientset(*kubeConfig)
 	if err != nil {
 		logrus.Fatalf("could not create kubernetes client: %v", err)
@@ -135,7 +134,6 @@ func createEventsInformer(stopChan <-chan struct{}) (cache.SharedIndexInformer, 
 // It loads a kubeconfig file if the kubeconfig parameter is set
 // If it's not set, it will try to load the InClusterConfig
 func getClientset(kubeconfig string) (*kubernetes.Clientset, error) {
-
 	var conf *restclient.Config
 	var err error
 
