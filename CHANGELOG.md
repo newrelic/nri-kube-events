@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 1.8.0
+### Changed
+
+- Updated dependencies
+- IntegrationVersion is now automatically populated and included in the sample
+
 ## 1.7.0
 ### Changed
 
