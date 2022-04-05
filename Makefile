@@ -14,6 +14,13 @@ GOOS ?=
 GOARCH ?=
 CGO_ENABLED ?= 0
 
+BUILD_DATE := $(shell date)
+TAG ?= dev
+COMMIT ?= $(shell git rev-parse HEAD || echo "unknown")
+
+LDFLAGS ?= -ldflags="-X 'main.integrationVersion=$(TAG)' -X 'main.gitCommit=$(COMMIT)' -X 'main.buildDate=$(BUILD_DATE)' "
+
+
 ifneq ($(strip $(GOOS)), )
 BUILD_TARGET := $(BUILD_TARGET)-$(GOOS)
 endif
@@ -42,7 +49,7 @@ validate:
 
 compile:
 	@echo "=== $(INTEGRATION) === [ compile ]: Building $(INTEGRATION)..."
-	CGO_ENABLED=$(CGO_ENABLED) go build -o $(BUILD_TARGET) ./cmd/nri-kube-events
+	CGO_ENABLED=$(CGO_ENABLED) go build $(LDFLAGS) -o $(BUILD_TARGET) ./cmd/nri-kube-events
 
 compile-multiarch:
 	$(MAKE) compile GOOS=linux GOARCH=amd64

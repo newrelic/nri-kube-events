@@ -33,14 +33,13 @@ func init() {
 }
 
 const (
-	newRelicNamespace          = "k8s"
-	newRelicCategory           = "kubernetes"
-	newRelicEventrouterVersion = "1.6.0"
-	newRelicSDKName            = "kube_events"
-	defaultAgentHTTPTimeout    = time.Second * 10
+	newRelicNamespace       = "k8s"
+	newRelicCategory        = "kubernetes"
+	newRelicSDKName         = "kube_events"
+	defaultAgentHTTPTimeout = time.Second * 10
 )
 
-func createNewRelicInfraSink(config SinkConfig) (events.Sink, error) {
+func createNewRelicInfraSink(config SinkConfig, integrationVersion string) (events.Sink, error) {
 
 	clusterName := config.MustGetString("clusterName")
 	agentEndpoint := config.MustGetString("agentEndpoint")
@@ -53,7 +52,7 @@ func createNewRelicInfraSink(config SinkConfig) (events.Sink, error) {
 		ClusterName: clusterName,
 	}
 
-	i, err := sdkIntegration.New(newRelicSDKName, newRelicEventrouterVersion, sdkIntegration.Args(&args))
+	i, err := sdkIntegration.New(newRelicSDKName, integrationVersion, sdkIntegration.Args(&args))
 	if err != nil {
 		return nil, errors.Wrap(err, "error while initializing New Relic SDK integration")
 	}
@@ -234,7 +233,9 @@ func disposeBody(response *http.Response) {
 }
 
 func (ns *newRelicInfraSink) decorateEvent(flattenedEvent map[string]interface{}) {
-	flattenedEvent["eventRouterVersion"] = newRelicEventrouterVersion
+	flattenedEvent["eventRouterVersion"] = ns.sdkIntegration.IntegrationVersion
+	flattenedEvent["integrationVersion"] = ns.sdkIntegration.IntegrationVersion
+	flattenedEvent["integrationName"] = ns.sdkIntegration.Name
 	flattenedEvent["clusterName"] = ns.clusterName
 }
 
