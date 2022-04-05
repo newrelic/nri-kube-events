@@ -44,7 +44,7 @@ func NewTestAgentSink() *TestAgentSink {
 		},
 	}
 
-	createdSinks, err := sinks.CreateSinks([]sinks.SinkConfig{agentSinkConfig})
+	createdSinks, err := sinks.CreateSinks([]sinks.SinkConfig{agentSinkConfig}, "0.0.0")
 	if err != nil {
 		log.Fatalf("error creating infra sink: %v", err)
 	}

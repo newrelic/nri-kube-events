@@ -16,7 +16,7 @@ func init() {
 	registerSink("stdout", createStdoutSink)
 }
 
-func createStdoutSink(SinkConfig) (events.Sink, error) {
+func createStdoutSink(_ SinkConfig, _ string) (events.Sink, error) {
 	return &stdoutSink{}, nil
 }
 

@@ -117,7 +117,7 @@ func TestNewRelicSinkIntegration(t *testing.T) {
 			"agentEndpoint": testServer.URL,
 		},
 	}
-	sink, _ := createNewRelicInfraSink(config)
+	sink, _ := createNewRelicInfraSink(config, "0.0.0")
 	err = sink.HandleEvent(events.KubeEvent{
 		Verb: "ADDED",
 		Event: &v1.Event{
@@ -150,7 +150,7 @@ func TestNewRelicInfraSink_HandleEvent_AddEventError(t *testing.T) {
 			"agentEndpoint": "",
 		},
 	}
-	sink, _ := createNewRelicInfraSink(config)
+	sink, _ := createNewRelicInfraSink(config, "0.0.0")
 	err := sink.HandleEvent(events.KubeEvent{
 		Verb: "ADDED",
 		Event: &v1.Event{

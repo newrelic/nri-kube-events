@@ -4,9 +4,12 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -26,8 +29,13 @@ import (
 )
 
 const (
-	integrationName    = "nri-kube-events"
-	integrationVersion = "1.6.0"
+	integrationName = "nri-kube-events"
+)
+
+var (
+	integrationVersion = "0.0.0"
+	gitCommit          = ""
+	buildDate          = ""
 )
 
 var (
@@ -41,10 +49,17 @@ func main() {
 	flag.Parse()
 	setLogLevel(*logLevel, logrus.InfoLevel)
 
-	logrus.Infof("Starting %s v%s", integrationName, integrationVersion)
+	logrus.Infof(
+		"New Relic %s integration Version: %s, Platform: %s, GoVersion: %s, GitCommit: %s, BuildDate: %s\n",
+		strings.Title(strings.Replace(integrationName, "com.newrelic.", "", 1)),
+		integrationVersion,
+		fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+		runtime.Version(),
+		gitCommit,
+		buildDate)
 	cfg := mustLoadConfigFile(*configFile)
 
-	activeSinks, err := sinks.CreateSinks(cfg.Sinks)
+	activeSinks, err := sinks.CreateSinks(cfg.Sinks, integrationVersion)
 	if err != nil {
 		logrus.Fatalf("could not create sinks: %v", err)
 	}

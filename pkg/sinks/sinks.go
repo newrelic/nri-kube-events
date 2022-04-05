@@ -45,7 +45,7 @@ func (s SinkConfig) GetDurationOr(name string, fallback time.Duration) time.Dura
 	return dur
 }
 
-type sinkFactory func(config SinkConfig) (events.Sink, error)
+type sinkFactory func(config SinkConfig, integrationVersion string) (events.Sink, error)
 
 // registeredSinkFactories holds all the registered sinks by this package
 var registeredSinkFactories = map[string]sinkFactory{}
@@ -60,7 +60,7 @@ func registerSink(name string, factory sinkFactory) {
 
 // CreateSinks takes a slice of SinkConfigs and attempts
 // to initialize the sinks.
-func CreateSinks(configs []SinkConfig) (map[string]events.Sink, error) {
+func CreateSinks(configs []SinkConfig, integrationVersion string) (map[string]events.Sink, error) {
 
 	sinks := make(map[string]events.Sink)
 
@@ -73,7 +73,7 @@ func CreateSinks(configs []SinkConfig) (map[string]events.Sink, error) {
 			return sinks, fmt.Errorf("sink not found: %s", sinkConf.Name)
 		}
 
-		sink, err := factory(sinkConf)
+		sink, err := factory(sinkConf, integrationVersion)
 		if err != nil {
 			return sinks, errors.Wrapf(err, "could not initialize sink %s", sinkConf.Name)
 		}
