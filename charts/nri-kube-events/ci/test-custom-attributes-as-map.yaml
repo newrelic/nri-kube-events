@@ -4,3 +4,9 @@ global:
 
 customAttributes:
   test_tag_label: test_tag_value
+
+image:
+  kubeEvents:
+    repository: e2e/nri-kube-events
+    tag: test
+    pullPolicy: IfNotPresent

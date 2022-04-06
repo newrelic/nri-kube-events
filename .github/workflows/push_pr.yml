@@ -32,6 +32,38 @@ jobs:
         run: |
           make compile
 
+  chart-lint:
+    name: Helm chart Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: helm/chart-testing-action@v2.2.1
+
+      - name: Lint charts
+        run: ct --config .github/ct.yaml lint --debug
+
+      - name: Check for changed installable charts
+        id: list-changed
+        run: |
+          changed=$(ct --config .github/ct.yaml list-changed)
+          if [[ -n "$changed" ]]; then
+            echo "::set-output name=changed::true"
+          fi
+      - name: Run helm unit tests
+        if: steps.list-changed.outputs.changed == 'true'
+        run: |
+          helm plugin install https://github.com/quintush/helm-unittest
+          for chart in $(ct --config .github/ct.yaml list-changed); do
+            if [ -d "$chart/tests/" ]; then
+              helm unittest -3 $chart
+            else
+              echo "No unit tests found for $chart"
+            fi
+          done
+
   static-analysis:
     name: Run all static analysis checks
     runs-on: ubuntu-latest
@@ -81,6 +113,8 @@ jobs:
         kubernetes-version: [ "v1.16.15", "v1.17.17", "v1.18.20", "v1.19.14", "v1.20.10", "v1.21.4", "v1.22.0" ]
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v2
         with:
           go-version: '1.17'
@@ -103,3 +137,14 @@ jobs:
           docker pull nginx
       - name: Run e2e tests
         run: make test-integration
+      - name: Create image for chart testing
+        run: |
+          GOOS=linux GOARCH=amd64 make compile # Set GOOS and GOARCH explicitly since Dockerfile expects them in the binary name
+          DOCKER_BUILDKIT=1 docker build -t e2e/nri-kube-events:test  .
+          minikube image load e2e/nri-kube-events:test
+          kubectl create ns ct
+      - uses: helm/chart-testing-action@v2.2.1
+      - name: Test install charts
+        run: ct install --namespace ct --config .github/ct.yaml --debug
+      - name: Test upgrade charts
+        run: ct install --namespace ct --config .github/ct.yaml --debug --upgrade
