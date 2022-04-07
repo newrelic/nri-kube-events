@@ -40,7 +40,7 @@ jobs:
           name: nri-kube-events-${{ matrix.goos }}-${{ matrix.goarch }}
           path: bin/nri-kube-events-${{ matrix.goos }}-${{ matrix.goarch }}
 
-  release:
+  docker-release:
     name: Release docker images and config
     needs: [ build ]
     runs-on: ubuntu-latest
@@ -55,10 +55,6 @@ jobs:
           echo "${{ github.event.release.tag_name }}" | grep -E '^v[0-9.]*[0-9]$'
           DOCKER_IMAGE_TAG=$(echo "${{ github.event.release.tag_name }}" | sed 's/^v//')
           echo "DOCKER_IMAGE_TAG=$DOCKER_IMAGE_TAG" >> $GITHUB_ENV
-
-      - if: ${{ github.event.release.prerelease }}
-        run: |
-          echo "DOCKER_IMAGE_TAG=${DOCKER_IMAGE_TAG}-pre" >> $GITHUB_ENV
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
@@ -75,14 +71,17 @@ jobs:
           username: ${{ secrets.FSI_DOCKERHUB_USERNAME }}
           password: ${{ secrets.FSI_DOCKERHUB_TOKEN }}
 
-      - name: Build and push docker image
+      - name: Build pre-release image
+        if: ${{ github.event.release.prerelease }}
         run: |
+          DOCKER_IMAGE_TAG=${DOCKER_IMAGE_TAG}-pre
           docker buildx build --push --platform=$DOCKER_PLATFORMS \
             -t $DOCKER_IMAGE_NAME:$DOCKER_IMAGE_TAG \
             .
-      - name: Push :latest image
+      - name: Push release images
         if: ${{ ! github.event.release.prerelease }}
         run: |
           docker buildx build --push --platform=$DOCKER_PLATFORMS \
             -t $DOCKER_IMAGE_NAME:latest \
+            -t $DOCKER_IMAGE_NAME:$DOCKER_IMAGE_TAG \
             .
