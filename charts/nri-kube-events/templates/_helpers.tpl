@@ -8,17 +8,6 @@ Create chart name and version as used by the chart label.
 {{- end -}}
 
 {{/*
-Create the name of the service account to use
-*/}}
-{{- define "nri-kube-events.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create -}}
-{{ default (include "common.naming.fullname" .) .Values.serviceAccount.name }}
-{{- else -}}
-{{ default "default" .Values.serviceAccount.name }}
-{{- end -}}
-{{- end -}}
-
-{{/*
 Return the licenseKey
 */}}
 {{- define "nri-kube-events.licenseKey" -}}

@@ -101,7 +101,7 @@ spec:
               mountPath: /etc/newrelic-infra.yml
               subPath: newrelic-infra.yml
             {{- end }}
-      serviceAccountName: {{ template "nri-kube-events.serviceAccountName" . }}
+      serviceAccountName: {{ include "common.serviceAccount.name" . }}
       volumes:
         {{- if .Values.config }}
         - name: config
