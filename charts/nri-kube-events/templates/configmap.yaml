@@ -17,7 +17,7 @@ metadata:
   name: {{ include "common.naming.fullname" . }}-config
   namespace: {{ .Release.Namespace }}
   labels:
-{{ include "nri-kube-events.labels" . | indent 4 }}
+{{ include "common.labels" . | indent 4 }}
 {{ if .Values.config }}
 ---
 apiVersion: v1
@@ -29,5 +29,5 @@ metadata:
   name: {{ include "common.naming.fullname" . }}-agent-config
   namespace: {{ .Release.Namespace }}
   labels: 
-{{ include "nri-kube-events.labels" . | indent 4 }}
+{{ include "common.labels" . | indent 4 }}
 {{ end }}
