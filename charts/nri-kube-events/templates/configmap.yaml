@@ -14,7 +14,7 @@ data:
         agentHTTPTimeout: {{ .Values.agentHTTPTimeout }}
     {{- end }}
 metadata:
-  name: {{ template "nri-kube-events.fullname" . }}-config
+  name: {{ include "common.naming.fullname" . }}-config
   namespace: {{ .Release.Namespace }}
   labels:
 {{ include "nri-kube-events.labels" . | indent 4 }}
@@ -26,7 +26,7 @@ data:
   newrelic-infra.yml: |
 {{ toYaml .Values.config | indent 4 }}
 metadata:
-  name: {{ template "nri-kube-events.fullname" . }}-agent-config
+  name: {{ include "common.naming.fullname" . }}-agent-config
   namespace: {{ .Release.Namespace }}
   labels: 
 {{ include "nri-kube-events.labels" . | indent 4 }}

@@ -1,10 +1,4 @@
 {{/* vim: set filetype=mustache: */}}
-{{/*
-Expand the name of the chart.
-*/}}
-{{- define "nri-kube-events.name" -}}
-{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
 
 {{/*
 Create chart name and version as used by the chart label.
@@ -14,29 +8,11 @@ Create chart name and version as used by the chart label.
 {{- end -}}
 
 {{/*
-Create a default fully qualified app name.
-We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
-If release name contains chart name it will be used as a full name.
-*/}}
-{{- define "nri-kube-events.fullname" -}}
-{{- if .Values.fullnameOverride -}}
-{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
-{{- else -}}
-{{- $name := default .Chart.Name .Values.nameOverride -}}
-{{- if contains $name .Release.Name -}}
-{{- .Release.Name | trunc 63 | trimSuffix "-" -}}
-{{- else -}}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
-{{- end -}}
-{{- end -}}
-
-{{/*
 Common labels
 */}}
 {{- define "nri-kube-events.labels" -}}
-app: {{ include "nri-kube-events.name" . }}
-app.kubernetes.io/name: {{ include "nri-kube-events.name" . }}
+app: {{ include "common.naming.name" . }}
+app.kubernetes.io/name: {{ include "common.naming.name" . }}
 helm.sh/chart: {{ include "nri-kube-events.chart" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if .Chart.AppVersion }}
@@ -50,7 +26,7 @@ Create the name of the service account to use
 */}}
 {{- define "nri-kube-events.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create -}}
-{{ default (include "nri-kube-events.fullname" .) .Values.serviceAccount.name }}
+{{ default (include "common.naming.fullname" .) .Values.serviceAccount.name }}
 {{- else -}}
 {{ default "default" .Values.serviceAccount.name }}
 {{- end -}}

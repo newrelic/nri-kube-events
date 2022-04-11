@@ -4,11 +4,11 @@ kind: ClusterRoleBinding
 metadata:
   labels:
 {{ include "nri-kube-events.labels" . | indent 4 }}
-  name: {{ template "nri-kube-events.fullname" . }}
+  name: {{ include "common.naming.fullname" . }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ template "nri-kube-events.fullname" . }}
+  name: {{ include "common.naming.fullname" . }}
 subjects:
 - kind: ServiceAccount
   name: {{ template "nri-kube-events.serviceAccountName" . }}
