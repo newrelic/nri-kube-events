@@ -26,14 +26,14 @@ spec:
     spec:
       {{- if .Values.image.pullSecrets }}
       imagePullSecrets:
-{{ toYaml .Values.image.pullSecrets | indent 8 }}
+        {{- include "common.images.renderPullSecrets" ( dict "pullSecrets" ( list .Values.jobImage.pullSecrets ) "context" .) | nindent 8 -}}
       {{- end }}
       securityContext:
         runAsUser: {{ .Values.runAsUser | default 1000 }}
         runAsNonRoot: true
       containers:
         - name: kube-events
-          image: {{ .Values.image.kubeEvents.repository }}:{{ .Values.image.kubeEvents.tag | default .Chart.AppVersion }}
+          image: {{ include "common.images.image" ( dict "imageRoot" .Values.image "context" .) }}
           imagePullPolicy: {{ .Values.image.kubeEvents.pullPolicy }}
           securityContext:
             privileged: false

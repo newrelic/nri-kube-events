@@ -55,10 +55,12 @@ nameOverride: ""
 
 image:
   kubeEvents:
+    registry:
     repository: newrelic/nri-kube-events
     tag: ""
     pullPolicy: IfNotPresent
   infraAgent:
+    registry:
     repository: newrelic/k8s-events-forwarder
     tag: 1.22.0
     pullPolicy: IfNotPresent
