@@ -127,9 +127,9 @@ spec:
       nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 8 }}
       {{- end }}
-      {{- if .Values.tolerations }}
+      {{- with include "common.tolerations" . }}
       tolerations:
-{{ toYaml .Values.tolerations | indent 8 }}
+        {{- . | nindent 8 -}}
       {{- end }}
       {{- with include "common.affinity" . }}
       affinity:
