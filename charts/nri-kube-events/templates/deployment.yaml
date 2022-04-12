@@ -67,7 +67,7 @@ spec:
                   name: {{ include "common.license._customSecretName" . }}
                   key: {{ include "common.license._customSecretKey" . }}
                   {{- end }}
-            {{- if (include "newrelic.nrStaging" .) }}
+            {{- if (include "common.nrStaging" .) }}
             - name: NRIA_STAGING
               value: "true"
             {{- end }}
