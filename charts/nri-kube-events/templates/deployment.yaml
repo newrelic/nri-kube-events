@@ -120,8 +120,9 @@ spec:
           emptyDir: {}
         - name: tmpfs-tmp
           emptyDir: {}
-      {{- if .Values.priorityClassName }}
-      priorityClassName: {{ .Values.priorityClassName }}
+      {{- with include "common.priorityClassName" . }}
+      priorityClassName:
+        {{- . | nindent 8 -}}
       {{- end }}
       {{- with include "common.nodeSelector" . }}
       nodeSelector:
