@@ -16,22 +16,6 @@ Return the customSecretName
 {{- end -}}
 
 {{/*
-Return the customSecretLicenseKey
-*/}}
-{{- define "nri-kube-events.customSecretLicenseKey" -}}
-{{- if .Values.global }}
-  {{- if .Values.global.customSecretLicenseKey }}
-      {{- .Values.global.customSecretLicenseKey -}}
-  {{- else -}}
-      {{- .Values.customSecretLicenseKey | default "" -}}
-  {{- end -}}
-{{- else -}}
-    {{- .Values.customSecretLicenseKey | default "" -}}
-{{- end -}}
-{{- end -}}
-
-
-{{/*
 Returns nrStaging
 */}}
 {{- define "newrelic.nrStaging" -}}
@@ -50,9 +34,9 @@ licenseKey and cluster are set.
 */}}
 {{- define "nri-kube-events.areValuesValid" -}}
 {{- $cluster := include "common.cluster" . -}}
-{{- $licenseKey := include "nri-kube-events.licenseKey" . -}}
-{{- $customSecretName := include "nri-kube-events.customSecretName" . -}}
-{{- $customSecretLicenseKey := include "nri-kube-events.customSecretLicenseKey" . -}}
+{{- $licenseKey := include "common.license._licenseKey" . -}}
+{{- $customSecretName := include "common.license._customSecretName" . -}}
+{{- $customSecretLicenseKey := include "common.license._customSecretKey" . -}}
 {{- and (or $licenseKey (and $customSecretName $customSecretLicenseKey)) $cluster}}
 {{- end -}}
 

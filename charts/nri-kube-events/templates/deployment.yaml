@@ -64,8 +64,8 @@ spec:
                   name: {{ include "common.naming.fullname" . }}-config
                   key: licenseKey
                   {{- else }}
-                  name: {{ include "nri-kube-events.customSecretName" . }}
-                  key: {{ include "nri-kube-events.customSecretLicenseKey" . }}
+                  name: {{ include "common.license._customSecretName" . }}
+                  key: {{ include "common.license._customSecretKey" . }}
                   {{- end }}
             {{- if (include "newrelic.nrStaging" .) }}
             - name: NRIA_STAGING
