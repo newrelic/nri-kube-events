@@ -60,7 +60,7 @@ spec:
             - name: NRIA_LICENSE_KEY
               valueFrom:
                 secretKeyRef:
-                  {{- if (include "nri-kube-events.licenseKey" .) }}
+                  {{- if (include "common.license._licenseKey" .) }}
                   name: {{ include "common.naming.fullname" . }}-config
                   key: licenseKey
                   {{- else }}

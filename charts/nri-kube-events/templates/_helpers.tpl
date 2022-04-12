@@ -1,21 +1,6 @@
 {{/* vim: set filetype=mustache: */}}
 
 {{/*
-Return the licenseKey
-*/}}
-{{- define "nri-kube-events.licenseKey" -}}
-{{- if .Values.global}}
-  {{- if .Values.global.licenseKey }}
-      {{- .Values.global.licenseKey -}}
-  {{- else -}}
-      {{- .Values.licenseKey | default "" -}}
-  {{- end -}}
-{{- else -}}
-    {{- .Values.licenseKey | default "" -}}
-{{- end -}}
-{{- end -}}
-
-{{/*
 Return the customSecretName
 */}}
 {{- define "nri-kube-events.customSecretName" -}}
