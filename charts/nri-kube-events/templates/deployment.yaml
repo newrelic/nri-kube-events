@@ -24,9 +24,9 @@ spec:
       labels:
 {{ include "common.labels" . | indent 8 }}
     spec:
-      {{- if .Values.image.pullSecrets }}
+      {{- with include "common.images.renderPullSecrets" ( dict "pullSecrets" (list .Values.image.pullSecrets) "context" .) }}
       imagePullSecrets:
-        {{- include "common.images.renderPullSecrets" ( dict "pullSecrets" ( list .Values.jobImage.pullSecrets ) "context" .) | nindent 8 -}}
+        {{- . | nindent 8 }}
       {{- end }}
       securityContext:
         runAsUser: {{ .Values.runAsUser | default 1000 }}

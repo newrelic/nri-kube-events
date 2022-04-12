@@ -1,0 +1,31 @@
+suite: test deployment images
+templates:
+  - templates/deployment.yaml
+release:
+  name: my-release
+  namespace: my-namespace
+tests:
+  - it: deployment image uses pullSecrets
+    set:
+      cluster: my-cluster
+      licenseKey: us-whatever
+      image:
+        pullSecrets:
+          - name: regsecret
+    asserts:
+      - equal:
+          path: spec.template.spec.imagePullSecrets[0].name
+          value: regsecret
+  - it: deployment image uses the proper image tag
+    set:
+      cluster: test-cluster
+      licenseKey: us-whatever
+      image:
+        repository: newrelic/nri-kube-events
+        tag: "latest"
+        pullSecrets:
+          - name: regsecret
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^.*newrelic/nri-kube-events:latest
