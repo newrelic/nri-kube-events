@@ -23,21 +23,6 @@ Return the licenseKey
 {{- end -}}
 
 {{/*
-Return the cluster
-*/}}
-{{- define "nri-kube-events.cluster" -}}
-{{- if .Values.global -}}
-  {{- if .Values.global.cluster -}}
-      {{- .Values.global.cluster -}}
-  {{- else -}}
-      {{- .Values.cluster | default "" -}}
-  {{- end -}}
-{{- else -}}
-  {{- .Values.cluster | default "" -}}
-{{- end -}}
-{{- end -}}
-
-{{/*
 Return the customSecretName
 */}}
 {{- define "nri-kube-events.customSecretName" -}}
@@ -86,7 +71,7 @@ Returns if the template should render, it checks if the required values
 licenseKey and cluster are set.
 */}}
 {{- define "nri-kube-events.areValuesValid" -}}
-{{- $cluster := include "nri-kube-events.cluster" . -}}
+{{- $cluster := include "common.cluster" . -}}
 {{- $licenseKey := include "nri-kube-events.licenseKey" . -}}
 {{- $customSecretName := include "nri-kube-events.customSecretName" . -}}
 {{- $customSecretLicenseKey := include "nri-kube-events.customSecretLicenseKey" . -}}

@@ -10,7 +10,7 @@ data:
     - name: newRelicInfra
       config:
         agentEndpoint: http://localhost:8001/v1/data
-        clusterName: {{ include "nri-kube-events.cluster" . }}
+        clusterName: {{ include "common.cluster" . }}
         agentHTTPTimeout: {{ .Values.agentHTTPTimeout }}
     {{- end }}
 metadata:
