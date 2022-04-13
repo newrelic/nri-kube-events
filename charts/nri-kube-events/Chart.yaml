@@ -3,9 +3,8 @@ description: A Helm chart to deploy the New Relic Kube Events
 name: nri-kube-events
 version: 1.15.0
 appVersion: 1.8.0
-engine: gotpl
 home: https://docs.newrelic.com/docs/integrations/kubernetes-integration/kubernetes-events/install-kubernetes-events-integration
-icon: https://newrelic.com/assets/newrelic/source/NewRelic-logo-square.svg
+icon: https://newrelic.com/themes/custom/curio/assets/mediakit/NR_logo_Horizontal.svg
 
 dependencies:
   - name: common-library

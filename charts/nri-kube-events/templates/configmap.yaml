@@ -17,7 +17,7 @@ metadata:
   name: {{ include "newrelic.common.naming.fullname" . }}-config
   namespace: {{ .Release.Namespace }}
   labels:
-{{ include "newrelic.common.labels" . | indent 4 }}
+    {{- include "newrelic.common.labels" . | nindent 4 }}
 {{ if .Values.config }}
 ---
 apiVersion: v1
@@ -29,5 +29,5 @@ metadata:
   name: {{ include "newrelic.common.naming.fullname" . }}-agent-config
   namespace: {{ .Release.Namespace }}
   labels: 
-{{ include "newrelic.common.labels" . | indent 4 }}
+    {{- include "newrelic.common.labels" . | nindent 4 }}
 {{ end }}
