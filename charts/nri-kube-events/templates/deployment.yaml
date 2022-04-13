@@ -33,7 +33,7 @@ spec:
         runAsNonRoot: true
       containers:
         - name: kube-events
-          image: {{ include "common.images.image" ( dict "imageRoot" .Values.image "context" .) }}
+          image: {{ include "common.images.image" ( dict "imageRoot" .Values.image.kubeEvents "context" .) }}
           imagePullPolicy: {{ .Values.image.kubeEvents.pullPolicy }}
           securityContext:
             privileged: false
@@ -48,7 +48,7 @@ spec:
             - name: config-volume
               mountPath: /app/config
         - name: infra-agent
-          image: {{ .Values.image.infraAgent.repository }}:{{ .Values.image.infraAgent.tag }}
+          image: {{ include "common.images.image" ( dict "imageRoot" .Values.image.infraAgent "context" .) }}
           imagePullPolicy: {{ .Values.image.infraAgent.pullPolicy }}
           securityContext:
             privileged: false

@@ -16,16 +16,21 @@ tests:
       - equal:
           path: spec.template.spec.imagePullSecrets[0].name
           value: regsecret
-  - it: deployment image uses the proper image tag
+  - it: deployment images use the proper image tag
     set:
       cluster: test-cluster
       licenseKey: us-whatever
       image:
-        repository: newrelic/nri-kube-events
-        tag: "latest"
-        pullSecrets:
-          - name: regsecret
+        kubeEvents:
+          repository: newrelic/nri-kube-events
+          tag: "latest"
+        infraAgent:
+          repository: newrelic/k8s-events-forwarder
+          tag: "latest"
     asserts:
       - matchRegex:
           path: spec.template.spec.containers[0].image
           pattern: ^.*newrelic/nri-kube-events:latest
+      - matchRegex:
+          path: spec.template.spec.containers[1].image
+          pattern: ^.*newrelic/k8s-events-forwarder:latest
