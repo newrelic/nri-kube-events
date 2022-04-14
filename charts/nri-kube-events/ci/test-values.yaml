@@ -43,6 +43,15 @@ affinity:
 
 hostNetwork: true
 
+dnsConfig:
+  nameservers:
+    - 1.2.3.4
+  searches:
+    - my.dns.search.suffix
+  options:
+    - name: ndots
+      value: "1"
+
 image:
   kubeEvents:
     repository: e2e/nri-kube-events
