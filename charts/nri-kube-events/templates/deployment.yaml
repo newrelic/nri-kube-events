@@ -81,7 +81,7 @@ spec:
                   fieldPath: spec.nodeName
             {{- if .Values.customAttributes }}
             - name: NRIA_CUSTOM_ATTRIBUTES
-              value: {{ include "newrelic.common.customAttributes" . | quote }}
+              value: {{ fromYaml (include "newrelic.common.customAttributes" . ) | toJson | quote }}
             {{- end }}
           volumeMounts:
             - mountPath: /var/db/newrelic-infra/data
@@ -115,8 +115,7 @@ spec:
         - name: tmpfs-tmp
           emptyDir: {}
       {{- with include "newrelic.common.priorityClassName" . }}
-      priorityClassName:
-        {{- . | nindent 8 -}}
+      priorityClassName: {{ . }}
       {{- end }}
       {{- with include "newrelic.common.nodeSelector" . }}
       nodeSelector:

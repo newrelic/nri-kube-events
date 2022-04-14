@@ -30,7 +30,7 @@ tests:
     asserts:
       - matchRegex:
           path: spec.template.spec.containers[0].image
-          pattern: ^.*newrelic/nri-kube-events:latest
+          pattern: .*newrelic/nri-kube-events:latest$
       - matchRegex:
           path: spec.template.spec.containers[1].image
-          pattern: ^.*newrelic/k8s-events-forwarder:latest
+          pattern: .*newrelic/k8s-events-forwarder:latest$
