@@ -8,7 +8,7 @@ icon: https://newrelic.com/themes/custom/curio/assets/mediakit/NR_logo_Horizonta
 
 dependencies:
   - name: common-library
-    version: 1.0.0
+    version: 1.0.1
     repository: "https://helm-charts.newrelic.com"
 
 maintainers:
