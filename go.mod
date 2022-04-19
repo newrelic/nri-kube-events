@@ -187,6 +187,6 @@ require (
 replace (
 	// To avoid CVE-2020-13949 triggering a security scan.
 	github.com/apache/thrift => github.com/apache/thrift v0.14.0
-	// To avoid CVE-2018-16886 triggering a security scan.
-	go.etcd.io/etcd => go.etcd.io/etcd v0.5.0-alpha.5.0.20190108173120-83c051b701d3
+	// To avoid CVE-2018-1098 triggering a security scan.
+	go.etcd.io/etcd => go.etcd.io/etcd v0.5.0-alpha.5.0.20190917205325-a14579fbfb1a
 )
