@@ -119,15 +119,15 @@ spec:
       {{- end }}
       {{- with include "newrelic.common.nodeSelector" . }}
       nodeSelector:
-        {{- . | nindent 8 -}}
+        {{- . | nindent 8 }}
       {{- end }}
       {{- with include "newrelic.common.tolerations" . }}
       tolerations:
-        {{- . | nindent 8 -}}
+        {{- . | nindent 8 }}
       {{- end }}
       {{- with include "newrelic.common.affinity" . }}
       affinity:
-        {{- . | nindent 8 -}}
+        {{- . | nindent 8 }}
       {{- end }}
       hostNetwork: {{ include "newrelic.common.hostNetwork.value" . }}
       {{- with include "newrelic.common.dnsConfig" . }}
