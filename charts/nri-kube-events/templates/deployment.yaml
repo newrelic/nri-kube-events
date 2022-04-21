@@ -65,9 +65,9 @@ spec:
             - name: NRIA_STAGING
               value: "true"
             {{- end }}
-            {{- if .Values.proxy }}
+            {{- with include "newrelic.common.proxy" . }}
             - name: NRIA_PROXY
-              value: "{{ .Values.proxy }}"
+              value: {{ . | quote }}
             {{- end }}
             # Using FORWARD_ONLY mode to avoid the entity creation for the events.
             - name: NRIA_IS_SECURE_FORWARD_ONLY
@@ -79,9 +79,9 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
-            {{- if .Values.customAttributes }}
+            {{- with include "newrelic.common.customAttributes" . }}
             - name: NRIA_CUSTOM_ATTRIBUTES
-              value: {{ fromYaml (include "newrelic.common.customAttributes" . ) | toJson | quote }}
+              value: {{ fromYaml . | toJson | quote }}
             {{- end }}
           volumeMounts:
             - mountPath: /var/db/newrelic-infra/data

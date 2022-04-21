@@ -34,3 +34,24 @@ tests:
       - matchRegex:
           path: spec.template.spec.containers[1].image
           pattern: .*newrelic/k8s-events-forwarder:latest$
+  - it: adds proxy when enabled
+    set:
+      cluster: test-cluster
+      proxy: "https://proxy:1234"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: NRIA_PROXY
+            value: "https://proxy:1234"
+  - it: adds customAttributes when enabled
+    set:
+      cluster: test-cluster
+      customAttributes:
+        test_tag_label: test_tag_value
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: NRIA_CUSTOM_ATTRIBUTES
+            value: '{"test_tag_label":"test_tag_value"}'
