@@ -4,7 +4,7 @@
 {{- if include "newrelic.common.securityContext.pod" . -}}
 {{- include "newrelic.common.securityContext.pod" . -}}
 {{- else if include "newrelic.compatibility.securityContext" . -}}
-{{- include "newrelic.compatibility.securityContext" . -}}
+{{- include "newrelic.compatibility.securityContext" . }}
 runAsNonRoot: true
 {{- else -}}
 runAsUser: 1000

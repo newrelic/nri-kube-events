@@ -44,6 +44,78 @@ tests:
           content:
             name: NRIA_PROXY
             value: "https://proxy:1234"
+  - it: set to defaults when no podSecurityContext set
+    set:
+      cluster: my-cluster
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 1000
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+  - it: set podSecurityContext custom values
+    set:
+      cluster: test-cluster
+      podSecurityContext:
+        foobar: true
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.foobar
+          value: true
+  - it: set to defaults when no containerSecurityContext set
+    set:
+      cluster: my-cluster
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.privileged
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.template.spec.containers[1].securityContext
+          value:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+  - it: set containerSecurityContext custom values
+    set:
+      cluster: test-cluster
+      containerSecurityContext:
+        foobar: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.foobar
+          value: true
+      - equal:
+          path: spec.template.spec.containers[1].securityContext.foobar
+          value: true
+  - it: uses securityContext compatibility layer
+    set:
+      cluster: test-cluster
+      runAsUser: 1001
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 1001
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+  - it: uses securityContext compatibility layer
+    set:
+      cluster: test-cluster
+      runAsUser: 1001
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 1001
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
   - it: adds customAttributes when enabled
     set:
       cluster: test-cluster
