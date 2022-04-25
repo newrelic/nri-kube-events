@@ -3,3 +3,6 @@ cmd/nri-kube-events/config.yaml
 bin/
 deploy/local.yaml
 .DS_STORE
+
+# Downloaded chart dependencies
+**/charts/*.tgz

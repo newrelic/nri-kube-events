@@ -1,0 +1,60 @@
+suite: test configmap sinks and and newrelic infra config
+templates:
+  - templates/configmap.yaml
+release:
+  name: my-release
+  namespace: my-namespace
+tests:
+  - it: has the correct sinks when default values used
+    set:
+      cluster: a-cluster
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: data.config\.yaml
+          value: |-
+            sinks:
+            - name: newRelicInfra
+              config:
+                agentEndpoint: http://localhost:8001/v1/data
+                clusterName: a-cluster
+                agentHTTPTimeout: 30s
+  - it: has the correct sinks defined in local values
+    set:
+      cluster: a-cluster
+      sinks:
+        stdout: true
+        newRelicInfra: false
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: data.config\.yaml
+          value: |-
+            sinks:
+            - name: stdout
+        documentIndex: 0
+  - it: has another document generated with the proper config set
+    set:
+      cluster: a-cluster
+      sinks:
+        stdout: false
+        newRelicInfra: false
+      config:
+        accountID: 111
+        region: A-REGION
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: data.config\.yaml
+          value: |-
+            sinks:
+        documentIndex: 0
+      - equal:
+          path: data.newrelic-infra\.yml
+          value: |
+            accountID: 111
+            region: A-REGION
+        documentIndex: 1

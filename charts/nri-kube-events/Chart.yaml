@@ -1,19 +1,26 @@
-apiVersion: v1
+apiVersion: v2
 description: A Helm chart to deploy the New Relic Kube Events
 name: nri-kube-events
-version: 1.14.0
+version: 2.0.0
 appVersion: 1.8.0
-engine: gotpl
 home: https://docs.newrelic.com/docs/integrations/kubernetes-integration/kubernetes-events/install-kubernetes-events-integration
-icon: https://newrelic.com/assets/newrelic/source/NewRelic-logo-square.svg
-keywords:
-  - events
-  - newrelic
-  - monitoring
+icon: https://newrelic.com/themes/custom/curio/assets/mediakit/NR_logo_Horizontal.svg
+
+dependencies:
+  - name: common-library
+    version: 1.0.2
+    repository: "https://helm-charts.newrelic.com"
+
 maintainers:
   - name: alvarocabanas
   - name: carlossscastro
   - name: gsanchezgavier
   - name: kang-makes
+  - name: marcsanmi
   - name: paologallinaharbur
   - name: roobre
+  - name: sigilioso
+keywords:
+  - infrastructure
+  - newrelic
+  - monitoring

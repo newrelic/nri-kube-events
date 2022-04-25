@@ -1,11 +1,10 @@
-{{- if (include "nri-kube-events.areValuesValid" .) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ template "nri-kube-events.fullname" . }}
+  name: {{ include "newrelic.common.naming.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-{{ include "nri-kube-events.labels" . | indent 4 }}
+    {{- include "newrelic.common.labels" . | nindent 4 }}
   annotations:
   {{- if .Values.deployment.annotations }}
 {{ toYaml .Values.deployment.annotations | indent 4 }}
@@ -14,7 +13,7 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ template "nri-kube-events.name" . }}
+      app.kubernetes.io/name: {{ include "newrelic.common.naming.name" . }}
   template:
     metadata:
 {{- if .Values.podAnnotations }}
@@ -22,18 +21,18 @@ spec:
 {{ toYaml .Values.podAnnotations | indent 8}}
 {{- end }}
       labels:
-{{ include "nri-kube-events.labels" . | indent 8 }}
+        {{- include "newrelic.common.labels" . | nindent 8 }}
     spec:
-      {{- if .Values.image.pullSecrets }}
+      {{- with include "newrelic.common.images.renderPullSecrets" ( dict "pullSecrets" (list .Values.image.pullSecrets) "context" .) }}
       imagePullSecrets:
-{{ toYaml .Values.image.pullSecrets | indent 8 }}
+        {{- . | nindent 8 }}
       {{- end }}
       securityContext:
         runAsUser: {{ .Values.runAsUser | default 1000 }}
         runAsNonRoot: true
       containers:
         - name: kube-events
-          image: {{ .Values.image.kubeEvents.repository }}:{{ .Values.image.kubeEvents.tag | default .Chart.AppVersion }}
+          image: {{ include "newrelic.common.images.image" ( dict "imageRoot" .Values.image.kubeEvents "context" .) }}
           imagePullPolicy: {{ .Values.image.kubeEvents.pullPolicy }}
           securityContext:
             privileged: false
@@ -48,7 +47,7 @@ spec:
             - name: config-volume
               mountPath: /app/config
         - name: infra-agent
-          image: {{ .Values.image.infraAgent.repository }}:{{ .Values.image.infraAgent.tag }}
+          image: {{ include "newrelic.common.images.image" ( dict "imageRoot" .Values.image.infraAgent "context" .) }}
           imagePullPolicy: {{ .Values.image.infraAgent.pullPolicy }}
           securityContext:
             privileged: false
@@ -60,14 +59,9 @@ spec:
             - name: NRIA_LICENSE_KEY
               valueFrom:
                 secretKeyRef:
-                  {{- if (include "nri-kube-events.licenseKey" .) }}
-                  name: {{ template "nri-kube-events.fullname" . }}-config
-                  key: licenseKey
-                  {{- else }}
-                  name: {{ include "nri-kube-events.customSecretName" . }}
-                  key: {{ include "nri-kube-events.customSecretLicenseKey" . }}
-                  {{- end }}
-            {{- if (include "newrelic.nrStaging" .) }}
+                  name: {{ include "newrelic.common.license.secretName" . }}
+                  key: {{ include "newrelic.common.license.secretKeyName" . }}
+            {{- if (include "newrelic.common.nrStaging" .) }}
             - name: NRIA_STAGING
               value: "true"
             {{- end }}
@@ -87,7 +81,7 @@ spec:
                   fieldPath: spec.nodeName
             {{- if .Values.customAttributes }}
             - name: NRIA_CUSTOM_ATTRIBUTES
-              value: {{ include "newrelic.customAttributes" . | quote }}
+              value: {{ fromYaml (include "newrelic.common.customAttributes" . ) | toJson | quote }}
             {{- end }}
           volumeMounts:
             - mountPath: /var/db/newrelic-infra/data
@@ -101,38 +95,42 @@ spec:
               mountPath: /etc/newrelic-infra.yml
               subPath: newrelic-infra.yml
             {{- end }}
-      serviceAccountName: {{ template "nri-kube-events.serviceAccountName" . }}
+      serviceAccountName: {{ include "newrelic.common.serviceAccount.name" . }}
       volumes:
         {{- if .Values.config }}
         - name: config
           configMap:
-            name: {{ template "nri-kube-events.fullname" . }}-agent-config
+            name: {{ include "newrelic.common.naming.fullname" . }}-agent-config
             items:
             - key: newrelic-infra.yml
               path: newrelic-infra.yml
         {{- end }}
         - name: config-volume
           configMap:
-            name: {{ template "nri-kube-events.fullname" . }}-config
+            name: {{ include "newrelic.common.naming.fullname" . }}-config
         - name: tmpfs-data
           emptyDir: {}
         - name: tmpfs-user-data
           emptyDir: {}
         - name: tmpfs-tmp
           emptyDir: {}
-      {{- if .Values.priorityClassName }}
-      priorityClassName: {{ .Values.priorityClassName }}
+      {{- with include "newrelic.common.priorityClassName" . }}
+      priorityClassName: {{ . }}
       {{- end }}
-      {{- if .Values.nodeSelector }}
+      {{- with include "newrelic.common.nodeSelector" . }}
       nodeSelector:
-{{ toYaml .Values.nodeSelector | indent 8 }}
+        {{- . | nindent 8 }}
       {{- end }}
-      {{- if .Values.tolerations }}
+      {{- with include "newrelic.common.tolerations" . }}
       tolerations:
-{{ toYaml .Values.tolerations | indent 8 }}
+        {{- . | nindent 8 }}
       {{- end }}
-      {{- if .Values.affinity }}
+      {{- with include "newrelic.common.affinity" . }}
       affinity:
-{{ toYaml .Values.affinity | indent 8 }}
+        {{- . | nindent 8 }}
       {{- end }}
-{{- end }}
+      hostNetwork: {{ include "newrelic.common.hostNetwork.value" . }}
+      {{- with include "newrelic.common.dnsConfig" . }}
+      dnsConfig:
+        {{- . | nindent 8 }}
+      {{- end }}
