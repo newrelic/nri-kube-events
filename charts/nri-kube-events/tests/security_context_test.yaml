@@ -10,11 +10,10 @@ tests:
       cluster: my-cluster
     asserts:
       - equal:
-          path: spec.template.spec.securityContext.runAsUser
-          value: 1000
-      - equal:
-          path: spec.template.spec.securityContext.runAsNonRoot
-          value: true
+          path: spec.template.spec.securityContext
+          value:
+            runAsUser: 1000
+            runAsNonRoot: true
   - it: pod securityContext set common-library values
     set:
       cluster: test-cluster
@@ -33,11 +32,10 @@ tests:
         runAsNonRoot: false
     asserts:
       - equal:
-          path: spec.template.spec.securityContext.runAsUser
-          value: 1001
-      - equal:
-          path: spec.template.spec.securityContext.runAsNonRoot
-          value: false
+          path: spec.template.spec.securityContext
+          value:
+            runAsUser: 1001
+            runAsNonRoot: false
   - it: pod securityContext compatibility layer overrides defaults
     set:
       cluster: test-cluster
@@ -51,14 +49,11 @@ tests:
       cluster: my-cluster
     asserts:
       - equal:
-          path: spec.template.spec.containers[0].securityContext.privileged
-          value: false
-      - equal:
-          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
-          value: false
-      - equal:
-          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
-          value: true
+          path: spec.template.spec.containers[0].securityContext
+          value:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
       - equal:
           path: spec.template.spec.containers[1].securityContext
           value:
@@ -73,7 +68,4 @@ tests:
     asserts:
       - equal:
           path: spec.template.spec.containers[0].securityContext.foobar
-          value: true
-      - equal:
-          path: spec.template.spec.containers[1].securityContext.foobar
           value: true
