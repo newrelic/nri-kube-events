@@ -5,7 +5,7 @@ release:
   name: my-release
   namespace: my-namespace
 tests:
-  - it: set to defaults when no podSecurityContext set
+  - it: pod securityContext set to defaults when no values provided
     set:
       cluster: my-cluster
     asserts:
@@ -15,7 +15,7 @@ tests:
       - equal:
           path: spec.template.spec.securityContext.runAsNonRoot
           value: true
-  - it: set podSecurityContext custom values
+  - it: pod securityContext set common-library values
     set:
       cluster: test-cluster
       podSecurityContext:
@@ -24,6 +24,28 @@ tests:
       - equal:
           path: spec.template.spec.securityContext.foobar
           value: true
+  - it: pod securityContext compatibility layer overrides values from common-library
+    set:
+      cluster: test-cluster
+      runAsUser: 1001
+      podSecurityContext:
+        runAsUser: 1000
+        runAsNonRoot: false
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 1001
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: false
+  - it: pod securityContext compatibility layer overrides defaults
+    set:
+      cluster: test-cluster
+      runAsUser: 1001
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 1001
   - it: set to defaults when no containerSecurityContext set
     set:
       cluster: my-cluster
@@ -54,26 +76,4 @@ tests:
           value: true
       - equal:
           path: spec.template.spec.containers[1].securityContext.foobar
-          value: true
-  - it: uses securityContext compatibility layer
-    set:
-      cluster: test-cluster
-      runAsUser: 1001
-    asserts:
-      - equal:
-          path: spec.template.spec.securityContext.runAsUser
-          value: 1001
-      - equal:
-          path: spec.template.spec.securityContext.runAsNonRoot
-          value: true
-  - it: uses securityContext compatibility layer
-    set:
-      cluster: test-cluster
-      runAsUser: 1001
-    asserts:
-      - equal:
-          path: spec.template.spec.securityContext.runAsUser
-          value: 1001
-      - equal:
-          path: spec.template.spec.securityContext.runAsNonRoot
           value: true

@@ -2,7 +2,7 @@
 
 {{- define "nri-kube-events.securityContext.pod" -}}
 {{- $defaults := fromYaml ( include "nriKubernetes.securityContext.podDefaults" . ) -}}
-{{- $compatibilityLayer := include "newrelic.compatibility.securityContext" . | fromYaml -}}
+{{- $compatibilityLayer := include "newrelic.compatibility.securityContext.pod" . | fromYaml -}}
 {{- $commonLibrary := fromYaml ( include "newrelic.common.securityContext.pod" . ) -}}
 
 {{- $finalSecurityContext := dict -}}
@@ -14,6 +14,7 @@
 {{- toYaml $finalSecurityContext -}}
 {{- end -}}
 
+{{- /* These are the defaults that are used for all the containers in this chart */ -}}
 {{- define "nriKubernetes.securityContext.podDefaults" -}}
 runAsUser: 1000
 runAsNonRoot: true
