@@ -73,7 +73,18 @@ image:
 # Can also be modified for OpenShift clusters where the runAsUser range
 # may be restricted.  See OpenShift docs for more information.
 # https://www.openshift.com/blog/a-guide-to-openshift-and-uids
-runAsUser:
+# runAsUser:
+
+# Custom container security context with default values:
+# - privileged: false
+# - allowPrivilegeEscalation: false
+# - readOnlyRootFilesystem: true
+containerSecurityContext:
+
+# Custom pod security context with default values:
+# - runAsUser: 1000
+# - runAsNonRoot: true
+podSecurityContext:
 
 resources:
   {}
