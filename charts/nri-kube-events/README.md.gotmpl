@@ -1,23 +1,17 @@
 [![Community Plus header](https://github.com/newrelic/opensource-website/raw/master/src/images/categories/Community_Plus.png)](https://opensource.newrelic.com/oss-category/#community-plus)
 
-# nri-kube-events
+{{ template "chart.header" . }}
+{{ template "chart.deprecationWarning" . }}
 
-![Version: 2.2.2](https://img.shields.io/badge/Version-2.2.2-informational?style=flat-square) ![AppVersion: 1.8.0](https://img.shields.io/badge/AppVersion-1.8.0-informational?style=flat-square)
+{{ template "chart.badgesSection" . }}
 
-A Helm chart to deploy the New Relic Kube Events router
+{{ template "chart.description" . }}
 
-**Homepage:** <https://docs.newrelic.com/docs/integrations/kubernetes-integration/kubernetes-events/install-kubernetes-events-integration>
+{{ template "chart.homepageLine" . }}
 
-## Source Code
+{{ template "chart.sourcesSection" . }}
 
-* <https://github.com/newrelic/nri-kube-events/>
-* <https://github.com/newrelic/nri-kube-events/tree/master/charts/newrelic-infrastructure>
-
-## Requirements
-
-| Repository | Name | Version |
-|------------|------|---------|
-| https://helm-charts.newrelic.com | common-library | 1.0.2 |
+{{ template "chart.requirementsSection" . }}
 
 ## Values managed globally
 
@@ -106,44 +100,18 @@ By default, from the common library, the privileged mode is set to false. But mo
 metrics so could see a true in some charts. The consequences of the privileged mode differ from one chart to another so for the chart that
 honors the privileged mode toggle should be a section in the README explaining which is the behavior with it enabled or disabled.
 
-## Values
 
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| affinity | object | `{}` |  |
-| agentHTTPTimeout | string | `"30s"` |  |
-| containerSecurityContext | string | `nil` |  |
-| customAttributes | object | `{}` | Custom attributes here has the same functionality as in the new infrastructure v3 chart. you can read a string (because is a string in JSON format) or read directly the map here and encode to JSON. |
-| deployment.annotations | object | `{}` |  |
-| images.agent.pullPolicy | string | `"IfNotPresent"` |  |
-| images.agent.registry | string | `nil` |  |
-| images.agent.repository | string | `"newrelic/k8s-events-forwarder"` |  |
-| images.agent.tag | string | `"1.22.0"` |  |
-| images.integration.pullPolicy | string | `"IfNotPresent"` |  |
-| images.integration.registry | string | `nil` |  |
-| images.integration.repository | string | `"newrelic/nri-kube-events"` |  |
-| images.integration.tag | string | `""` |  |
-| images.pullSecrets | list | `[]` |  |
-| nameOverride | string | `""` |  |
-| nodeSelector | object | `{}` |  |
-| nrStaging | bool | `false` |  |
-| podSecurityContext | string | `nil` |  |
-| rbac.create | bool | `true` |  |
-| resources | object | `{}` |  |
-| serviceAccount.annotations | string | `nil` |  |
-| serviceAccount.create | bool | `true` |  |
-| serviceAccount.name | string | `""` |  |
-| sinks.newRelicInfra | bool | `true` |  |
-| sinks.stdout | bool | `false` |  |
-| tolerations | list | `[]` |  |
+{{ template "chart.valuesSection" . }}
 
+{{ if .Maintainers }}
 ## Maintainers
-
-* [Alvaro Cabanas](https://github.com/alvarocabanas)
-* [Carlos Castro](https://github.com/carlossscastro)
-* [Christian Felipe](https://github.com/sigilioso)
-* [Guillermo Sanchez](https://github.com/gsanchezgavier)
-* [Juan Manuel Perez](https://github.com/kang-makes)
-* [Marc Sanmiquel](https://github.com/marcsanmi)
-* [Paolo Gallina](https://github.com/paologallinaharbur)
-* [Roberto Santalla](https://github.com/roobre)
+{{ range .Maintainers }}
+{{- if .Name }}
+{{- if .Url }}
+* [{{ .Name }}]({{ .Url }})
+{{- else }}
+* {{ .Name }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
