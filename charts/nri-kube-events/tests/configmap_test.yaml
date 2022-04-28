@@ -1,4 +1,4 @@
-suite: test configmap sinks and and newrelic infra config
+suite: test configmap for sinks
 templates:
   - templates/configmap.yaml
 release:
@@ -9,17 +9,31 @@ tests:
     set:
       cluster: a-cluster
     asserts:
-      - hasDocuments:
-          count: 1
       - equal:
           path: data.config\.yaml
           value: |-
             sinks:
-            - name: newRelicInfra
-              config:
-                agentEndpoint: http://localhost:8001/v1/data
-                clusterName: a-cluster
-                agentHTTPTimeout: 30s
+              - name: newRelicInfra
+                config:
+                  agentEndpoint: http://localhost:8001/v1/data
+                  clusterName: a-cluster
+                  agentHTTPTimeout: 30s
+
+  - it: honors agentHTTPTimeout
+    set:
+      cluster: a-cluster
+      agentHTTPTimeout: 10s
+    asserts:
+      - equal:
+          path: data.config\.yaml
+          value: |-
+            sinks:
+              - name: newRelicInfra
+                config:
+                  agentEndpoint: http://localhost:8001/v1/data
+                  clusterName: a-cluster
+                  agentHTTPTimeout: 10s
+
   - it: has the correct sinks defined in local values
     set:
       cluster: a-cluster
@@ -27,34 +41,20 @@ tests:
         stdout: true
         newRelicInfra: false
     asserts:
-      - hasDocuments:
-          count: 1
       - equal:
           path: data.config\.yaml
           value: |-
             sinks:
-            - name: stdout
-        documentIndex: 0
+              - name: stdout
+
   - it: has another document generated with the proper config set
     set:
       cluster: a-cluster
       sinks:
         stdout: false
         newRelicInfra: false
-      config:
-        accountID: 111
-        region: A-REGION
     asserts:
-      - hasDocuments:
-          count: 2
       - equal:
           path: data.config\.yaml
           value: |-
             sinks:
-        documentIndex: 0
-      - equal:
-          path: data.newrelic-infra\.yml
-          value: |
-            accountID: 111
-            region: A-REGION
-        documentIndex: 1
