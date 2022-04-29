@@ -9,22 +9,24 @@ tests:
     set:
       cluster: my-cluster
       licenseKey: us-whatever
-      image:
+      images:
         pullSecrets:
           - name: regsecret
     asserts:
       - equal:
-          path: spec.template.spec.imagePullSecrets[0].name
-          value: regsecret
+          path: spec.template.spec.imagePullSecrets
+          value:
+            - name: regsecret
+
   - it: deployment images use the proper image tag
     set:
       cluster: test-cluster
       licenseKey: us-whatever
-      image:
-        kubeEvents:
+      images:
+        integration:
           repository: newrelic/nri-kube-events
           tag: "latest"
-        infraAgent:
+        agent:
           repository: newrelic/k8s-events-forwarder
           tag: "latest"
     asserts:
@@ -34,24 +36,41 @@ tests:
       - matchRegex:
           path: spec.template.spec.containers[1].image
           pattern: .*newrelic/k8s-events-forwarder:latest$
-  - it: adds proxy when enabled
-    set:
-      cluster: test-cluster
-      proxy: "https://proxy:1234"
+
+
+  - it: by default the agent forwarder templates
     asserts:
       - contains:
-          path: spec.template.spec.containers[1].env
+          path: spec.template.spec.containers
+          any: true
           content:
-            name: NRIA_PROXY
-            value: "https://proxy:1234"
-  - it: adds customAttributes when enabled
-    set:
-      cluster: test-cluster
-      customAttributes:
-        test_tag_label: test_tag_value
-    asserts:
+            name: forwarder
       - contains:
-          path: spec.template.spec.containers[1].env
+          path: spec.template.spec.volumes
           content:
-            name: NRIA_CUSTOM_ATTRIBUTES
-            value: '{"test_tag_label":"test_tag_value"}'
+            name: config
+            configMap:
+              name: my-release-nri-kube-events-agent-config
+              items:
+                - key: newrelic-infra.yml
+                  path: newrelic-infra.yml
+
+  - it: agent does not template if the sink is disabled
+    set:
+      sinks:
+        newRelicInfra: false
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers
+          any: true
+          content:
+            name: forwarder
+      - notContains:
+          path: spec.template.spec.volumes
+          content:
+            name: config
+            configMap:
+              name: my-release-nri-kube-events-agent-config
+              items:
+                - key: newrelic-infra.yml
+                  path: newrelic-infra.yml

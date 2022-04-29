@@ -1,7 +1,7 @@
 apiVersion: v2
 description: A Helm chart to deploy the New Relic Kube Events
 name: nri-kube-events
-version: 2.2.0
+version: 2.2.1
 appVersion: 1.8.0
 home: https://docs.newrelic.com/docs/integrations/kubernetes-integration/kubernetes-events/install-kubernetes-events-integration
 icon: https://newrelic.com/themes/custom/curio/assets/mediakit/NR_logo_Horizontal.svg

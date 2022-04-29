@@ -7,23 +7,22 @@ metadata:
     {{- include "newrelic.common.labels" . | nindent 4 }}
   annotations:
   {{- if .Values.deployment.annotations }}
-{{ toYaml .Values.deployment.annotations | indent 4 }}
+    {{- toYaml .Values.deployment.annotations | nindent 4 }}
   {{- end }}
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ include "newrelic.common.naming.name" . }}
   template:
     metadata:
-{{- if .Values.podAnnotations }}
+      {{- if .Values.podAnnotations }}
       annotations:
-{{ toYaml .Values.podAnnotations | indent 8}}
-{{- end }}
+        {{- toYaml .Values.podAnnotations | nindent 8}}
+      {{- end }}
       labels:
         {{- include "newrelic.common.labels" . | nindent 8 }}
     spec:
-      {{- with include "newrelic.common.images.renderPullSecrets" ( dict "pullSecrets" (list .Values.image.pullSecrets) "context" .) }}
+      {{- with include "newrelic.common.images.renderPullSecrets" ( dict "pullSecrets" (list .Values.images.pullSecrets) "context" .) }}
       imagePullSecrets:
         {{- . | nindent 8 }}
       {{- end }}
@@ -33,57 +32,43 @@ spec:
       {{- end }}
       containers:
         - name: kube-events
-          image: {{ include "newrelic.common.images.image" ( dict "imageRoot" .Values.image.kubeEvents "context" .) }}
-          imagePullPolicy: {{ .Values.image.kubeEvents.pullPolicy }}
+          image: {{ include "newrelic.common.images.image" ( dict "imageRoot" .Values.images.integration "context" .) }}
+          imagePullPolicy: {{ .Values.images.integration.pullPolicy }}
           {{- with include "nri-kube-events.securityContext.container" . }}
           securityContext:
             {{- . | nindent 12 }}
           {{- end }}
           {{- if .Values.resources }}
           resources:
-{{ toYaml .Values.resources | indent 12 }}
+            {{- toYaml .Values.resources | nindent 12 }}
           {{- end }}
           args: ["-config", "/app/config/config.yaml", "-loglevel", "debug"]
           volumeMounts:
             - name: config-volume
               mountPath: /app/config
-        - name: infra-agent
-          image: {{ include "newrelic.common.images.image" ( dict "imageRoot" .Values.image.infraAgent "context" .) }}
-          imagePullPolicy: {{ .Values.image.infraAgent.pullPolicy }}
+        {{- if .Values.sinks.newRelicInfra }}
+        - name: forwarder
+          image: {{ include "newrelic.common.images.image" ( dict "imageRoot" .Values.images.agent "context" .) }}
+          imagePullPolicy: {{ .Values.images.agent.pullPolicy }}
           {{- with include "nri-kube-events.securityContext.container" . }}
           securityContext:
             {{- . | nindent 12 }}
           {{- end }}
           ports:
-            - containerPort: 8001
+            - containerPort: {{ get (fromYaml (include "nri-kube-events.agentConfig" .)) "http_server_port" }}
           env:
             - name: NRIA_LICENSE_KEY
               valueFrom:
                 secretKeyRef:
                   name: {{ include "newrelic.common.license.secretName" . }}
                   key: {{ include "newrelic.common.license.secretKeyName" . }}
-            {{- if (include "newrelic.common.nrStaging" .) }}
-            - name: NRIA_STAGING
-              value: "true"
-            {{- end }}
-            {{- with include "newrelic.common.proxy" . }}
-            - name: NRIA_PROXY
-              value: {{ . | quote }}
-            {{- end }}
-            # Using FORWARD_ONLY mode to avoid the entity creation for the events.
-            - name: NRIA_IS_SECURE_FORWARD_ONLY
-              value: "false"
-            - name: NRIA_IS_FORWARD_ONLY
-              value: "true"
+
             - name: NRIA_OVERRIDE_HOSTNAME_SHORT
               valueFrom:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
-            {{- with include "newrelic.common.customAttributes" . }}
-            - name: NRIA_CUSTOM_ATTRIBUTES
-              value: {{ fromYaml . | toJson | quote }}
-            {{- end }}
+
           volumeMounts:
             - mountPath: /var/db/newrelic-infra/data
               name: tmpfs-data
@@ -91,14 +76,13 @@ spec:
               name: tmpfs-user-data
             - mountPath: /tmp
               name: tmpfs-tmp
-            {{- if .Values.config }}
             - name: config
               mountPath: /etc/newrelic-infra.yml
               subPath: newrelic-infra.yml
-            {{- end }}
+        {{- end }}
       serviceAccountName: {{ include "newrelic.common.serviceAccount.name" . }}
       volumes:
-        {{- if .Values.config }}
+        {{- if .Values.sinks.newRelicInfra }}
         - name: config
           configMap:
             name: {{ include "newrelic.common.naming.fullname" . }}-agent-config
