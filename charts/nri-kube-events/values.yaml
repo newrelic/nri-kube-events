@@ -1,56 +1,31 @@
-# Default values for nri-kube-events.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
+# Default values for nri-kube-events
+# This is a YAML-formatted file
+# Declare variables to be passed into your templates
 
-agentHTTPTimeout: "30s"
-
-sinks:
-  # Enable the stdout sink to also see all events in the logs.
-  stdout: false
-  # The newRelicInfra sink sends all events to New relic.
-  newRelicInfra: true
-
-nameOverride: ""
-
+# -- Images used by the chart for the integration and agents
+# @default -- See `values.yaml`
 images:
+  # Image for the New Relic Kubernetes integration
   integration:
     registry:
+    # -- Image for the kubernetes events integration
     repository: newrelic/nri-kube-events
-    tag: ""
+    # -- Tag for the kubernetes events integration
+    tag: 1.8.0
     pullPolicy: IfNotPresent
+  # Image for the New Relic Infrastructure Agent sidecar
   agent:
     registry:
+    # -- Image for the agent sidecar
     repository: newrelic/k8s-events-forwarder
+    # -- Tag for the agent sidecar
     tag: 1.22.0
     pullPolicy: IfNotPresent
-  ## It is possible to specify docker registry credentials
-  ## See https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
   pullSecrets: []
   # - name: regsecret
 
-# For unprivileged mode - default is 1000.
-# Can also be modified for OpenShift clusters where the runAsUser range
-# may be restricted.  See OpenShift docs for more information.
-# https://www.openshift.com/blog/a-guide-to-openshift-and-uids
-# runAsUser:
-
-# Custom container security context with default values:
-# - privileged: false
-# - allowPrivilegeEscalation: false
-# - readOnlyRootFilesystem: true
-containerSecurityContext:
-
-# Custom pod security context with default values:
-# - runAsUser: 1000
-# - runAsNonRoot: true
-podSecurityContext:
-
-resources:
-  {}
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+# -- Resources available for this pod
+resources: {}
   # limits:
   #   cpu: 100m
   #   memory: 128Mi
@@ -59,40 +34,33 @@ resources:
   #   memory: 128Mi
 
 rbac:
-  # Specifies whether RBAC resources should be created
+  # -- Specifies whether RBAC resources should be created
   create: true
 
+# -- Settings controlling ServiceAccount creation
+# @default -- See `values.yaml`
 serviceAccount:
-  # Specifies whether a ServiceAccount should be created
-  create: true
-  # The name of the ServiceAccount to use.
-  # If not set and create is true, a name is generated using the name template
+  # serviceAccount.create -- (bool) Specifies whether a ServiceAccount should be created
+  # @default -- `true`
+  create:
+  # If not set and create is true, a name is generated using the fullname template
   name: ""
   # Specify any annotations to add to the ServiceAccount
   annotations:
 
-# If you wish to provide additional annotations to apply to the pod(s), specify
-# them here
-# podAnnotations:
-
-# Pod scheduling priority
-# Ref: https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/
-# priorityClassName: high-priority
-
-nodeSelector: {}
-
-tolerations: []
-
-affinity: {}
-
-nrStaging: false
+# -- Annotations to add to the pod.
+podAnnotations: {}
 
 deployment:
-  # Annotations to add to the Deployment.
+  # deployment.annotations -- Annotations to add to the Deployment.
   annotations: {}
 
-# -- Custom attributes here has the same functionality as in the new infrastructure v3 chart. you can read a string (because is a string in JSON format)
-# or read directly the map here and encode to JSON.
-customAttributes: {}
-# environment: test
-# owning-team: devel
+agentHTTPTimeout: "30s"
+
+# -- Configure where will the metrics be writen. Mostly for debugging purposes.
+# @default -- See `values.yaml`
+sinks:
+  # -- Enable the stdout sink to also see all events in the logs.
+  stdout: false
+  # -- The newRelicInfra sink sends all events to New relic.
+  newRelicInfra: true

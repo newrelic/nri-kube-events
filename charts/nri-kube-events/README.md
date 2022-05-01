@@ -110,32 +110,21 @@ honors the privileged mode toggle should be a section in the README explaining w
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| affinity | object | `{}` |  |
 | agentHTTPTimeout | string | `"30s"` |  |
-| containerSecurityContext | string | `nil` |  |
-| customAttributes | object | `{}` | Custom attributes here has the same functionality as in the new infrastructure v3 chart. you can read a string (because is a string in JSON format) or read directly the map here and encode to JSON. |
-| deployment.annotations | object | `{}` |  |
-| images.agent.pullPolicy | string | `"IfNotPresent"` |  |
-| images.agent.registry | string | `nil` |  |
-| images.agent.repository | string | `"newrelic/k8s-events-forwarder"` |  |
-| images.agent.tag | string | `"1.22.0"` |  |
-| images.integration.pullPolicy | string | `"IfNotPresent"` |  |
-| images.integration.registry | string | `nil` |  |
-| images.integration.repository | string | `"newrelic/nri-kube-events"` |  |
-| images.integration.tag | string | `""` |  |
-| images.pullSecrets | list | `[]` |  |
-| nameOverride | string | `""` |  |
-| nodeSelector | object | `{}` |  |
-| nrStaging | bool | `false` |  |
-| podSecurityContext | string | `nil` |  |
-| rbac.create | bool | `true` |  |
-| resources | object | `{}` |  |
-| serviceAccount.annotations | string | `nil` |  |
-| serviceAccount.create | bool | `true` |  |
-| serviceAccount.name | string | `""` |  |
-| sinks.newRelicInfra | bool | `true` |  |
-| sinks.stdout | bool | `false` |  |
-| tolerations | list | `[]` |  |
+| deployment.annotations | object | `{}` | Annotations to add to the Deployment. |
+| images | object | See `values.yaml` | Images used by the chart for the integration and agents |
+| images.agent.repository | string | `"newrelic/k8s-events-forwarder"` | Image for the agent sidecar |
+| images.agent.tag | string | `"1.22.0"` | Tag for the agent sidecar |
+| images.integration.repository | string | `"newrelic/nri-kube-events"` | Image for the kubernetes events integration |
+| images.integration.tag | string | `"1.8.0"` | Tag for the kubernetes events integration |
+| podAnnotations | object | `{}` | Annotations to add to the pod. |
+| rbac.create | bool | `true` | Specifies whether RBAC resources should be created |
+| resources | object | `{}` | Resources available for this pod |
+| serviceAccount | object | See `values.yaml` | Settings controlling ServiceAccount creation |
+| serviceAccount.create | bool | `true` | Specifies whether a ServiceAccount should be created |
+| sinks | object | See `values.yaml` | Configure where will the metrics be writen. Mostly for debugging purposes. |
+| sinks.newRelicInfra | bool | `true` | The newRelicInfra sink sends all events to New relic. |
+| sinks.stdout | bool | `false` | Enable the stdout sink to also see all events in the logs. |
 
 ## Maintainers
 
