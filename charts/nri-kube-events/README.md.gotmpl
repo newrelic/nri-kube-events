@@ -18,38 +18,37 @@
 This chart implements the [New Relic's common Helm library](https://github.com/newrelic/helm-charts/tree/master/library/common-library) which
 means that is has a seamless UX between things that are configurable across different Helm charts.
 
-Here is a list of options that you can set globally and affect all the charts in the `nri-bundle` at the same time while being able to override
-the behaviour locally only for this chart. To give more width to the __Description__ column we cut the options like `[global.]cluster`. That
-means that you can set `cluster` in the root of the values of this chart or in the global to affect all the charts from New Relic.
+Here is a list of options that you can set globally and affect all the charts in the `nri-bundle` (and this chart) at the same time while being
+able to override the behaviour for this chart only.
 
-| key | Default | Merged[<sup>1</sup>](#values-managed-globally-1) | Description |
-|-----|---------|--------------------------------------------------|-------------|
-| [global.]cluster | `""` |  | Allows to set into the integration the cluster name that is being monitored |
-| [global.]licenseKey | `""` |  | This set this license key to all the products of New Relic |
-| [global.]customSecretName | `""` |  | In case you don't want to have the license key in you values, this allows you to point to a user created secret to get the key from there |
-| [global.]customSecretLicenseKey | `""` |  | In case you don't want to have the license key in you values, this allows you to point to which secret key is the license key located |
-| [global.]podLabels | `{}` | yes | A map of labels to add to the pods deployed with this chart |
-| [global.]Labels | `{}` | yes | A map of labels to add to all the objects deployed with this chart |
-| [global.]priorityClassName | `""` |  | Allows to set pod's priorityClassName |
-| [global.]hostNetwork | `false` |  | Allows to set pod's hostNetwork |
-| [global.]dnsConfig | `{}` |  | Allows to set pod's dnsConfig |
-| [global.]image (depends on chart[<sup>2</sup>](#values-managed-globally-2)) | `""` |  | Allow to change the registry where to get the images. Useful when there is an internal image cache/proxy |
-| [global.]image (depends on chart[<sup>2</sup>](#values-managed-globally-2)) | `[]` |  | Allow to set secrets to be able to fetch images |
-| [global.]podSecurityContext | `{}` |  | Allow to set security context (at pod level) |
-| [global.]containerSecurityContext | `{}` |  | Allow to set security context (at container level) |
-| [global.]affinity | `{}` |  | Allows to set pod/node affinity |
-| [global.]nodeSelector | `{}` |  | Allows to schedule the pods to a certain node selector |
-| [global.]tolerations | `[]` |  | Allows to add tolerations to node taints |
-| [global.]serviceAccount.create | `true` |  | Configures if the service account should be created or not |
-| [global.]serviceAccount.name | name of the release |  | Allow to change the name of the service account. This is honored in even it you not create the service account to allow the user to create their own. In case you do not create a service account this defaults to `default` |
-| [global.]serviceAccount.annotations | `{}` | yes | Add these annotations to the service account we create |
-| [global.]customAttributes | `{}` |  | Allows to add extra tags to the cluster and all the metrics emitted to the backend |
-| [global.]fedramp | `false` |  | For the integrations that support it, enables FedRAMP |
-| [global.]lowDataMode | `false` |  | In each integration it has different behaviour but all aims to send less metrics to the backend to try to save costs |
-| [global.]privileged | Depends on the chart[<sup>3</sup>](#values-managed-globally-3) |  | In each integration it has different behaviour but all aims to send less metrics to the backend to try to save costs |
-| [global.]proxy | `""` |  | Configures the integration to send all HTTP/HTTPS request through the proxy in that URL. The URL should have a standard format like `https://user:password@hostname:port` |
-| [global.]nrStaging | `false` |  | Send the metrics to the staging backend. Requires a valid staging license key |
-| [global.]verboseLog | `false` |  | Sets the debug logs to this integration or all integrations if it is set globally |
+| Global keys | Local keys | Default | Merged[<sup>1</sup>](#values-managed-globally-1) | Description |
+|-------------|------------|---------|--------------------------------------------------|-------------|
+| global.cluster | cluster | `""` |  | Name of the Kubernetes cluster monitored |
+| global.licenseKey | licenseKey | `""` |  | This set this license key to use |
+| global.customSecretName | customSecretName | `""` |  | In case you don't want to have the license key in you values, this allows you to point to a user created secret to get the key from there |
+| global.customSecretLicenseKey | customSecretLicenseKey | `""` |  | In case you don't want to have the license key in you values, this allows you to point to which secret key is the license key located |
+| global.podLabels | podLabels | `{}` | yes | Additional labels for chart pods |
+| global.labels | labels | `{}` | yes | Additional labels for chart objects |
+| global.priorityClassName | priorityClassName | `""` |  | Sets pod's priorityClassName |
+| global.hostNetwork | hostNetwork | `false` |  | Sets pod's hostNetwork |
+| global.dnsConfig | dnsConfig | `{}` |  | Sets pod's dnsConfig |
+| global.images | [See values](#values) | `""` |  | Changes the registry where to get the images. Useful when there is an internal image cache/proxy |
+| global.images | [See values](#values) | `[]` |  | Set secrets to be able to fetch images |
+| global.podSecurityContext | podSecurityContext | `{}` |  | Sets security context (at pod level) |
+| global.containerSecurityContext | containerSecurityContext | `{}` |  | Sets security context (at container level) |
+| global.affinity | affinity | `{}` |  | Sets pod/node affinities |
+| global.nodeSelector | nodeSelector | `{}` |  | Sets pod's node selector |
+| global.tolerations | tolerations | `[]` |  | Sets pod's tolerations to node taints |
+| global.serviceAccount.create | serviceAccount.create | `true` |  | Configures if the service account should be created or not |
+| global.serviceAccount.name | serviceAccount.name | name of the release |  | Change the name of the service account. This is honored if you disable on this cahrt the creation of the service account so you can use your own. |
+| global.serviceAccount.annotations | serviceAccount.annotations | `{}` | yes | Add these annotations to the service account we create |
+| global.customAttributes | customAttributes | `{}` |  | Adds extra attributes to the cluster and all the metrics emitted to the backend |
+| global.fedramp | fedramp | `false` |  | Enables FedRAMP |
+| global.lowDataMode | lowDataMode | `false` |  | Reduces number of metrics sent in order to reduce costs |
+| global.privileged | privileged | Depends on the chart |  | In each integration it has different behaviour. See [Further information](#values-managed-globally-3) but all aims to send less metrics to the backend to try to save costs |
+| global.proxy | proxy | `""` |  | Configures the integration to send all HTTP/HTTPS request through the proxy in that URL. The URL should have a standard format like `https://user:password@hostname:port` |
+| global.nrStaging | nrStaging | `false` |  | Send the metrics to the staging backend. Requires a valid staging license key |
+| global.verboseLog | verboseLog | `false` |  | Sets the debug logs to this integration or all integrations if it is set globally |
 
 ### Further information
 <a name="values-managed-globally-1"></a>
@@ -74,16 +73,14 @@ hostNetwork: false
 This values will template `hostNetwork` to `false`, a map of labels `{ "global": "global", "local": "local" }` and a `nodeSelector` with
 `{ "local": "local" }`.
 
-This is the rationale behind of this behavior:
+As Helm by default merges all the maps it could be confusing that we have two behaviours (merging `labels` and replacing `nodeSelector`)
+the `values` from global to local. All functions simply replace the value from `global` with the one that is "local" of this chart except
+functions that template `labels`, `customAttributes` and service account's annotations. This is the rationale behind of this behavior:
  * `hostNetwork` is templated to `false` because is overriding the value defined globally.
- * `labels` are merged because the use may want to label all the New Relic pods at once and label other solution pods differently for
+ * `labels` are merged because the user may want to label all the New Relic pods at once and label other solution pods differently for
    clarity' sake.
  * `nodeSelector` does not merge as `labels` because could make harder to overwrite/delete a selector that comes from global because
    of the logic that Helm follows merging maps.
-
-It could be confusing to have two behaviours regarding when this chart merges or replaces the `values` from global to local. All functions
-simply replace the value from `global` with the one that is in the root of the chart except functions that template `labels`,
-`customAttributes` and service account's annotations.
 
 <a name="values-managed-globally-2"></a>
 #### 2. Fine grain registries
