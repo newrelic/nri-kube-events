@@ -50,7 +50,7 @@ func main() {
 	setLogLevel(*logLevel, logrus.InfoLevel)
 
 	logrus.Infof(
-		"New Relic %s integration Version: %s, Platform: %s, GoVersion: %s, GitCommit: %s, BuildDate: %s\n",
+		"New Relic %s integration Version: %s, Platform: %s, GoVersion: %s, GitCommit: %s, BuildDate: %s",
 		strings.Title(strings.Replace(integrationName, "com.newrelic.", "", 1)),
 		integrationVersion,
 		fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
