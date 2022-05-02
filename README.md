@@ -36,11 +36,23 @@ SELECT event.involvedObject.kind, event.involvedObject.name, event.type, event.m
 WHERE category = 'kubernetes' AND clusterName='YOUR_CLUSTER_NAME'
 ```
 
+## Helm chart
+
+You can install this chart using [`nri-bundle`](https://github.com/newrelic/helm-charts/tree/master/charts/nri-bundle) located in the
+[helm-charts repository](https://github.com/newrelic/helm-charts) or directly from this repository by adding this Helm repository:
+
+```shell
+helm repo add nri-kube-events https://newrelic.github.io/nri-kube-events
+helm upgrade --install nri-kube-events/nri-kube-events -f your-custom-values.yaml
+```
+
+For further information of the configuration needed for the chart just read the [chart's README](/charts/nri-kube-events/README.md).
+
 ## Development flow
 
 This project uses a Makefile for the most common use cases:
 
-Some of the available commands include:
+Some available commands include:
 
 ```sh
 make test # run the unit tests
@@ -50,7 +62,9 @@ make compile # compile the project into a single binary
 
 ### Running locally
 
-The easiest way to get started is by using [Skaffold](https://skaffold.dev) and [Minikube](https://kubernetes.io/docs/setup/learning-environment/minikube/).
+The easiest way to get started is by using [Skaffold](https://skaffold.dev)
+and [Minikube](https://kubernetes.io/docs/setup/learning-environment/minikube/).
+
 Follow these steps to run this project:
 
  - Ensure Minikube is running
@@ -82,11 +96,13 @@ Cache check complete in 39.444528ms
 ... more
 ```
 
-This might take up to a minute to start, but this should start the application in your Minikube cluster with 2 sinks enabled!
+This might take up to a minute to start, but this should start the application
+in your Minikube cluster with 2 sinks enabled!
 
 ## Configuration
 
-nri-kube-events uses a YAML file to configure the application. The structure is as follows. See [Available Sinks](#available-sinks) for a list of sinks.
+nri-kube-events uses a YAML file to configure the application. The structure is
+as follows. See [Available Sinks](#available-sinks) for a list of sinks.
 
 ```yaml
 sinks:
@@ -142,13 +158,19 @@ opensource@newrelic.com.
 
 **A note about vulnerabilities**
 
-As noted in our [security policy](../../security/policy), New Relic is committed to the privacy and security of our customers and their data. We believe that providing coordinated disclosure by security researchers and engaging with the security community are important means to achieve our security goals.
+As noted in our [security policy](../../security/policy), New Relic is committed
+to the privacy and security of our customers and their data. We believe that
+providing coordinated disclosure by security researchers and engaging with the
+security community are important means to achieve our security goals.
 
-If you believe you have found a security vulnerability in this project or any of New Relic's products or websites, we welcome and greatly appreciate you reporting it to New Relic through [HackerOne](https://hackerone.com/newrelic).
+If you believe you have found a security vulnerability in this project or any of
+New Relic's products or websites, we welcome and greatly appreciate you reporting
+it to New Relic through [HackerOne](https://hackerone.com/newrelic).
 
 If you would like to contribute to this project, please review [these guidelines](./CONTRIBUTING.md).
 
-To all contributors, we thank you!  Without your contribution, this project would not be what it is today.
+To all contributors, we thank you!  Without your contribution, this project would
+not be what it is today.
 
 ## License
 The New Relic integration for Kubernetes events is licensed under the [Apache

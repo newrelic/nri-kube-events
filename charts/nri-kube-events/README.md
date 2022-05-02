@@ -1,5 +1,3 @@
-[![Community Plus header](https://github.com/newrelic/opensource-website/raw/master/src/images/categories/Community_Plus.png)](https://opensource.newrelic.com/oss-category/#community-plus)
-
 # nri-kube-events
 
 ![Version: 2.2.2](https://img.shields.io/badge/Version-2.2.2-informational?style=flat-square) ![AppVersion: 1.8.0](https://img.shields.io/badge/AppVersion-1.8.0-informational?style=flat-square)
@@ -7,6 +5,16 @@
 A Helm chart to deploy the New Relic Kube Events router
 
 **Homepage:** <https://docs.newrelic.com/docs/integrations/kubernetes-integration/kubernetes-events/install-kubernetes-events-integration>
+
+# Helm installation
+
+You can install this chart using [`nri-bundle`](https://github.com/newrelic/helm-charts/tree/master/charts/nri-bundle) located in the
+[helm-charts repository](https://github.com/newrelic/helm-charts) or directly from this repository by adding this Helm repository:
+
+```shell
+helm repo add nri-kube-events https://newrelic.github.io/nri-kube-events
+helm upgrade --install nri-kube-events/nri-kube-events -f your-custom-values.yaml
+```
 
 ## Source Code
 
