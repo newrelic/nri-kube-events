@@ -12,6 +12,7 @@ A Helm chart to deploy the New Relic Kube Events router
 
 * <https://github.com/newrelic/nri-kube-events/>
 * <https://github.com/newrelic/nri-kube-events/tree/master/charts/newrelic-infrastructure>
+* <https://github.com/newrelic/infrastructure-agent/>
 
 ## Requirements
 
@@ -22,86 +23,12 @@ A Helm chart to deploy the New Relic Kube Events router
 ## Values managed globally
 
 This chart implements the [New Relic's common Helm library](https://github.com/newrelic/helm-charts/tree/master/library/common-library) which
-means that is has a seamless UX between things that are configurable across different Helm charts.
+means that is has a seamless UX between things that are configurable across different Helm charts. So there are behaviours that could be
+changed globally if you install this chart from `nri-bundle` or your own umbrella chart.
 
-Here is a list of options that you can set globally and affect all the charts in the `nri-bundle` (and this chart) at the same time while being
-able to override the behaviour for this chart only.
+A really broad list of global managed values are `affinity`, `nodeSelector`, `tolerations`, `proxy` and many more.
 
-| Global keys | Local keys | Default | Merged[<sup>1</sup>](#values-managed-globally-1) | Description |
-|-------------|------------|---------|--------------------------------------------------|-------------|
-| global.cluster | cluster | `""` |  | Name of the Kubernetes cluster monitored |
-| global.licenseKey | licenseKey | `""` |  | This set this license key to use |
-| global.customSecretName | customSecretName | `""` |  | In case you don't want to have the license key in you values, this allows you to point to a user created secret to get the key from there |
-| global.customSecretLicenseKey | customSecretLicenseKey | `""` |  | In case you don't want to have the license key in you values, this allows you to point to which secret key is the license key located |
-| global.podLabels | podLabels | `{}` | yes | Additional labels for chart pods |
-| global.labels | labels | `{}` | yes | Additional labels for chart objects |
-| global.priorityClassName | priorityClassName | `""` |  | Sets pod's priorityClassName |
-| global.hostNetwork | hostNetwork | `false` |  | Sets pod's hostNetwork |
-| global.dnsConfig | dnsConfig | `{}` |  | Sets pod's dnsConfig |
-| global.images | [See values](#values) | `""` |  | Changes the registry where to get the images. Useful when there is an internal image cache/proxy |
-| global.images | [See values](#values) | `[]` |  | Set secrets to be able to fetch images |
-| global.podSecurityContext | podSecurityContext | `{}` |  | Sets security context (at pod level) |
-| global.containerSecurityContext | containerSecurityContext | `{}` |  | Sets security context (at container level) |
-| global.affinity | affinity | `{}` |  | Sets pod/node affinities |
-| global.nodeSelector | nodeSelector | `{}` |  | Sets pod's node selector |
-| global.tolerations | tolerations | `[]` |  | Sets pod's tolerations to node taints |
-| global.serviceAccount.create | serviceAccount.create | `true` |  | Configures if the service account should be created or not |
-| global.serviceAccount.name | serviceAccount.name | name of the release |  | Change the name of the service account. This is honored if you disable on this cahrt the creation of the service account so you can use your own. |
-| global.serviceAccount.annotations | serviceAccount.annotations | `{}` | yes | Add these annotations to the service account we create |
-| global.customAttributes | customAttributes | `{}` |  | Adds extra attributes to the cluster and all the metrics emitted to the backend |
-| global.fedramp | fedramp | `false` |  | Enables FedRAMP |
-| global.lowDataMode | lowDataMode | `false` |  | Reduces number of metrics sent in order to reduce costs |
-| global.privileged | privileged | Depends on the chart |  | In each integration it has different behaviour. See [Further information](#values-managed-globally-3) but all aims to send less metrics to the backend to try to save costs |
-| global.proxy | proxy | `""` |  | Configures the integration to send all HTTP/HTTPS request through the proxy in that URL. The URL should have a standard format like `https://user:password@hostname:port` |
-| global.nrStaging | nrStaging | `false` |  | Send the metrics to the staging backend. Requires a valid staging license key |
-| global.verboseLog | verboseLog | `false` |  | Sets the debug logs to this integration or all integrations if it is set globally |
-
-### Further information
-<a name="values-managed-globally-1"></a>
-#### 1. Merged
-
-Merged means that the values from global are not replaced by the local ones. Think in this example:
-```yaml
-global:
-  labels:
-    global: global
-  hostNetwork: true
-  nodeSelector:
-    global: global
-
-labels:
-  local: local
-nodeSelector:
-  local: local
-hostNetwork: false
-```
-
-This values will template `hostNetwork` to `false`, a map of labels `{ "global": "global", "local": "local" }` and a `nodeSelector` with
-`{ "local": "local" }`.
-
-As Helm by default merges all the maps it could be confusing that we have two behaviours (merging `labels` and replacing `nodeSelector`)
-the `values` from global to local. All functions simply replace the value from `global` with the one that is "local" of this chart except
-functions that template `labels`, `customAttributes` and service account's annotations. This is the rationale behind of this behavior:
- * `hostNetwork` is templated to `false` because is overriding the value defined globally.
- * `labels` are merged because the user may want to label all the New Relic pods at once and label other solution pods differently for
-   clarity' sake.
- * `nodeSelector` does not merge as `labels` because could make harder to overwrite/delete a selector that comes from global because
-   of the logic that Helm follows merging maps.
-
-<a name="values-managed-globally-2"></a>
-#### 2. Fine grain registries
-
-There are charts that only have 1 image and others that can have 2 or more images. The local path for the registry can change depending
-on the chart itself. If you have an advanced configuration that has a proxy cache for the docker registry you should take a look to the
-chart's `values.yaml` directly to see where you have to change it if you really need so much granularity that needs a proxy/cache registry
-per integration.
-
-<a name="values-managed-globally-3"></a>
-#### 3. Privileged mode
-
-By default, from the common library, the privileged mode is set to false. But most of the helm charts require this to be true to fetch more
-metrics so could see a true in some charts. The consequences of the privileged mode differ from one chart to another so for the chart that
-honors the privileged mode toggle should be a section in the README explaining which is the behavior with it enabled or disabled.
+For more information go to the [user's guide of the common library](https://github.com/newrelic/helm-charts/blob/master/library/common-library/README.md)
 
 ## Values
 
@@ -110,10 +37,8 @@ honors the privileged mode toggle should be a section in the README explaining w
 | agentHTTPTimeout | string | `"30s"` |  |
 | deployment.annotations | object | `{}` | Annotations to add to the Deployment. |
 | images | object | See `values.yaml` | Images used by the chart for the integration and agents |
-| images.agent.repository | string | `"newrelic/k8s-events-forwarder"` | Image for the agent sidecar |
-| images.agent.tag | string | `"1.22.0"` | Tag for the agent sidecar |
-| images.integration.repository | string | `"newrelic/nri-kube-events"` | Image for the kubernetes events integration |
-| images.integration.tag | string | `"1.8.0"` | Tag for the kubernetes events integration |
+| images.agent | object | See `values.yaml` | Image for the New Relic Infrastructure Agent sidecar |
+| images.integration | object | See `values.yaml` | Image for the New Relic Kubernetes integration |
 | podAnnotations | object | `{}` | Annotations to add to the pod. |
 | rbac.create | bool | `true` | Specifies whether RBAC resources should be created |
 | resources | object | `{}` | Resources available for this pod |
@@ -125,11 +50,11 @@ honors the privileged mode toggle should be a section in the README explaining w
 
 ## Maintainers
 
-* [Alvaro Cabanas](https://github.com/alvarocabanas)
-* [Carlos Castro](https://github.com/carlossscastro)
-* [Christian Felipe](https://github.com/sigilioso)
-* [Guillermo Sanchez](https://github.com/gsanchezgavier)
-* [Juan Manuel Perez](https://github.com/kang-makes)
-* [Marc Sanmiquel](https://github.com/marcsanmi)
-* [Paolo Gallina](https://github.com/paologallinaharbur)
-* [Roberto Santalla](https://github.com/roobre)
+* [alvarocabanas](https://github.com/alvarocabanas)
+* [carlossscastro](https://github.com/carlossscastro)
+* [sigilioso](https://github.com/sigilioso)
+* [gsanchezgavier](https://github.com/gsanchezgavier)
+* [kang-makes](https://github.com/kang-makes)
+* [marcsanmi](https://github.com/marcsanmi)
+* [paologallinaharbur](https://github.com/paologallinaharbur)
+* [roobre](https://github.com/roobre)

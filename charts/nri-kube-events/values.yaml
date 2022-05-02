@@ -5,20 +5,18 @@
 # -- Images used by the chart for the integration and agents
 # @default -- See `values.yaml`
 images:
-  # Image for the New Relic Kubernetes integration
+  # -- Image for the New Relic Kubernetes integration
+  # @default -- See `values.yaml`
   integration:
     registry:
-    # -- Image for the kubernetes events integration
     repository: newrelic/nri-kube-events
-    # -- Tag for the kubernetes events integration
     tag: 1.8.0
     pullPolicy: IfNotPresent
-  # Image for the New Relic Infrastructure Agent sidecar
+  # -- Image for the New Relic Infrastructure Agent sidecar
+  # @default -- See `values.yaml`
   agent:
     registry:
-    # -- Image for the agent sidecar
     repository: newrelic/k8s-events-forwarder
-    # -- Tag for the agent sidecar
     tag: 1.22.0
     pullPolicy: IfNotPresent
   pullSecrets: []
