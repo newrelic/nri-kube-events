@@ -78,7 +78,7 @@ func CreateSinks(configs []SinkConfig, integrationVersion string) (map[string]ev
 			return sinks, errors.Wrapf(err, "could not initialize sink %s", sinkConf.Name)
 		}
 
-		logrus.Infof("Created sink: %s\n", sinkConf.Name)
+		logrus.Infof("Created sink: %s", sinkConf.Name)
 
 		sinks[sinkConf.Name] = sink
 	}
