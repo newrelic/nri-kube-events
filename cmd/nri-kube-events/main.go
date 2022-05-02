@@ -91,7 +91,7 @@ func main() {
 }
 
 func servePrometheus(addr string) {
-	logrus.Infof("Serving Prometheus metrics on %s\n", addr)
+	logrus.Infof("Serving Prometheus metrics on %s", addr)
 	err := http.ListenAndServe(addr, promhttp.Handler())
 	logrus.Fatalf("Could not serve Prometheus on %s: %v", addr, err)
 }
@@ -105,7 +105,7 @@ func listenForStopSignal() <-chan struct{} {
 		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 		sig := <-c
 
-		logrus.Infof("%s signal detected, stopping server.\n", sig)
+		logrus.Infof("%s signal detected, stopping server.", sig)
 		close(stopChan)
 	}()
 
@@ -168,7 +168,7 @@ func getClientset(kubeconfig string) (*kubernetes.Clientset, error) {
 func setLogLevel(logLevel string, fallback logrus.Level) {
 	level, err := logrus.ParseLevel(logLevel)
 	if err != nil {
-		logrus.Warningf("invalid loglevel %s, defaulting to %s.\n", logLevel, fallback.String())
+		logrus.Warningf("invalid loglevel %s, defaulting to %s.", logLevel, fallback.String())
 		level = fallback
 	}
 
