@@ -1,6 +1,7 @@
-# Default values for nri-kube-events
-# This is a YAML-formatted file
-# Declare variables to be passed into your templates
+# -- Override the name of the chart
+nameOverride: ""
+# -- Override the full name of the release
+fullnameOverride: ""
 
 # -- Images used by the chart for the integration and agents
 # @default -- See `values.yaml`

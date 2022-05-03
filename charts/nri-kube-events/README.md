@@ -52,6 +52,7 @@ For more information go to the [user's guide of the common library](https://gith
 | deployment.annotations | object | `{}` | Annotations to add to the Deployment. |
 | dnsConfig | object | `{}` | Sets pod's dnsConfig. Can be configured also with `global.dnsConfig` |
 | fedramp.enabled | bool | `false` | Enables FedRAMP. Can be configured also with `global.fedramp.enabled` |
+| fullnameOverride | string | `""` | Override the full name of the release |
 | hostNetwork | bool | `false` | Sets pod's hostNetwork. Can be configured also with `global.hostNetwork` |
 | images | object | See `values.yaml` | Images used by the chart for the integration and agents |
 | images.agent | object | See `values.yaml` | Image for the New Relic Infrastructure Agent sidecar |
@@ -59,6 +60,7 @@ For more information go to the [user's guide of the common library](https://gith
 | images.pullSecrets | list | `[]` | The secrets that are needed to pull images from a custom registry. |
 | labels | object | `{}` | Additional labels for chart objects |
 | licenseKey | string | `""` | This set this license key to use. Can be configured also with `global.licenseKey` |
+| nameOverride | string | `""` | Override the name of the chart |
 | nodeSelector | object | `{}` | Sets pod's node selector. Can be configured also with `global.nodeSelector` |
 | nrStaging | bool | `false` | Send the metrics to the staging backend. Requires a valid staging license key. Can be configured also with `global.nrStaging` |
 | podAnnotations | object | `{}` | Annotations to add to the pod. |
