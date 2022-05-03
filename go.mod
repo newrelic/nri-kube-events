@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/golangci/golangci-lint v1.45.2
 	github.com/google/go-cmp v0.5.8
-	github.com/newrelic/infra-integrations-sdk v3.7.1+incompatible
+	github.com/newrelic/infra-integrations-sdk v3.7.2+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.2.0
