@@ -23,7 +23,7 @@ type SinkConfig struct {
 func (s SinkConfig) MustGetString(name string) string {
 	val, ok := s.Config[name]
 	if !ok {
-		logrus.Fatalf("Required string variable %s not set for %s Sink\n", name, s.Name)
+		logrus.Fatalf("Required string variable %s not set for %s Sink", name, s.Name)
 	}
 	return val
 }
@@ -78,7 +78,7 @@ func CreateSinks(configs []SinkConfig, integrationVersion string) (map[string]ev
 			return sinks, errors.Wrapf(err, "could not initialize sink %s", sinkConf.Name)
 		}
 
-		logrus.Infof("Created sink: %s\n", sinkConf.Name)
+		logrus.Infof("Created sink: %s", sinkConf.Name)
 
 		sinks[sinkConf.Name] = sink
 	}
