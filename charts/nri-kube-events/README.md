@@ -22,21 +22,13 @@ helm upgrade --install nri-kube-events/nri-kube-events -f your-custom-values.yam
 * <https://github.com/newrelic/nri-kube-events/tree/master/charts/nri-kube-events>
 * <https://github.com/newrelic/infrastructure-agent/>
 
-## Requirements
-
-| Repository | Name | Version |
-|------------|------|---------|
-| https://helm-charts.newrelic.com | common-library | 1.0.2 |
-
 ## Values managed globally
 
 This chart implements the [New Relic's common Helm library](https://github.com/newrelic/helm-charts/tree/master/library/common-library) which
-means that is has a seamless UX between things that are configurable across different Helm charts. So there are behaviours that could be
-changed globally if you install this chart from `nri-bundle` or your own umbrella chart.
+means that it honors a wide range of defaults and globals common to most New Relic Helm charts.
 
-A really broad list of global managed values are `affinity`, `nodeSelector`, `tolerations`, `proxy` and many more.
-
-For more information go to the [user's guide of the common library](https://github.com/newrelic/helm-charts/blob/master/library/common-library/README.md)
+Options that can be defined globally include `affinity`, `nodeSelector`, `tolerations`, `proxy` and others. The full list can be found at
+[user's guide of the common library](https://github.com/newrelic/helm-charts/blob/master/library/common-library/README.md).
 
 ## Values
 
@@ -73,7 +65,7 @@ For more information go to the [user's guide of the common library](https://gith
 | serviceAccount | object | See `values.yaml` | Settings controlling ServiceAccount creation |
 | serviceAccount.create | bool | `true` | Specifies whether a ServiceAccount should be created |
 | sinks | object | See `values.yaml` | Configure where will the metrics be writen. Mostly for debugging purposes. |
-| sinks.newRelicInfra | bool | `true` | The newRelicInfra sink sends all events to New relic. |
+| sinks.newRelicInfra | bool | `true` | The newRelicInfra sink sends all events to New Relic. |
 | sinks.stdout | bool | `false` | Enable the stdout sink to also see all events in the logs. |
 | tolerations | list | `[]` | Sets pod's tolerations to node taints. Can be configured also with `global.tolerations` |
 | verboseLog | bool | `false` | Sets the debug logs to this integration or all integrations if it is set globally. Can be configured also with `global.verboseLog` |

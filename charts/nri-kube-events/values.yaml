@@ -75,7 +75,7 @@ agentHTTPTimeout: "30s"
 sinks:
   # -- Enable the stdout sink to also see all events in the logs.
   stdout: false
-  # -- The newRelicInfra sink sends all events to New relic.
+  # -- The newRelicInfra sink sends all events to New Relic.
   newRelicInfra: true
 
 
