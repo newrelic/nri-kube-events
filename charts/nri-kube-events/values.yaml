@@ -1,82 +1,40 @@
-# Default values for nri-kube-events.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
-
-# - Specify either the New Relic license key or the secret which
-#   contains it.
-#
-# - Specify the Kubernetes cluster name.
-#   https://docs.newrelic.com/docs/kubernetes-monitoring-integration
-#
-# licenseKey:
-# customSecretName:
-# customSecretLicenseKey:
-# cluster:
-#
-# IMPORTANT: the previous values can also be set as global so that they
-# can be shared by other newrelic product's charts
-#
-# global:
-#   licenseKey:
-#   customSecretName:
-#   customSecretLicenseKey:
-#   cluster:
-
-agentHTTPTimeout: "30s"
-
-# Kube-events container will spin up a infra-agent(event-forwarder) as a sidecar container to forward
-# events to New Relic One endpoint. However, due to security restrictions, some users might require
-# to use an http proxy to route traffic over the internet. If this is the case for you, set this value
-# to your http proxy endpoint.
-proxy: {}
-
-sinks:
-  # Enable the stdout sink to also see all events in the logs.
-  stdout: false
-  # The newRelicInfra sink sends all events to New relic.
-  newRelicInfra: true
-
+# -- Override the name of the chart
 nameOverride: ""
+# -- Override the full name of the release
+fullnameOverride: ""
 
+# -- Name of the Kubernetes cluster monitored. Mandatory. Can be configured also with `global.cluster`
+cluster: ""
+# -- This set this license key to use. Can be configured also with `global.licenseKey`
+licenseKey: ""
+# -- In case you don't want to have the license key in you values, this allows you to point to a user created secret to get the key from there. Can be configured also with `global.customSecretName`
+customSecretName: ""
+# -- In case you don't want to have the license key in you values, this allows you to point to which secret key is the license key located. Can be configured also with `global.customSecretLicenseKey`
+customSecretLicenseKey: ""
+
+# -- Images used by the chart for the integration and agents
+# @default -- See `values.yaml`
 images:
+  # -- Image for the New Relic Kubernetes integration
+  # @default -- See `values.yaml`
   integration:
     registry:
     repository: newrelic/nri-kube-events
-    tag: ""
+    tag: 1.8.0
     pullPolicy: IfNotPresent
+  # -- Image for the New Relic Infrastructure Agent sidecar
+  # @default -- See `values.yaml`
   agent:
     registry:
     repository: newrelic/k8s-events-forwarder
     tag: 1.22.0
     pullPolicy: IfNotPresent
-  ## It is possible to specify docker registry credentials
-  ## See https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
+  # -- The secrets that are needed to pull images from a custom registry.
   pullSecrets: []
   # - name: regsecret
 
-# For unprivileged mode - default is 1000.
-# Can also be modified for OpenShift clusters where the runAsUser range
-# may be restricted.  See OpenShift docs for more information.
-# https://www.openshift.com/blog/a-guide-to-openshift-and-uids
-# runAsUser:
-
-# Custom container security context with default values:
-# - privileged: false
-# - allowPrivilegeEscalation: false
-# - readOnlyRootFilesystem: true
-containerSecurityContext:
-
-# Custom pod security context with default values:
-# - runAsUser: 1000
-# - runAsNonRoot: true
-podSecurityContext:
-
-resources:
-  {}
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+# -- Resources available for this pod
+resources: {}
   # limits:
   #   cpu: 100m
   #   memory: 128Mi
@@ -85,40 +43,75 @@ resources:
   #   memory: 128Mi
 
 rbac:
-  # Specifies whether RBAC resources should be created
+  # -- Specifies whether RBAC resources should be created
   create: true
 
+# -- Settings controlling ServiceAccount creation
+# @default -- See `values.yaml`
 serviceAccount:
-  # Specifies whether a ServiceAccount should be created
-  create: true
-  # The name of the ServiceAccount to use.
-  # If not set and create is true, a name is generated using the name template
+  # serviceAccount.create -- (bool) Specifies whether a ServiceAccount should be created
+  # @default -- `true`
+  create:
+  # If not set and create is true, a name is generated using the fullname template
   name: ""
   # Specify any annotations to add to the ServiceAccount
   annotations:
 
-# If you wish to provide additional annotations to apply to the pod(s), specify
-# them here
-# podAnnotations:
+# -- Annotations to add to the pod.
+podAnnotations: {}
+deployment:
+  # deployment.annotations -- Annotations to add to the Deployment.
+  annotations: {}
+# -- Additional labels for chart pods
+podLabels: {}
+# -- Additional labels for chart objects
+labels: {}
 
-# Pod scheduling priority
-# Ref: https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/
-# priorityClassName: high-priority
+# -- Amount of time to wait until timeout to send metrics to the metric forwarder
+agentHTTPTimeout: "30s"
 
+# -- Configure where will the metrics be writen. Mostly for debugging purposes.
+# @default -- See `values.yaml`
+sinks:
+  # -- Enable the stdout sink to also see all events in the logs.
+  stdout: false
+  # -- The newRelicInfra sink sends all events to New Relic.
+  newRelicInfra: true
+
+
+# -- Sets pod's priorityClassName. Can be configured also with `global.priorityClassName`
+priorityClassName: ""
+# -- (bool) Sets pod's hostNetwork. Can be configured also with `global.hostNetwork`
+# @default -- `false`
+hostNetwork:
+# -- Sets pod's dnsConfig. Can be configured also with `global.dnsConfig`
+dnsConfig: {}
+# -- Sets security context (at pod level). Can be configured also with `global.podSecurityContext`
+podSecurityContext: {}
+# -- Sets security context (at container level). Can be configured also with `global.containerSecurityContext`
+containerSecurityContext: {}
+
+# -- Sets pod/node affinities. Can be configured also with `global.affinity`
+affinity: {}
+# -- Sets pod's node selector. Can be configured also with `global.nodeSelector`
 nodeSelector: {}
-
+# -- Sets pod's tolerations to node taints. Can be configured also with `global.tolerations`
 tolerations: []
 
-affinity: {}
-
-nrStaging: false
-
-deployment:
-  # Annotations to add to the Deployment.
-  annotations: {}
-
-# -- Custom attributes here has the same functionality as in the new infrastructure v3 chart. you can read a string (because is a string in JSON format)
-# or read directly the map here and encode to JSON.
+# -- Adds extra attributes to the cluster and all the metrics emitted to the backend. Can be configured also with `global.customAttributes`
 customAttributes: {}
-# environment: test
-# owning-team: devel
+
+# -- Configures the integration to send all HTTP/HTTPS request through the proxy in that URL. The URL should have a standard format like `https://user:password@hostname:port`. Can be configured also with `global.proxy`
+proxy: ""
+
+# -- (bool) Send the metrics to the staging backend. Requires a valid staging license key. Can be configured also with `global.nrStaging`
+# @default -- `false`
+nrStaging:
+fedramp:
+  # -- (bool) Enables FedRAMP. Can be configured also with `global.fedramp.enabled`
+  # @default -- `false`
+  enabled:
+
+# -- (bool) Sets the debug logs to this integration or all integrations if it is set globally. Can be configured also with `global.verboseLog`
+# @default -- `false`
+verboseLog:

@@ -1,57 +1,82 @@
 # nri-kube-events
 
-## Chart Details
+![Version: 2.2.2](https://img.shields.io/badge/Version-2.2.2-informational?style=flat-square) ![AppVersion: 1.8.0](https://img.shields.io/badge/AppVersion-1.8.0-informational?style=flat-square)
 
-This chart will deploy the New Relic Events Routers as a Deployment.
+A Helm chart to deploy the New Relic Kube Events router
 
-## Configuration
+**Homepage:** <https://docs.newrelic.com/docs/integrations/kubernetes-integration/kubernetes-events/install-kubernetes-events-integration>
 
-| Parameter                                                  | Description                                                                                                                                                                                                                                    | Default                         |
-|------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------|
-| `global.cluster` - `cluster`                               | The cluster name for the Kubernetes cluster.                                                                                                                                                                                                   |                                 |
-| `global.licenseKey` - `licenseKey`                         | The [license key](https://docs.newrelic.com/docs/accounts/install-new-relic/account-setup/license-key) for your New Relic Account. This will be preferred configuration option if both `licenseKey` and `customSecret` are specified.          |                                 |
-| `global.nrStaging` - `nrStaging`                           | Send data to staging (requires a staging license key).                                                                                                                                                                                         | false                           |
-| `global.customSecretName` - `customSecretName`             | Name of the Secret object where the license key is stored                                                                                                                                                                                      |                                 |
-| `global.customSecretLicenseKey` - `customSecretLicenseKey` | Key in the Secret object where the license key is stored.                                                                                                                                                                                      |                                 |
-| `agentHTTPTimeout`                                         | The timeout for the events-router to reach the infra-agent                                                                                                                                                                                     | `30s`                           |
-| `sinks.stdout`                                             | When enabled all routed events are also logged.                                                                                                                                                                                                | `false`                         |
-| `nameOverride`                                             | The name that should be used for the deployment.                                                                                                                                                                                               |                                 |
-| `image.kubeEvents.repository`                              | The events-router image name.                                                                                                                                                                                                                  | `newrelic/nri-kube-events`      |
-| `image.kubeEvents.tag`                                     | The events-router image tag.                                                                                                                                                                                                                   | `1.7.0`                         |
-| `image.kubeEvents.pullPolicy`                              | The events-router image pull policy.                                                                                                                                                                                                           | (Empty, cluster default)        |
-| `image.infraAgent.repository`                              | The infra-agent image name.                                                                                                                                                                                                                    | `newrelic/k8s-events-forwarder` |
-| `image.infraAgent.tag`                                     | The infra-agent image tag.                                                                                                                                                                                                                     | `1.22.0`                        |
-| `image.infraAgent.pullPolicy`                              | The infra-agent image pull policy.                                                                                                                                                                                                             | (Empty, cluster default)        |
-| `image.pullSecrets`                                        | Image pull secrets.                                                                                                                                                                                                                            | `nil`                           |
-| `resources`                                                | A yaml defining the resources for the events-router container.                                                                                                                                                                                 | {}                              |
-| `rbac.create`                                              | Enable Role-based authentication                                                                                                                                                                                                               | `true`                          |
-| `serviceAccount.create`                                    | If true, a service account would be created and assigned to the deployment                                                                                                                                                                     | true                            |
-| `serviceAccount.name`                                      | The service account to assign to the deployment. If `serviceAccount.create` is true then this name will be used when creating the service account                                                                                              |                                 |
-| `serviceAccount.annotations`                               | The annotations to add to the service account if `serviceAccount.create` is set to true.                                                                                                                                                       |                                 |
-| `podAnnotations`                                           | If you wish to provide additional annotations to apply to the pod(s), specify them here.                                                                                                                                                       |                                 |
-| `priorityClassName`                                        | Scheduling priority of the pod                                                                                                                                                                                                                 | `nil`                           |
-| `nodeSelector`                                             | Node label to use for scheduling                                                                                                                                                                                                               | `{}`                            |
-| `tolerations`                                              | List of node taints to tolerate (requires Kubernetes >= 1.6)                                                                                                                                                                                   | `[]`                            |
-| `hostNetwork`                                              | Enable hostNetwork                                                                                                                                                                                                                             | `[]`                            |
-| `dnsConfig`                                                | Set DNS settings for a pod.                                                                                                                                                                                                                    | `[]`                            |
-| `affinity`                                                 | Node affinity to use for scheduling                                                                                                                                                                                                            | `{}`                            |
-| `runAsUser`                                                | Set when running in unprivileged mode or when hitting UID constraints in OpenShift.                                                                                                                                                            | `1000`                          |
-| `podSecurityContext.fsGroup`                               | fsGroup for Pod Security Context.                                                                                                                                                                                                              |                                 |
-| `podSecurityContext.runAsUser`                             | runAsUser UID for Pod Security Context.                                                                                                                                                                                                        | `1001`                          |
-| `podSecurityContext.runAsGroup`                            | runAsGroup GID for Pod Security Context.                                                                                                                                                                                                       | true                            |
-| `proxy`                                                    | Set proxy if you required as Kube-events-forwarder / infra-agent needs to send metrics to New Relic One.                                                                                                                                       |                                 |
-| `config`                                                   | Set config option in order to pass any configuration to the agent running as a sidecar. This object is map as a configuration map mounted in /etc/newrelic-infra.yml.                                                                          |                                 |
-| `deployment.annotations`                                   | The annotations to add to the `Deployment`.                                                                                                                                                                                                    | `{}`                            |
-| `customAttributes.*`                                       | Custom attributes/Extra Label that will be added to all the metrics sent by Kube events. Queryable in New Relic.                                                                                                                               | `{}`                            |
+# Helm installation
 
-## Example
+You can install this chart using [`nri-bundle`](https://github.com/newrelic/helm-charts/tree/master/charts/nri-bundle) located in the
+[helm-charts repository](https://github.com/newrelic/helm-charts) or directly from this repository by adding this Helm repository:
 
-Make sure you have [added the New Relic chart repository.](../../README.md#installing-charts)
-
-Then, to install this chart, run the following command:
-
-```sh
-helm install newrelic/nri-kube-events \
---set licenseKey=<enter_new_relic_license_key> \
---set cluster=my-k8s-cluster
+```shell
+helm repo add nri-kube-events https://newrelic.github.io/nri-kube-events
+helm upgrade --install nri-kube-events/nri-kube-events -f your-custom-values.yaml
 ```
+
+## Source Code
+
+* <https://github.com/newrelic/nri-kube-events/>
+* <https://github.com/newrelic/nri-kube-events/tree/master/charts/nri-kube-events>
+* <https://github.com/newrelic/infrastructure-agent/>
+
+## Values managed globally
+
+This chart implements the [New Relic's common Helm library](https://github.com/newrelic/helm-charts/tree/master/library/common-library) which
+means that it honors a wide range of defaults and globals common to most New Relic Helm charts.
+
+Options that can be defined globally include `affinity`, `nodeSelector`, `tolerations`, `proxy` and others. The full list can be found at
+[user's guide of the common library](https://github.com/newrelic/helm-charts/blob/master/library/common-library/README.md).
+
+## Values
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| affinity | object | `{}` | Sets pod/node affinities. Can be configured also with `global.affinity` |
+| agentHTTPTimeout | string | `"30s"` | Amount of time to wait until timeout to send metrics to the metric forwarder |
+| cluster | string | `""` | Name of the Kubernetes cluster monitored. Mandatory. Can be configured also with `global.cluster` |
+| containerSecurityContext | object | `{}` | Sets security context (at container level). Can be configured also with `global.containerSecurityContext` |
+| customAttributes | object | `{}` | Adds extra attributes to the cluster and all the metrics emitted to the backend. Can be configured also with `global.customAttributes` |
+| customSecretLicenseKey | string | `""` | In case you don't want to have the license key in you values, this allows you to point to which secret key is the license key located. Can be configured also with `global.customSecretLicenseKey` |
+| customSecretName | string | `""` | In case you don't want to have the license key in you values, this allows you to point to a user created secret to get the key from there. Can be configured also with `global.customSecretName` |
+| deployment.annotations | object | `{}` | Annotations to add to the Deployment. |
+| dnsConfig | object | `{}` | Sets pod's dnsConfig. Can be configured also with `global.dnsConfig` |
+| fedramp.enabled | bool | `false` | Enables FedRAMP. Can be configured also with `global.fedramp.enabled` |
+| fullnameOverride | string | `""` | Override the full name of the release |
+| hostNetwork | bool | `false` | Sets pod's hostNetwork. Can be configured also with `global.hostNetwork` |
+| images | object | See `values.yaml` | Images used by the chart for the integration and agents |
+| images.agent | object | See `values.yaml` | Image for the New Relic Infrastructure Agent sidecar |
+| images.integration | object | See `values.yaml` | Image for the New Relic Kubernetes integration |
+| images.pullSecrets | list | `[]` | The secrets that are needed to pull images from a custom registry. |
+| labels | object | `{}` | Additional labels for chart objects |
+| licenseKey | string | `""` | This set this license key to use. Can be configured also with `global.licenseKey` |
+| nameOverride | string | `""` | Override the name of the chart |
+| nodeSelector | object | `{}` | Sets pod's node selector. Can be configured also with `global.nodeSelector` |
+| nrStaging | bool | `false` | Send the metrics to the staging backend. Requires a valid staging license key. Can be configured also with `global.nrStaging` |
+| podAnnotations | object | `{}` | Annotations to add to the pod. |
+| podLabels | object | `{}` | Additional labels for chart pods |
+| podSecurityContext | object | `{}` | Sets security context (at pod level). Can be configured also with `global.podSecurityContext` |
+| priorityClassName | string | `""` | Sets pod's priorityClassName. Can be configured also with `global.priorityClassName` |
+| proxy | string | `""` | Configures the integration to send all HTTP/HTTPS request through the proxy in that URL. The URL should have a standard format like `https://user:password@hostname:port`. Can be configured also with `global.proxy` |
+| rbac.create | bool | `true` | Specifies whether RBAC resources should be created |
+| resources | object | `{}` | Resources available for this pod |
+| serviceAccount | object | See `values.yaml` | Settings controlling ServiceAccount creation |
+| serviceAccount.create | bool | `true` | Specifies whether a ServiceAccount should be created |
+| sinks | object | See `values.yaml` | Configure where will the metrics be writen. Mostly for debugging purposes. |
+| sinks.newRelicInfra | bool | `true` | The newRelicInfra sink sends all events to New Relic. |
+| sinks.stdout | bool | `false` | Enable the stdout sink to also see all events in the logs. |
+| tolerations | list | `[]` | Sets pod's tolerations to node taints. Can be configured also with `global.tolerations` |
+| verboseLog | bool | `false` | Sets the debug logs to this integration or all integrations if it is set globally. Can be configured also with `global.verboseLog` |
+
+## Maintainers
+
+* [alvarocabanas](https://github.com/alvarocabanas)
+* [carlossscastro](https://github.com/carlossscastro)
+* [sigilioso](https://github.com/sigilioso)
+* [gsanchezgavier](https://github.com/gsanchezgavier)
+* [kang-makes](https://github.com/kang-makes)
+* [marcsanmi](https://github.com/marcsanmi)
+* [paologallinaharbur](https://github.com/paologallinaharbur)
+* [roobre](https://github.com/roobre)
