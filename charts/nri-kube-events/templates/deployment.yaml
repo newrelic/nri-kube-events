@@ -32,8 +32,8 @@ spec:
       {{- end }}
       containers:
         - name: kube-events
-          image: {{ include "newrelic.common.images.image" ( dict "imageRoot" .Values.images.integration "context" .) }}
-          imagePullPolicy: {{ .Values.images.integration.pullPolicy }}
+          image: {{ include "nri-kube-events.compatibility.images.integration" . }}
+          imagePullPolicy: {{ include "nri-kube-events.compatibility.images.pullPolicy.integration" . }}
           {{- with include "nri-kube-events.securityContext.container" . }}
           securityContext:
             {{- . | nindent 12 }}
@@ -48,8 +48,8 @@ spec:
               mountPath: /app/config
         {{- if .Values.sinks.newRelicInfra }}
         - name: forwarder
-          image: {{ include "newrelic.common.images.image" ( dict "imageRoot" .Values.images.agent "context" .) }}
-          imagePullPolicy: {{ .Values.images.agent.pullPolicy }}
+          image: {{ include "nri-kube-events.compatibility.images.agent" . }}
+          imagePullPolicy: {{ include "nri-kube-events.compatibility.images.pullPolicy.agent" . }}
           {{- with include "nri-kube-events.securityContext.container" . }}
           securityContext:
             {{- . | nindent 12 }}
