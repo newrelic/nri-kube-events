@@ -132,3 +132,25 @@ tests:
       - equal:
           path: spec.template.spec.containers[1].imagePullPolicy
           value: old
+
+  - it: imagePullSecrets merge properly
+    set:
+      cluster: test-cluster
+      licenseKey: us-whatever
+      global:
+        images:
+          pullSecrets:
+            - global: global
+      images:
+        pullSecrets:
+          - images: images
+      image:
+        pullSecrets:
+          - image: image
+    asserts:
+      - equal:
+          path: spec.template.spec.imagePullSecrets
+          value:
+            - global: global
+            - image: image
+            - images: images

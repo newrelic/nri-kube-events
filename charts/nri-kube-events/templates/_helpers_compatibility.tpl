@@ -11,24 +11,198 @@ runAsUser: {{ .Values.runAsUser }}
 
 
 
+
+{{- /* Functions to fetch integration and agent image configurations from the old .Values.image */ -}}
+{{- define "nri-kube-events.compatibility.old.integration.registry" -}}
+    {{- if .Values.image -}}
+        {{- if .Values.image.kubeEvents -}}
+            {{- if .Values.image.kubeEvents.registry -}}
+                {{ .Values.image.kubeEvents.registry }}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- define "nri-kube-events.compatibility.old.integration.repository" -}}
+    {{- if .Values.image -}}
+        {{- if .Values.image.kubeEvents -}}
+            {{- if .Values.image.kubeEvents.repository -}}
+                {{ .Values.image.kubeEvents.repository }}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- define "nri-kube-events.compatibility.old.integration.tag" -}}
+    {{- if .Values.image -}}
+        {{- if .Values.image.kubeEvents -}}
+            {{- if .Values.image.kubeEvents.tag -}}
+                {{ .Values.image.kubeEvents.tag }}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- define "nri-kube-events.compatibility.old.integration.pullPolicy" -}}
+    {{- if .Values.image -}}
+        {{- if .Values.image.kubeEvents -}}
+            {{- if .Values.image.kubeEvents.pullPolicy -}}
+                {{ .Values.image.kubeEvents.pullPolicy }}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- define "nri-kube-events.compatibility.old.agent.registry" -}}
+    {{- if .Values.image -}}
+        {{- if .Values.image.infraAgent -}}
+            {{- if .Values.image.infraAgent.registry -}}
+                {{ .Values.image.infraAgent.registry }}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- define "nri-kube-events.compatibility.old.agent.repository" -}}
+    {{- if .Values.image -}}
+        {{- if .Values.image.infraAgent -}}
+            {{- if .Values.image.infraAgent.repository -}}
+                {{ .Values.image.infraAgent.repository }}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- define "nri-kube-events.compatibility.old.agent.tag" -}}
+    {{- if .Values.image -}}
+        {{- if .Values.image.infraAgent -}}
+            {{- if .Values.image.infraAgent.tag -}}
+                {{ .Values.image.infraAgent.tag }}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- define "nri-kube-events.compatibility.old.agent.pullPolicy" -}}
+    {{- if .Values.image -}}
+        {{- if .Values.image.infraAgent -}}
+            {{- if .Values.image.infraAgent.pullPolicy -}}
+                {{ .Values.image.infraAgent.pullPolicy }}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- /* Functions to fetch integration and agent image configurations from the new .Values.images */ -}}
+{{- define "nri-kube-events.compatibility.new.integration.registry" -}}
+    {{- if .Values.images -}}
+        {{- if .Values.images.integration -}}
+            {{- if .Values.images.integration.registry -}}
+                {{ .Values.images.integration.registry }}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- define "nri-kube-events.compatibility.new.integration.repository" -}}
+    {{- if .Values.images -}}
+        {{- if .Values.images.integration -}}
+            {{- if .Values.images.integration.repository -}}
+                {{ .Values.images.integration.repository }}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- define "nri-kube-events.compatibility.new.integration.tag" -}}
+    {{- if .Values.images -}}
+        {{- if .Values.images.integration -}}
+            {{- if .Values.images.integration.tag -}}
+                {{ .Values.images.integration.tag }}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- define "nri-kube-events.compatibility.new.integration.pullPolicy" -}}
+    {{- if .Values.images -}}
+        {{- if .Values.images.integration -}}
+            {{- if .Values.images.integration.pullPolicy -}}
+                {{ .Values.images.integration.pullPolicy }}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- define "nri-kube-events.compatibility.new.agent.registry" -}}
+    {{- if .Values.images -}}
+        {{- if .Values.images.agent -}}
+            {{- if .Values.images.agent.registry -}}
+                {{ .Values.images.agent.registry }}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- define "nri-kube-events.compatibility.new.agent.repository" -}}
+    {{- if .Values.images -}}
+        {{- if .Values.images.agent -}}
+            {{- if .Values.images.agent.repository -}}
+                {{ .Values.images.agent.repository }}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- define "nri-kube-events.compatibility.new.agent.tag" -}}
+    {{- if .Values.images -}}
+        {{- if .Values.images.agent -}}
+            {{- if .Values.images.agent.tag -}}
+                {{ .Values.images.agent.tag }}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- define "nri-kube-events.compatibility.new.agent.pullPolicy" -}}
+    {{- if .Values.images -}}
+        {{- if .Values.images.agent -}}
+            {{- if .Values.images.agent.pullPolicy -}}
+                {{ .Values.images.agent.pullPolicy }}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- /* Functions to fetch image configurations from globals */ -}}
+{{- define "nri-kube-events.compatibility.global.registry" -}}
+    {{- if .Values.global -}}
+        {{- if .Values.global.images -}}
+            {{- if .Values.global.images.registry -}}
+                {{ .Values.global.images.registry }}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+
+
 {{/*
 Creates the image string needed to pull the integration image respecting the breaking change we made in the values file
 */}}
 {{- define "nri-kube-events.compatibility.images.integration" -}}
-{{- /* workaround: https://github.com/helm/helm/issues/9266 */ -}}
-{{- $values := (.Values | merge (dict)) -}}
+{{- $globalRegistry := include "nri-kube-events.compatibility.global.registry" . -}}
+{{- $oldRegistry := include "nri-kube-events.compatibility.old.integration.registry" . -}}
+{{- $newRegistry := include "nri-kube-events.compatibility.new.integration.registry" . -}}
+{{- $registry := $oldRegistry | default $newRegistry | default $globalRegistry -}}
 
-{{- $oldRegistry := dig "image" "kubeEvents" "registry" "" $values }}
-{{- $newRegistry := dig "images" "integration" "registry" "" $values }}
-{{- $registry := $oldRegistry | default $newRegistry }}
-
-{{- $oldRepository := dig "image" "kubeEvents" "repository" "" $values }}
-{{- $newRepository := dig "images" "integration" "repository" "" $values }}
+{{- $oldRepository := include "nri-kube-events.compatibility.old.integration.repository" . -}}
+{{- $newRepository := include "nri-kube-events.compatibility.new.integration.repository" . -}}
 {{- $repository := $oldRepository | default $newRepository }}
 
-{{- $oldTag := dig "image" "kubeEvents" "tag" "" $values }}
-{{- $newTag := dig "images" "integration" "tag" "" $values }}
-{{- $tag := $oldTag | default $newTag }}
+{{- $oldTag := include "nri-kube-events.compatibility.old.integration.tag" . -}}
+{{- $newTag := include "nri-kube-events.compatibility.new.integration.tag" . -}}
+{{- $tag := $oldTag | default $newTag -}}
 
 {{- if $registry -}}
     {{- printf "%s/%s:%s" $registry $repository $tag -}}
@@ -43,19 +217,17 @@ Creates the image string needed to pull the integration image respecting the bre
 Creates the image string needed to pull the agent's image respecting the breaking change we made in the values file
 */}}
 {{- define "nri-kube-events.compatibility.images.agent" -}}
-{{- /* workaround: https://github.com/helm/helm/issues/9266 */ -}}
-{{- $values := (.Values | merge (dict)) -}}
+{{- $globalRegistry := include "nri-kube-events.compatibility.global.registry" . -}}
+{{- $oldRegistry := include "nri-kube-events.compatibility.old.agent.registry" . -}}
+{{- $newRegistry := include "nri-kube-events.compatibility.new.agent.registry" . -}}
+{{- $registry := $oldRegistry | default $newRegistry | default $globalRegistry -}}
 
-{{- $oldRegistry := dig "image" "infraAgent" "registry" "" $values -}}
-{{- $newRegistry := dig "images" "agent" "registry" "" $values -}}
-{{- $registry := $oldRegistry | default $newRegistry -}}
+{{- $oldRepository := include "nri-kube-events.compatibility.old.agent.repository" . -}}
+{{- $newRepository := include "nri-kube-events.compatibility.new.agent.repository" . -}}
+{{- $repository := $oldRepository | default $newRepository }}
 
-{{- $oldRepository := dig "image" "infraAgent" "repository" "" $values -}}
-{{- $newRepository := dig "images" "agent" "repository" "" $values -}}
-{{- $repository := $oldRepository | default $newRepository -}}
-
-{{- $oldTag := dig "image" "infraAgent" "tag" "" $values -}}
-{{- $newTag := dig "images" "agent" "tag" "" $values -}}
+{{- $oldTag := include "nri-kube-events.compatibility.old.agent.tag" . -}}
+{{- $newTag := include "nri-kube-events.compatibility.new.agent.tag" . -}}
 {{- $tag := $oldTag | default $newTag -}}
 
 {{- if $registry -}}
@@ -71,13 +243,10 @@ Creates the image string needed to pull the agent's image respecting the breakin
 Returns the pull policy for the integration image taking into account that we made a breaking change on the values path.
 */}}
 {{- define "nri-kube-events.compatibility.images.pullPolicy.integration" -}}
-{{- /* workaround: https://github.com/helm/helm/issues/9266 */ -}}
-{{- $values := (.Values | merge (dict)) -}}
+{{- $old := include "nri-kube-events.compatibility.old.integration.pullPolicy" . -}}
+{{- $new := include "nri-kube-events.compatibility.new.integration.pullPolicy" . -}}
 
-{{- $oldPullPolicy := dig "image" "kubeEvents" "pullPolicy" "" $values -}}
-{{- $newPullPolicy := dig "images" "integration" "pullPolicy" "" $values -}}
-
-{{- $oldPullPolicy | default $newPullPolicy -}}
+{{- $old | default $new -}}
 {{- end -}}
 
 
@@ -86,13 +255,54 @@ Returns the pull policy for the integration image taking into account that we ma
 Returns the pull policy for the agent image taking into account that we made a breaking change on the values path.
 */}}
 {{- define "nri-kube-events.compatibility.images.pullPolicy.agent" -}}
-{{- /* workaround: https://github.com/helm/helm/issues/9266 */ -}}
-{{- $values := (.Values | merge (dict)) -}}
+{{- $old := include "nri-kube-events.compatibility.old.agent.pullPolicy" . -}}
+{{- $new := include "nri-kube-events.compatibility.new.agent.pullPolicy" . -}}
 
-{{- $oldPullPolicy := dig "image" "infraAgent" "pullPolicy" "" $values -}}
-{{- $newPullPolicy := dig "images" "agent" "pullPolicy" "" $values -}}
+{{- $old | default $new -}}
+{{- end -}}
 
-{{- $oldPullPolicy | default $newPullPolicy -}}
+
+
+{{/*
+Returns a merged list of pull secrets ready to be used
+*/}}
+{{- define "nri-kube-events.compatibility.images.pullSecrets" -}}
+{{- $flatlist := list }}
+
+{{- $global := list -}}
+{{- if .Values.global -}}
+    {{- if .Values.global.images -}}
+        {{- if .Values.global.images.pullSecrets -}}
+            {{- $global = .Values.global.images.pullSecrets -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- $old := list -}}
+{{- if .Values.image -}}
+    {{- if .Values.image.pullSecrets -}}
+        {{- $old = .Values.image.pullSecrets }}
+    {{- end -}}
+{{- end -}}
+
+{{- $new := list -}}
+{{- if .Values.images -}}
+    {{- if .Values.images.pullSecrets -}}
+        {{- $new = .Values.images.pullSecrets -}}
+    {{- end -}}
+{{- end -}}
+
+{{- range $global -}}
+    {{- $flatlist = append $flatlist . -}}
+{{- end -}}
+{{- range $old -}}
+    {{- $flatlist = append $flatlist . -}}
+{{- end -}}
+{{- range $new -}}
+    {{- $flatlist = append $flatlist . -}}
+{{- end -}}
+
+{{ toYaml $flatlist }}
 {{- end -}}
 
 
@@ -102,14 +312,14 @@ Returns the pull policy for the agent image taking into account that we made a b
 {{- /* workaround: https://github.com/helm/helm/issues/9266 */ -}}
 {{- $values := (.Values | merge (dict)) -}}
 
-{{- $oldIntegrationRegistry := dig "image" "kubeEvents" "registry" "" $values }}
-{{- $oldIntegrationRepository := dig "image" "kubeEvents" "repository" "" $values }}
-{{- $oldIntegrationTag := dig "image" "kubeEvents" "tag" "" $values }}
-{{- $oldIntegrationPullPolicy := dig "image" "kubeEvents" "pullPolicy" "" $values -}}
-{{- $oldAgentRegistry := dig "image" "infraAgent" "registry" "" $values -}}
-{{- $oldAgentRepository := dig "image" "infraAgent" "repository" "" $values -}}
-{{- $oldAgentTag := dig "image" "infraAgent" "tag" "" $values -}}
-{{- $oldAgentPullPolicy := dig "image" "infraAgent" "pullPolicy" "" $values -}}
+{{- $oldIntegrationRegistry := include "nri-kube-events.compatibility.old.integration.registry" . -}}
+{{- $oldIntegrationRepository := include "nri-kube-events.compatibility.old.integration.repository" . -}}
+{{- $oldIntegrationTag := include "nri-kube-events.compatibility.old.integration.tag" . -}}
+{{- $oldIntegrationPullPolicy := include "nri-kube-events.compatibility.old.integration.pullPolicy" . -}}
+{{- $oldAgentRegistry := include "nri-kube-events.compatibility.old.agent.registry" . -}}
+{{- $oldAgentRepository := include "nri-kube-events.compatibility.old.agent.repository" . -}}
+{{- $oldAgentTag := include "nri-kube-events.compatibility.old.agent.tag" . -}}
+{{- $oldAgentPullPolicy := include "nri-kube-events.compatibility.old.agent.pullPolicy" . -}}
 
 {{- if or $oldIntegrationRegistry $oldIntegrationRepository $oldIntegrationTag $oldIntegrationPullPolicy
           $oldAgentRegistry $oldAgentRepository $oldAgentTag $oldAgentPullPolicy }}
