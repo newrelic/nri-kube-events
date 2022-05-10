@@ -309,9 +309,6 @@ Returns a merged list of pull secrets ready to be used
 
 {{- /* Messege to show to the user saying that image value is not supported anymore */ -}}
 {{- define "nri-kube-events.compatibility.message.images" -}}
-{{- /* workaround: https://github.com/helm/helm/issues/9266 */ -}}
-{{- $values := (.Values | merge (dict)) -}}
-
 {{- $oldIntegrationRegistry := include "nri-kube-events.compatibility.old.integration.registry" . -}}
 {{- $oldIntegrationRepository := include "nri-kube-events.compatibility.old.integration.repository" . -}}
 {{- $oldIntegrationTag := include "nri-kube-events.compatibility.old.integration.tag" . -}}
