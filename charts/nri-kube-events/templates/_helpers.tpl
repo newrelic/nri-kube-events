@@ -2,7 +2,7 @@
 
 {{- define "nri-kube-events.securityContext.pod" -}}
 {{- $defaults := fromYaml ( include "nriKubernetes.securityContext.podDefaults" . ) -}}
-{{- $compatibilityLayer := include "newrelic.compatibility.securityContext.pod" . | fromYaml -}}
+{{- $compatibilityLayer := include "nri-kube-events.compatibility.securityContext.pod" . | fromYaml -}}
 {{- $commonLibrary := fromYaml ( include "newrelic.common.securityContext.pod" . ) -}}
 
 {{- $finalSecurityContext := dict -}}
