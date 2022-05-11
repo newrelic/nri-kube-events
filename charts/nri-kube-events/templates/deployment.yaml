@@ -22,7 +22,7 @@ spec:
       labels:
         {{- include "newrelic.common.labels" . | nindent 8 }}
     spec:
-      {{- with include "nri-kube-events.compatibility.images.pullSecrets" . }}
+      {{- with include "nri-kube-events.compatibility.images.renderPullSecrets" . }}
       imagePullSecrets:
         {{- . | nindent 8 }}
       {{- end }}

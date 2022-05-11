@@ -266,43 +266,22 @@ Returns the pull policy for the agent image taking into account that we made a b
 {{/*
 Returns a merged list of pull secrets ready to be used
 */}}
-{{- define "nri-kube-events.compatibility.images.pullSecrets" -}}
-{{- $flatlist := list }}
+{{- define "nri-kube-events.compatibility.images.renderPullSecrets" -}}
+{{- $list := list -}}
 
-{{- $global := list -}}
-{{- if .Values.global -}}
-    {{- if .Values.global.images -}}
-        {{- if .Values.global.images.pullSecrets -}}
-            {{- $global = .Values.global.images.pullSecrets -}}
-        {{- end -}}
-    {{- end -}}
-{{- end -}}
-
-{{- $old := list -}}
 {{- if .Values.image -}}
     {{- if .Values.image.pullSecrets -}}
-        {{- $old = .Values.image.pullSecrets }}
+        {{- $list = append $list .Values.image.pullSecrets }}
     {{- end -}}
 {{- end -}}
 
-{{- $new := list -}}
 {{- if .Values.images -}}
     {{- if .Values.images.pullSecrets -}}
-        {{- $new = .Values.images.pullSecrets -}}
+        {{- $list = append $list .Values.images.pullSecrets -}}
     {{- end -}}
 {{- end -}}
 
-{{- range $global -}}
-    {{- $flatlist = append $flatlist . -}}
-{{- end -}}
-{{- range $old -}}
-    {{- $flatlist = append $flatlist . -}}
-{{- end -}}
-{{- range $new -}}
-    {{- $flatlist = append $flatlist . -}}
-{{- end -}}
-
-{{ toYaml $flatlist }}
+{{- include "newrelic.common.images.renderPullSecrets" ( dict "pullSecrets" $list "context" .) }}
 {{- end -}}
 
 
