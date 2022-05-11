@@ -11,175 +11,108 @@ runAsUser: {{ .Values.runAsUser }}
 
 
 
-
-{{- /* Functions to fetch integration and agent image configurations from the old .Values.image */ -}}
-{{- define "nri-kube-events.compatibility.old.integration.registry" -}}
-    {{- if .Values.image -}}
-        {{- if .Values.image.kubeEvents -}}
-            {{- if .Values.image.kubeEvents.registry -}}
-                {{ .Values.image.kubeEvents.registry }}
-            {{- end -}}
-        {{- end -}}
-    {{- end -}}
-{{- end -}}
-
-{{- define "nri-kube-events.compatibility.old.integration.repository" -}}
-    {{- if .Values.image -}}
-        {{- if .Values.image.kubeEvents -}}
-            {{- if .Values.image.kubeEvents.repository -}}
-                {{ .Values.image.kubeEvents.repository }}
-            {{- end -}}
-        {{- end -}}
-    {{- end -}}
-{{- end -}}
-
-{{- define "nri-kube-events.compatibility.old.integration.tag" -}}
-    {{- if .Values.image -}}
-        {{- if .Values.image.kubeEvents -}}
-            {{- if .Values.image.kubeEvents.tag -}}
-                {{ .Values.image.kubeEvents.tag }}
-            {{- end -}}
-        {{- end -}}
-    {{- end -}}
-{{- end -}}
-
-{{- define "nri-kube-events.compatibility.old.integration.pullPolicy" -}}
-    {{- if .Values.image -}}
-        {{- if .Values.image.kubeEvents -}}
-            {{- if .Values.image.kubeEvents.pullPolicy -}}
-                {{ .Values.image.kubeEvents.pullPolicy }}
-            {{- end -}}
-        {{- end -}}
-    {{- end -}}
-{{- end -}}
-
-{{- define "nri-kube-events.compatibility.old.agent.registry" -}}
-    {{- if .Values.image -}}
-        {{- if .Values.image.infraAgent -}}
-            {{- if .Values.image.infraAgent.registry -}}
-                {{ .Values.image.infraAgent.registry }}
-            {{- end -}}
-        {{- end -}}
-    {{- end -}}
-{{- end -}}
-
-{{- define "nri-kube-events.compatibility.old.agent.repository" -}}
-    {{- if .Values.image -}}
-        {{- if .Values.image.infraAgent -}}
-            {{- if .Values.image.infraAgent.repository -}}
-                {{ .Values.image.infraAgent.repository }}
-            {{- end -}}
-        {{- end -}}
-    {{- end -}}
-{{- end -}}
-
-{{- define "nri-kube-events.compatibility.old.agent.tag" -}}
-    {{- if .Values.image -}}
-        {{- if .Values.image.infraAgent -}}
-            {{- if .Values.image.infraAgent.tag -}}
-                {{ .Values.image.infraAgent.tag }}
-            {{- end -}}
-        {{- end -}}
-    {{- end -}}
-{{- end -}}
-
-{{- define "nri-kube-events.compatibility.old.agent.pullPolicy" -}}
-    {{- if .Values.image -}}
-        {{- if .Values.image.infraAgent -}}
-            {{- if .Values.image.infraAgent.pullPolicy -}}
-                {{ .Values.image.infraAgent.pullPolicy }}
-            {{- end -}}
-        {{- end -}}
-    {{- end -}}
-{{- end -}}
-
-{{- /* Functions to fetch integration and agent image configurations from the new .Values.images */ -}}
-{{- define "nri-kube-events.compatibility.new.integration.registry" -}}
-    {{- if .Values.images -}}
-        {{- if .Values.images.integration -}}
-            {{- if .Values.images.integration.registry -}}
-                {{ .Values.images.integration.registry }}
-            {{- end -}}
-        {{- end -}}
-    {{- end -}}
-{{- end -}}
-
-{{- define "nri-kube-events.compatibility.new.integration.repository" -}}
-    {{- if .Values.images -}}
-        {{- if .Values.images.integration -}}
-            {{- if .Values.images.integration.repository -}}
-                {{ .Values.images.integration.repository }}
-            {{- end -}}
-        {{- end -}}
-    {{- end -}}
-{{- end -}}
-
-{{- define "nri-kube-events.compatibility.new.integration.tag" -}}
-    {{- if .Values.images -}}
-        {{- if .Values.images.integration -}}
-            {{- if .Values.images.integration.tag -}}
-                {{ .Values.images.integration.tag }}
-            {{- end -}}
-        {{- end -}}
-    {{- end -}}
-{{- end -}}
-
-{{- define "nri-kube-events.compatibility.new.integration.pullPolicy" -}}
-    {{- if .Values.images -}}
-        {{- if .Values.images.integration -}}
-            {{- if .Values.images.integration.pullPolicy -}}
-                {{ .Values.images.integration.pullPolicy }}
-            {{- end -}}
-        {{- end -}}
-    {{- end -}}
-{{- end -}}
-
-{{- define "nri-kube-events.compatibility.new.agent.registry" -}}
-    {{- if .Values.images -}}
-        {{- if .Values.images.agent -}}
-            {{- if .Values.images.agent.registry -}}
-                {{ .Values.images.agent.registry }}
-            {{- end -}}
-        {{- end -}}
-    {{- end -}}
-{{- end -}}
-
-{{- define "nri-kube-events.compatibility.new.agent.repository" -}}
-    {{- if .Values.images -}}
-        {{- if .Values.images.agent -}}
-            {{- if .Values.images.agent.repository -}}
-                {{ .Values.images.agent.repository }}
-            {{- end -}}
-        {{- end -}}
-    {{- end -}}
-{{- end -}}
-
-{{- define "nri-kube-events.compatibility.new.agent.tag" -}}
-    {{- if .Values.images -}}
-        {{- if .Values.images.agent -}}
-            {{- if .Values.images.agent.tag -}}
-                {{ .Values.images.agent.tag }}
-            {{- end -}}
-        {{- end -}}
-    {{- end -}}
-{{- end -}}
-
-{{- define "nri-kube-events.compatibility.new.agent.pullPolicy" -}}
-    {{- if .Values.images -}}
-        {{- if .Values.images.agent -}}
-            {{- if .Values.images.agent.pullPolicy -}}
-                {{ .Values.images.agent.pullPolicy }}
-            {{- end -}}
-        {{- end -}}
-    {{- end -}}
-{{- end -}}
-
-{{- /* Functions to fetch image configurations from globals */ -}}
+{{- /*
+Functions to get values from the globals instead of the common library
+We make this because there could be difficult to see what is going under
+the hood if we use the common-library here. So it is easy to read something
+like:
+{{- $registry := $oldRegistry | default $newRegistry | default $globalRegistry -}}
+*/ -}}
 {{- define "nri-kube-events.compatibility.global.registry" -}}
     {{- if .Values.global -}}
         {{- if .Values.global.images -}}
             {{- if .Values.global.images.registry -}}
-                {{ .Values.global.images.registry }}
+                {{- .Values.global.images.registry -}}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- /* Functions to fetch integration image configuration from the old .Values.image */ -}}
+{{- /* integration's old registry */ -}}
+{{- define "nri-kube-events.compatibility.old.integration.registry" -}}
+    {{- if .Values.image -}}
+        {{- if .Values.image.kubeEvents -}}
+            {{- if .Values.image.kubeEvents.registry -}}
+                {{- .Values.image.kubeEvents.registry -}}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- /* integration's old repository */ -}}
+{{- define "nri-kube-events.compatibility.old.integration.repository" -}}
+    {{- if .Values.image -}}
+        {{- if .Values.image.kubeEvents -}}
+            {{- if .Values.image.kubeEvents.repository -}}
+                {{- .Values.image.kubeEvents.repository -}}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- /* integration's old tag */ -}}
+{{- define "nri-kube-events.compatibility.old.integration.tag" -}}
+    {{- if .Values.image -}}
+        {{- if .Values.image.kubeEvents -}}
+            {{- if .Values.image.kubeEvents.tag -}}
+                {{- .Values.image.kubeEvents.tag -}}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- /* integration's old imagePullPolicy */ -}}
+{{- define "nri-kube-events.compatibility.old.integration.pullPolicy" -}}
+    {{- if .Values.image -}}
+        {{- if .Values.image.kubeEvents -}}
+            {{- if .Values.image.kubeEvents.pullPolicy -}}
+                {{- .Values.image.kubeEvents.pullPolicy -}}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- /* Functions to fetch agent image configuration from the old .Values.image */ -}}
+{{- /* agent's old registry */ -}}
+{{- define "nri-kube-events.compatibility.old.agent.registry" -}}
+    {{- if .Values.image -}}
+        {{- if .Values.image.infraAgent -}}
+            {{- if .Values.image.infraAgent.registry -}}
+                {{- .Values.image.infraAgent.registry -}}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- /* agent's old repository */ -}}
+{{- define "nri-kube-events.compatibility.old.agent.repository" -}}
+    {{- if .Values.image -}}
+        {{- if .Values.image.infraAgent -}}
+            {{- if .Values.image.infraAgent.repository -}}
+                {{- .Values.image.infraAgent.repository -}}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- /* agent's old tag */ -}}
+{{- define "nri-kube-events.compatibility.old.agent.tag" -}}
+    {{- if .Values.image -}}
+        {{- if .Values.image.infraAgent -}}
+            {{- if .Values.image.infraAgent.tag -}}
+                {{- .Values.image.infraAgent.tag -}}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- /* agent's old imagePullPolicy */ -}}
+{{- define "nri-kube-events.compatibility.old.agent.pullPolicy" -}}
+    {{- if .Values.image -}}
+        {{- if .Values.image.infraAgent -}}
+            {{- if .Values.image.infraAgent.pullPolicy -}}
+                {{- .Values.image.infraAgent.pullPolicy -}}
             {{- end -}}
         {{- end -}}
     {{- end -}}
@@ -193,15 +126,15 @@ Creates the image string needed to pull the integration image respecting the bre
 {{- define "nri-kube-events.compatibility.images.integration" -}}
 {{- $globalRegistry := include "nri-kube-events.compatibility.global.registry" . -}}
 {{- $oldRegistry := include "nri-kube-events.compatibility.old.integration.registry" . -}}
-{{- $newRegistry := include "nri-kube-events.compatibility.new.integration.registry" . -}}
+{{- $newRegistry := .Values.images.integration.registry -}}
 {{- $registry := $oldRegistry | default $newRegistry | default $globalRegistry -}}
 
 {{- $oldRepository := include "nri-kube-events.compatibility.old.integration.repository" . -}}
-{{- $newRepository := include "nri-kube-events.compatibility.new.integration.repository" . -}}
+{{- $newRepository := .Values.images.integration.repository -}}
 {{- $repository := $oldRepository | default $newRepository }}
 
 {{- $oldTag := include "nri-kube-events.compatibility.old.integration.tag" . -}}
-{{- $newTag := include "nri-kube-events.compatibility.new.integration.tag" . -}}
+{{- $newTag := .Values.images.integration.tag -}}
 {{- $tag := $oldTag | default $newTag -}}
 
 {{- if $registry -}}
@@ -219,15 +152,15 @@ Creates the image string needed to pull the agent's image respecting the breakin
 {{- define "nri-kube-events.compatibility.images.agent" -}}
 {{- $globalRegistry := include "nri-kube-events.compatibility.global.registry" . -}}
 {{- $oldRegistry := include "nri-kube-events.compatibility.old.agent.registry" . -}}
-{{- $newRegistry := include "nri-kube-events.compatibility.new.agent.registry" . -}}
+{{- $newRegistry := .Values.images.agent.registry -}}
 {{- $registry := $oldRegistry | default $newRegistry | default $globalRegistry -}}
 
 {{- $oldRepository := include "nri-kube-events.compatibility.old.agent.repository" . -}}
-{{- $newRepository := include "nri-kube-events.compatibility.new.agent.repository" . -}}
+{{- $newRepository := .Values.images.agent.repository -}}
 {{- $repository := $oldRepository | default $newRepository }}
 
 {{- $oldTag := include "nri-kube-events.compatibility.old.agent.tag" . -}}
-{{- $newTag := include "nri-kube-events.compatibility.new.agent.tag" . -}}
+{{- $newTag := .Values.images.agent.tag -}}
 {{- $tag := $oldTag | default $newTag -}}
 
 {{- if $registry -}}
@@ -244,7 +177,7 @@ Returns the pull policy for the integration image taking into account that we ma
 */}}
 {{- define "nri-kube-events.compatibility.images.pullPolicy.integration" -}}
 {{- $old := include "nri-kube-events.compatibility.old.integration.pullPolicy" . -}}
-{{- $new := include "nri-kube-events.compatibility.new.integration.pullPolicy" . -}}
+{{- $new := .Values.images.integration.pullPolicy -}}
 
 {{- $old | default $new -}}
 {{- end -}}
@@ -256,7 +189,7 @@ Returns the pull policy for the agent image taking into account that we made a b
 */}}
 {{- define "nri-kube-events.compatibility.images.pullPolicy.agent" -}}
 {{- $old := include "nri-kube-events.compatibility.old.agent.pullPolicy" . -}}
-{{- $new := include "nri-kube-events.compatibility.new.agent.pullPolicy" . -}}
+{{- $new := .Values.images.agent.pullPolicy -}}
 
 {{- $old | default $new -}}
 {{- end -}}
@@ -275,10 +208,8 @@ Returns a merged list of pull secrets ready to be used
     {{- end -}}
 {{- end -}}
 
-{{- if .Values.images -}}
-    {{- if .Values.images.pullSecrets -}}
-        {{- $list = append $list .Values.images.pullSecrets -}}
-    {{- end -}}
+{{- if .Values.images.pullSecrets -}}
+    {{- $list = append $list .Values.images.pullSecrets -}}
 {{- end -}}
 
 {{- include "newrelic.common.images.renderPullSecrets" ( dict "pullSecrets" $list "context" .) }}
