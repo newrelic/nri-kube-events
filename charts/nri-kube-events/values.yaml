@@ -30,7 +30,7 @@ images:
     tag: 1.22.0
     pullPolicy: IfNotPresent
   # -- The secrets that are needed to pull images from a custom registry.
-  pullSecrets:
+  pullSecrets: []
   # - name: regsecret
 
 # -- Resources available for this pod

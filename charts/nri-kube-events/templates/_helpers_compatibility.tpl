@@ -228,8 +228,7 @@ Returns a merged list of pull secrets ready to be used
 {{- $oldAgentTag := include "nri-kube-events.compatibility.old.agent.tag" . -}}
 {{- $oldAgentPullPolicy := include "nri-kube-events.compatibility.old.agent.pullPolicy" . -}}
 
-{{- if or $oldIntegrationRegistry $oldIntegrationRepository $oldIntegrationTag $oldIntegrationPullPolicy
-          $oldAgentRegistry $oldAgentRepository $oldAgentTag $oldAgentPullPolicy }}
+{{- if or $oldIntegrationRegistry $oldIntegrationRepository $oldIntegrationTag $oldIntegrationPullPolicy $oldAgentRegistry $oldAgentRepository $oldAgentTag $oldAgentPullPolicy }}
 Configuring image repository an tag under 'image' is no longer supported.
 This is the list values that we no longer support:
  - image.kubeEvents.registry
