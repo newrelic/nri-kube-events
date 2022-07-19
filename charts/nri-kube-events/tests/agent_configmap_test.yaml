@@ -26,7 +26,8 @@ tests:
             http_server_enabled: true
             http_server_port: 8001
 
-            verbose: 1
+            log:
+              level: trace
             fedramp: true
 
   - it: does not template if the http sink is disabled
