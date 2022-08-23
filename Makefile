@@ -5,7 +5,6 @@ NATIVEARCH	 := $(shell go version | awk -F '[ /]' '{print $$5}')
 TOOLS_DIR    := ./bin/dev-tools
 INTEGRATION  = nri-kube-events
 GOFLAGS       = -mod=readonly
-GOLANGCI_LINT = github.com/golangci/golangci-lint/cmd/golangci-lint
 DOCKER_IMAGE_NAME ?= newrelic/nri-kube-events
 BUILD_TARGET ?= bin/$(INTEGRATION)
 
@@ -31,7 +30,7 @@ endif
 
 all: build
 
-build: clean validate test compile
+build: clean test compile
 
 clean:
 	@echo "=== $(INTEGRATION) === [ clean ]: Removing binaries and coverage file..."
@@ -40,12 +39,6 @@ clean:
 fmt:
 	@echo "=== $(INTEGRATION) === [ fmt ]: Running Gofmt...."
 	@go fmt ./...
-
-validate:
-	@printf "=== $(INTEGRATION) === [ validate ]: running golangci-lint & semgrep... "
-	@go run  $(GOFLAGS) $(GOLANGCI_LINT) run --verbose
-	@[ -f .semgrep.yml ] && semgrep_config=".semgrep.yml" || semgrep_config="p/golang" ; \
-	docker run --rm -v "${PWD}:/src:ro" --workdir /src returntocorp/semgrep -c "$$semgrep_config"
 
 compile:
 	@echo "=== $(INTEGRATION) === [ compile ]: Building $(INTEGRATION)..."
@@ -75,4 +68,4 @@ docker-multiarch: compile-multiarch
 buildThirdPartyNotice:
 	@go list -m -json all | go-licence-detector -rules ./assets/licence/rules.json  -noticeTemplate ./assets/licence/THIRD_PARTY_NOTICES.md.tmpl -noticeOut THIRD_PARTY_NOTICES.md -includeIndirect -overrides ./assets/licence/overrides
 
-.PHONY: all build clean fmt validate compile compile-multiarch test test-unit docker docker-multiarch buildThirdPartyNotice
+.PHONY: all build clean fmt compile compile-multiarch test test-unit docker docker-multiarch buildThirdPartyNotice
