@@ -64,7 +64,7 @@ Options that can be defined globally include `affinity`, `nodeSelector`, `tolera
 | resources | object | `{}` | Resources available for this pod |
 | serviceAccount | object | See `values.yaml` | Settings controlling ServiceAccount creation |
 | serviceAccount.create | bool | `true` | Specifies whether a ServiceAccount should be created |
-| sinks | object | See `values.yaml` | Configure where will the metrics be writen. Mostly for debugging purposes. |
+| sinks | object | See `values.yaml` | Configure where will the metrics be written. Mostly for debugging purposes. |
 | sinks.newRelicInfra | bool | `true` | The newRelicInfra sink sends all events to New Relic. |
 | sinks.stdout | bool | `false` | Enable the stdout sink to also see all events in the logs. |
 | tolerations | list | `[]` | Sets pod's tolerations to node taints. Can be configured also with `global.tolerations` |

@@ -59,7 +59,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Update newrelic/k8s-events-forwarder to version `1.11.24`.
 - Move manifest from `apps/v1beta2` to `apps/v1`
 - Sync labels in helm chart and manifest. Use `nri-kube-events` in all cases.
-  **IMPORTANT:** If you prevously installed `nr-kube-events` using the manifest you should uninstall it first with the OLD manifest before applying the new one. Users of our wizard can upgrade normally.
+  **IMPORTANT:** If you previously installed `nr-kube-events` using the manifest you should uninstall it first with the OLD manifest before applying the new one. Users of our wizard can upgrade normally.
 
 ## 1.0.0
 ### Added

@@ -67,7 +67,7 @@ func NewRouter(informer cache.SharedIndexInformer, sinks map[string]Sink, opts .
 
 	// According to the shared_informer source code it's not designed to
 	// wait for the event handlers to finish, they should return quickly
-	// Therefor we push to a queue and handle it in another goroutine
+	// Therefore we push to a queue and handle it in another goroutine
 	// See: https://github.com/kubernetes/client-go/blob/c8dc69f8a8bf8d8640493ce26688b26c7bfde8e6/tools/cache/shared_informer.go#L111
 	workQueue := make(chan KubeEvent, config.workQueueLength)
 
