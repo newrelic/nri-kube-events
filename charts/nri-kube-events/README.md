@@ -19,7 +19,7 @@ helm upgrade --install nri-kube-events/nri-kube-events -f your-custom-values.yam
 ## Source Code
 
 * <https://github.com/newrelic/nri-kube-events/>
-* <https://github.com/newrelic/nri-kube-events/tree/master/charts/nri-kube-events>
+* <https://github.com/newrelic/nri-kube-events/tree/main/charts/nri-kube-events>
 * <https://github.com/newrelic/infrastructure-agent/>
 
 ## Values managed globally
