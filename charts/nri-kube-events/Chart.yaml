@@ -5,7 +5,7 @@ home: https://docs.newrelic.com/docs/integrations/kubernetes-integration/kuberne
 icon: https://newrelic.com/themes/custom/curio/assets/mediakit/NR_logo_Horizontal.svg
 sources:
   - https://github.com/newrelic/nri-kube-events/
-  - https://github.com/newrelic/nri-kube-events/tree/master/charts/nri-kube-events
+  - https://github.com/newrelic/nri-kube-events/tree/main/charts/nri-kube-events
   - https://github.com/newrelic/infrastructure-agent/
 
 version: 2.2.6
