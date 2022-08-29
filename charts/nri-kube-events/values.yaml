@@ -70,7 +70,7 @@ labels: {}
 # -- Amount of time to wait until timeout to send metrics to the metric forwarder
 agentHTTPTimeout: "30s"
 
-# -- Configure where will the metrics be writen. Mostly for debugging purposes.
+# -- Configure where will the metrics be written. Mostly for debugging purposes.
 # @default -- See `values.yaml`
 sinks:
   # -- Enable the stdout sink to also see all events in the logs.

@@ -1,6 +1,6 @@
 # nri-kube-events
 
-![Version: 2.2.5](https://img.shields.io/badge/Version-2.2.5-informational?style=flat-square) ![AppVersion: 1.8.0](https://img.shields.io/badge/AppVersion-1.8.0-informational?style=flat-square)
+![Version: 2.2.6](https://img.shields.io/badge/Version-2.2.6-informational?style=flat-square) ![AppVersion: 1.8.0](https://img.shields.io/badge/AppVersion-1.8.0-informational?style=flat-square)
 
 A Helm chart to deploy the New Relic Kube Events router
 
@@ -19,7 +19,7 @@ helm upgrade --install nri-kube-events/nri-kube-events -f your-custom-values.yam
 ## Source Code
 
 * <https://github.com/newrelic/nri-kube-events/>
-* <https://github.com/newrelic/nri-kube-events/tree/master/charts/nri-kube-events>
+* <https://github.com/newrelic/nri-kube-events/tree/main/charts/nri-kube-events>
 * <https://github.com/newrelic/infrastructure-agent/>
 
 ## Values managed globally
@@ -64,7 +64,7 @@ Options that can be defined globally include `affinity`, `nodeSelector`, `tolera
 | resources | object | `{}` | Resources available for this pod |
 | serviceAccount | object | See `values.yaml` | Settings controlling ServiceAccount creation |
 | serviceAccount.create | bool | `true` | Specifies whether a ServiceAccount should be created |
-| sinks | object | See `values.yaml` | Configure where will the metrics be writen. Mostly for debugging purposes. |
+| sinks | object | See `values.yaml` | Configure where will the metrics be written. Mostly for debugging purposes. |
 | sinks.newRelicInfra | bool | `true` | The newRelicInfra sink sends all events to New Relic. |
 | sinks.stdout | bool | `false` | Enable the stdout sink to also see all events in the logs. |
 | tolerations | list | `[]` | Sets pod's tolerations to node taints. Can be configured also with `global.tolerations` |
