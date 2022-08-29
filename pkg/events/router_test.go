@@ -174,8 +174,8 @@ func TestRouter_Run(t *testing.T) {
 
 	stubSink.On("HandleEvent", mock.AnythingOfType("KubeEvent")).Run(func(args mock.Arguments) {
 		log.Info("stub called")
-		ache := args.Get(0).(KubeEvent)
-		assert.Equal(t, ke, ache.Event)
+		ake := args.Get(0).(KubeEvent)
+		assert.Equal(t, ke, ake.Event)
 		defer close(stopChan)
 	}).Return(nil).Once()
 
