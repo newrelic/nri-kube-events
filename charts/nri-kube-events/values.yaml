@@ -20,14 +20,14 @@ images:
   integration:
     registry:
     repository: newrelic/nri-kube-events
-    tag: 1.8.0
+    tag:
     pullPolicy: IfNotPresent
   # -- Image for the New Relic Infrastructure Agent sidecar
   # @default -- See `values.yaml`
   agent:
     registry:
     repository: newrelic/k8s-events-forwarder
-    tag: 1.22.0
+    tag: 1.29.1
     pullPolicy: IfNotPresent
   # -- The secrets that are needed to pull images from a custom registry.
   pullSecrets: []
