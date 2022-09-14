@@ -135,7 +135,7 @@ Creates the image string needed to pull the integration image respecting the bre
 
 {{- $oldTag := include "nri-kube-events.compatibility.old.integration.tag" . -}}
 {{- $newTag := .Values.images.integration.tag -}}
-{{- $tag := $oldTag | default $newTag -}}
+{{- $tag := $oldTag | default $newTag | default .Chart.AppVersion -}}
 
 {{- if $registry -}}
     {{- printf "%s/%s:%s" $registry $repository $tag -}}
