@@ -3,6 +3,46 @@ entries:
   nri-kube-events:
   - apiVersion: v2
     appVersion: 1.8.2
+    created: "2022-10-03T09:11:52.928720636Z"
+    dependencies:
+    - name: common-library
+      repository: https://helm-charts.newrelic.com
+      version: 1.1.0
+    description: A Helm chart to deploy the New Relic Kube Events router
+    digest: 460a4ec4a79b23b3e19c962c8c1481347e6ed296f854b90faf26a89d2b13541d
+    home: https://docs.newrelic.com/docs/integrations/kubernetes-integration/kubernetes-events/install-kubernetes-events-integration
+    icon: https://newrelic.com/themes/custom/curio/assets/mediakit/NR_logo_Horizontal.svg
+    keywords:
+    - infrastructure
+    - newrelic
+    - monitoring
+    maintainers:
+    - name: alvarocabanas
+      url: https://github.com/alvarocabanas
+    - name: carlossscastro
+      url: https://github.com/carlossscastro
+    - name: sigilioso
+      url: https://github.com/sigilioso
+    - name: gsanchezgavier
+      url: https://github.com/gsanchezgavier
+    - name: kang-makes
+      url: https://github.com/kang-makes
+    - name: marcsanmi
+      url: https://github.com/marcsanmi
+    - name: paologallinaharbur
+      url: https://github.com/paologallinaharbur
+    - name: roobre
+      url: https://github.com/roobre
+    name: nri-kube-events
+    sources:
+    - https://github.com/newrelic/nri-kube-events/
+    - https://github.com/newrelic/nri-kube-events/tree/main/charts/nri-kube-events
+    - https://github.com/newrelic/infrastructure-agent/
+    urls:
+    - https://github.com/newrelic/nri-kube-events/releases/download/nri-kube-events-2.2.10/nri-kube-events-2.2.10.tgz
+    version: 2.2.10
+  - apiVersion: v2
+    appVersion: 1.8.2
     created: "2022-09-14T13:34:25.514761024Z"
     dependencies:
     - name: common-library
@@ -427,4 +467,4 @@ entries:
     urls:
     - https://github.com/newrelic/nri-kube-events/releases/download/nri-kube-events-1.14.0/nri-kube-events-1.14.0.tgz
     version: 1.14.0
-generated: "2022-09-14T13:34:25.514865524Z"
+generated: "2022-10-03T09:11:52.928798636Z"
