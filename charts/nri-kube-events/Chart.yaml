@@ -8,12 +8,12 @@ sources:
   - https://github.com/newrelic/nri-kube-events/tree/main/charts/nri-kube-events
   - https://github.com/newrelic/infrastructure-agent/
 
-version: 2.2.6
-appVersion: 1.8.0
+version: 2.2.10
+appVersion: 1.8.2
 
 dependencies:
   - name: common-library
-    version: 1.0.5
+    version: 1.1.0
     repository: "https://helm-charts.newrelic.com"
 
 maintainers:

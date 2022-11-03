@@ -5,6 +5,18 @@ release:
   name: my-release
   namespace: my-namespace
 tests:
+  - it: by default the tag is not nil
+    set:
+      cluster: test-cluster
+      licenseKey: us-whatever
+    asserts:
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ".*nil.*"
+      - notMatchRegex:
+          path: spec.template.spec.containers[1].image
+          pattern: ".*nil.*"
+
   - it: templates image correctly from the new values
     set:
       cluster: test-cluster
