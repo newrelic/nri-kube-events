@@ -6,7 +6,7 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/newrelic/infra-integrations-sdk v3.7.3+incompatible
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.13.0
+	github.com/prometheus/client_golang v1.14.0
 	github.com/prometheus/client_model v0.3.0
 	github.com/sethgrid/pester v1.2.0
 	github.com/sirupsen/logrus v1.9.0
