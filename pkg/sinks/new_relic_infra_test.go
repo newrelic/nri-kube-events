@@ -74,11 +74,11 @@ func TestFormatEntityID(t *testing.T) {
 	}
 }
 
-func TestNewRelicSinkIntegration(t *testing.T) {
+func TestNewRelicSinkIntegration_HandleEvent_Success(t *testing.T) {
 	_ = os.Setenv("METADATA", "true")
 	_ = os.Setenv("NRI_KUBE_EVENTS_myCustomAttribute", "attrValue")
 	defer os.Clearenv()
-	expectedPostJSON, err := ioutil.ReadFile("./testdata/new_relic_infra_test_data.json")
+	expectedPostJSON, err := ioutil.ReadFile("./testdata/event_data.json")
 	if err != nil {
 		t.Fatalf("could not read test_post_data.json: %v", err)
 	}
