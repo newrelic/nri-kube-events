@@ -9,10 +9,16 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/newrelic/nri-kube-events/pkg/events"
+	"github.com/newrelic/nri-kube-events/pkg/common"
 )
 
-// SinkConfig defines the name and config map of an `events.Sink`
+// Sink receives events from the router, process and publish them to a certain
+// destination (stdout, NewRelic platform, etc.).
+type Sink interface {
+	HandleEvent(kubeEvent common.KubeEvent) error
+}
+
+// SinkConfig defines the name and config map of an `Sink`
 type SinkConfig struct {
 	Name   string
 	Config map[string]string
@@ -45,31 +51,30 @@ func (s SinkConfig) GetDurationOr(name string, fallback time.Duration) time.Dura
 	return dur
 }
 
-type sinkFactory func(config SinkConfig, integrationVersion string) (events.Sink, error)
+type sinkFactory func(config SinkConfig, integrationVersion string) (Sink, error)
 
-// registeredSinkFactories holds all the registered sinks by this package
-var registeredSinkFactories = map[string]sinkFactory{}
+// registeredFactories holds all the registered sinks by this package
+var registeredFactories = map[string]sinkFactory{}
 
-func registerSink(name string, factory sinkFactory) {
-	if _, ok := registeredSinkFactories[name]; ok {
+func register(name string, factory sinkFactory) {
+	if _, ok := registeredFactories[name]; ok {
 		logrus.Fatal("registered a double sink factory")
 	}
 
-	registeredSinkFactories[name] = factory
+	registeredFactories[name] = factory
 }
 
-// CreateSinks takes a slice of SinkConfigs and attempts
-// to initialize the sinks.
-func CreateSinks(configs []SinkConfig, integrationVersion string) (map[string]events.Sink, error) {
-
-	sinks := make(map[string]events.Sink)
+// Create takes a slice of SinkConfigs and attempts
+// to initialize the sink handlers.
+func Create(configs []SinkConfig, integrationVersion string) (map[string]Sink, error) {
+	sinks := make(map[string]Sink)
 
 	for _, sinkConf := range configs {
 
 		var ok bool
 		var factory sinkFactory
 
-		if factory, ok = registeredSinkFactories[sinkConf.Name]; !ok {
+		if factory, ok = registeredFactories[sinkConf.Name]; !ok {
 			return sinks, fmt.Errorf("sink not found: %s", sinkConf.Name)
 		}
 

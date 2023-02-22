@@ -4,13 +4,16 @@
 package events
 
 import (
-	"github.com/newrelic/nri-kube-events/pkg/common"
-	"github.com/newrelic/nri-kube-events/pkg/router"
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/cache"
+
+	"github.com/newrelic/nri-kube-events/pkg/common"
+	"github.com/newrelic/nri-kube-events/pkg/router"
 )
 
 var (
@@ -34,19 +37,35 @@ var (
 	}, []string{"sink"})
 )
 
+type EventHandler interface {
+	HandleEvent(kubeEvent common.KubeEvent) error
+}
+
 // Router listens for events coming from a SharedIndexInformer,
 // and forwards them to the registered sinks
 type Router struct {
-	// list of sinks to send events to
-	sinks map[string]Sink
+	// list of handlers to send events to
+	handlers map[string]EventHandler
 
 	// all updates & adds will be appended to this queue
 	workQueue chan common.KubeEvent
 }
 
+type observedEventHandler struct {
+	EventHandler
+	prometheus.Observer
+}
+
+func (o *observedEventHandler) HandleEvent(kubeEvent common.KubeEvent) error {
+	t := time.Now()
+	defer func() { o.Observer.Observe(time.Since(t).Seconds()) }()
+
+	return o.EventHandler.HandleEvent(kubeEvent)
+}
+
 // NewRouter returns a new Router which listens to the given SharedIndexInformer,
 // and forwards all incoming events to the given sinks
-func NewRouter(informer cache.SharedIndexInformer, sinks map[string]Sink, opts ...router.ConfigOption) *Router {
+func NewRouter(informer cache.SharedIndexInformer, handlers map[string]EventHandler, opts ...router.ConfigOption) *Router {
 	config, err := router.NewConfig(opts...)
 	if err != nil {
 		logrus.Fatalf("Error with Router configuration: %v", err)
@@ -73,17 +92,18 @@ func NewRouter(informer cache.SharedIndexInformer, sinks map[string]Sink, opts .
 			}
 		},
 	})
+
 	// instrument all sinks with histogram observation
-	observedSinks := map[string]Sink{}
-	for name, sink := range sinks {
-		observedSinks[name] = &observedSink{
-			sink:     sink,
-			observer: requestDurationSeconds.WithLabelValues(name),
+	observedSinks := map[string]EventHandler{}
+	for name, handler := range handlers {
+		observedSinks[name] = &observedEventHandler{
+			EventHandler: handler,
+			Observer:     requestDurationSeconds.WithLabelValues(name),
 		}
 	}
 
 	return instrument(&Router{
-		sinks:     observedSinks,
+		handlers:  observedSinks,
 		workQueue: workQueue,
 	})
 }
@@ -109,7 +129,6 @@ func instrument(r *Router) *Router {
 // Run listens to the workQueue and forwards incoming events
 // to all registered sinks
 func (r *Router) Run(stopChan <-chan struct{}) {
-
 	logrus.Infof("Router started")
 	defer logrus.Infof("Router stopped")
 
@@ -124,11 +143,10 @@ func (r *Router) Run(stopChan <-chan struct{}) {
 }
 
 func (r *Router) publishEvent(kubeEvent common.KubeEvent) {
-	for name, sink := range r.sinks {
-
+	for name, handler := range r.handlers {
 		eventsReceivedTotal.WithLabelValues(name).Inc()
 
-		if err := sink.HandleEvent(kubeEvent); err != nil {
+		if err := handler.HandleEvent(kubeEvent); err != nil {
 			logrus.Warningf("Sink %s HandleEvent error: %v", name, err)
 			eventsFailuresTotal.WithLabelValues(name).Inc()
 		}

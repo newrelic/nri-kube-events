@@ -10,14 +10,13 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/newrelic/nri-kube-events/pkg/common"
-	"github.com/newrelic/nri-kube-events/pkg/events"
 )
 
 func init() {
-	registerSink("stdout", createStdoutSink)
+	register("stdout", createStdoutSink)
 }
 
-func createStdoutSink(_ SinkConfig, _ string) (events.Sink, error) {
+func createStdoutSink(_ SinkConfig, _ string) (Sink, error) {
 	return &stdoutSink{}, nil
 }
 

@@ -290,7 +290,7 @@ func initialize(t *testing.T) (*kubernetes.Clientset, *integration.TestAgentSink
 	}
 	testSinkInstance.ForgetEvents()
 
-	router := events.NewRouter(eventsInformer, map[string]events.Sink{"mock": testSinkInstance})
+	router := events.NewRouter(eventsInformer, map[string]events.EventHandler{"mock": testSinkInstance})
 	go router.Run(nil)
 
 	return client, testSinkInstance
