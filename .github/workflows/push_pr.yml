@@ -124,7 +124,7 @@ jobs:
         with:
           go-version-file: 'go.mod'
       - name: Setup Minikube
-        uses: manusa/actions-setup-minikube@v2.4.3
+        uses: manusa/actions-setup-minikube@v2.7.2
         with:
           minikube version: v1.20.0
           kubernetes version: ${{ matrix.kubernetes-version }}
