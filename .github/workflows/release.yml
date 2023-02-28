@@ -34,7 +34,7 @@ jobs:
           TAG=$(echo "${{ github.event.release.tag_name }}" | sed 's/^v//')
           make compile TAG=${TAG}
       - name: Upload artifact for docker build step
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           retention-days: 1
           name: nri-kube-events-${{ matrix.goos }}-${{ matrix.goarch }}
