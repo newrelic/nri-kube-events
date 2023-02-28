@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - uses: helm/chart-testing-action@v2.2.1
+      - uses: helm/chart-testing-action@v2.3.1
 
       - name: Lint charts
         run: ct --config .github/ct.yaml lint --debug
@@ -148,7 +148,7 @@ jobs:
           DOCKER_BUILDKIT=1 docker build -t e2e/nri-kube-events:test  .
           minikube image load e2e/nri-kube-events:test
           kubectl create ns ct
-      - uses: helm/chart-testing-action@v2.2.1
+      - uses: helm/chart-testing-action@v2.3.1
       - name: Test install charts
         run: ct install --namespace ct --config .github/ct.yaml --debug
       - name: Test upgrade charts
