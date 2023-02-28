@@ -62,10 +62,3 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
-
-replace (
-	// To avoid CVE-2020-13949 triggering a security scan.
-	github.com/apache/thrift => github.com/apache/thrift v0.14.0
-	// To avoid CVE-2018-1098 triggering a security scan.
-	go.etcd.io/etcd => go.etcd.io/etcd v0.5.0-alpha.5.0.20190917205325-a14579fbfb1a
-)
