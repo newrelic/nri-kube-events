@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/newrelic/nri-kube-events/pkg/events"
@@ -76,7 +75,7 @@ func CreateSinks(configs []SinkConfig, integrationVersion string) (map[string]ev
 
 		sink, err := factory(sinkConf, integrationVersion)
 		if err != nil {
-			return sinks, errors.Wrapf(err, "could not initialize sink %s", sinkConf.Name)
+			return sinks, fmt.Errorf("could not initialize sink %s: %w", sinkConf.Name, err)
 		}
 
 		logrus.Infof("Created sink: %s", sinkConf.Name)

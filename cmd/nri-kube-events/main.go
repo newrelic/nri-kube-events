@@ -14,7 +14,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/informers"
@@ -158,7 +157,7 @@ func getClientset(kubeconfig string) (*kubernetes.Clientset, error) {
 	}
 
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot load kubernetes client configuration")
+		return nil, fmt.Errorf("cannot load kubernetes client configuration: %w", err)
 	}
 
 	return kubernetes.NewForConfig(conf)
