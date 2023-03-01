@@ -7,9 +7,9 @@ import (
 	"encoding/json"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"github.com/newrelic/nri-kube-events/pkg/events"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {

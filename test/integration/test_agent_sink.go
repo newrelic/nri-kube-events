@@ -11,9 +11,10 @@ import (
 	"time"
 
 	sdkEvent "github.com/newrelic/infra-integrations-sdk/data/event"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/newrelic/nri-kube-events/pkg/events"
 	"github.com/newrelic/nri-kube-events/pkg/sinks"
-	log "github.com/sirupsen/logrus"
 )
 
 // Must be in sync with unexported name in pkg/sinks/new_relic_infra.go:32.

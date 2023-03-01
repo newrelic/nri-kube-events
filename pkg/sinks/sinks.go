@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/newrelic/nri-kube-events/pkg/events"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
+	"github.com/newrelic/nri-kube-events/pkg/events"
 )
 
 // SinkConfig defines the name and config map of an `events.Sink`
