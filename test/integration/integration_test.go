@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 // Package integration_test implements simple integration test against a local cluster, whose config is loaded from the kubeconfig file.
@@ -13,14 +14,15 @@ import (
 	"time"
 
 	sdkEvent "github.com/newrelic/infra-integrations-sdk/data/event"
-	"github.com/newrelic/nri-kube-events/pkg/events"
-	"github.com/newrelic/nri-kube-events/test/integration"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+
+	"github.com/newrelic/nri-kube-events/pkg/events"
+	"github.com/newrelic/nri-kube-events/test/integration"
 )
 
 // We must have a global TestAgentSink because the infrastructure-sdk attempts to register global flags when the

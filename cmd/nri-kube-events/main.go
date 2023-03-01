@@ -14,18 +14,17 @@ import (
 	"syscall"
 	"time"
 
-	"k8s.io/client-go/tools/cache"
-
+	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/newrelic/nri-kube-events/pkg/events"
 	"github.com/newrelic/nri-kube-events/pkg/sinks"
-	"github.com/pkg/errors"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/sirupsen/logrus"
 )
 
 const (

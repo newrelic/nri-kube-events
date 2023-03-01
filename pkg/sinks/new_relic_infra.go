@@ -14,18 +14,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sethgrid/pester"
-
-	"github.com/prometheus/client_golang/prometheus/promauto"
-
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
-
 	sdkArgs "github.com/newrelic/infra-integrations-sdk/args"
 	sdkEvent "github.com/newrelic/infra-integrations-sdk/data/event"
 	sdkIntegration "github.com/newrelic/infra-integrations-sdk/integration"
-	"github.com/newrelic/nri-kube-events/pkg/events"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/sethgrid/pester"
+	"github.com/sirupsen/logrus"
+
+	"github.com/newrelic/nri-kube-events/pkg/events"
 )
 
 func init() {
