@@ -155,7 +155,7 @@ func (ns *newRelicInfraSink) createEntity(kubeEvent events.KubeEvent) (*sdkInteg
 
 	e, err := ns.sdkIntegration.Entity(entityName, entityType)
 	if err != nil {
-		return nil, fmt.Errorf("could not initialise new SDK Entity: %w", err)
+		return nil, fmt.Errorf("could not initialize new SDK Entity: %w", err)
 	}
 
 	return e, nil
