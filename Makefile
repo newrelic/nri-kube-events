@@ -62,6 +62,9 @@ docker:
 	$(MAKE) compile GOOS=linux GOARCH=amd64
 	DOCKER_BUILDKIT=1 docker build . -t $(DOCKER_IMAGE_NAME)
 
+docker-push: docker
+	DOCKER_BUILDKIT=1 docker push $(DOCKER_IMAGE_NAME)
+
 docker-multiarch: compile-multiarch
 	@docker buildx build . -t $(DOCKER_IMAGE_NAME)
 

@@ -1,14 +1,22 @@
-apiVersion: skaffold/v2alpha1
+apiVersion: skaffold/v4beta1
 kind: Config
 metadata:
   name: nri-kube-events
 build:
   artifacts:
-    - image: quay.io/newrelic/nri-kube-events
+  - image: newrelic/nri-kube-events
+    context: .
+    custom:
+      buildCommand: ./skaffold_build.sh
+      dependencies:
+        paths:
+        - "**/*.go"
+        - go.mod
+        - skaffold_build.sh
   tagPolicy:
     sha256: {}
+manifests:
+  rawYaml:
+  - deploy/local.yaml
 deploy:
-  kubectl:
-    manifests:
-    - deploy/local.yaml
-
+  kubectl: {}

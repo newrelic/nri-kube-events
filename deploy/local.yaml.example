@@ -1,8 +1,14 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nri-dev
+---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: nri-kube-events
-  namespace: default
+  namespace: nri-dev
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -24,7 +30,7 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: nri-kube-events
-    namespace: default
+    namespace: nri-dev
 ---
 apiVersion: v1
 data:
@@ -39,13 +45,13 @@ data:
 kind: ConfigMap
 metadata:
   name: nri-kube-events
-  namespace: default
+  namespace: nri-dev
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nri-kube-events
-  namespace: default
+  namespace: nri-dev
   labels:
     app: nri-kube-events
     app.kubernetes.io/name: nri-kube-events
@@ -61,7 +67,7 @@ spec:
     spec:
       containers:
         - name: kube-events
-          image: newrelic/nri-kube-events:1.7.0
+          image: newrelic/nri-kube-events:latest
           resources:
             limits:
               memory: "128Mi"
@@ -75,7 +81,7 @@ spec:
             - name: config-volume
               mountPath: /app/config
         - name: infra-agent
-          image: newrelic/k8s-events-forwarder:1.22.0
+          image: newrelic/k8s-events-forwarder:1.36.1
           resources:
             limits:
               memory: 128Mi
@@ -97,6 +103,8 @@ spec:
               value: "<ADD YOUR LICENSE KEY>"
 #            - name: "NRIA_VERBOSE"
 #              value: "1"
+            - name: NRIA_STAGING
+              value: "true"
             - name: NRIA_COLLECTOR_URL
               value: "https://staging-infra-api.newrelic.com"
           volumeMounts:
