@@ -26,15 +26,7 @@ Distributed under the following license(s):
 
 Distributed under the following license(s):
 
-* MIT
-
-
-
-## [github.com/pkg/errors](https://github.com/pkg/errors)
-
-Distributed under the following license(s):
-
-* BSD-2-Clause
+* Apache-2.0
 
 
 
@@ -116,55 +108,7 @@ Indirect dependencies
 
 
 
-## [cloud.google.com/go](https://cloud.google.com/go)
-
-Distributed under the following license(s):
-
-* Apache-2.0
-
-
-
-## [github.com/Azure/go-autorest](https://github.com/Azure/go-autorest)
-
-Distributed under the following license(s):
-
-* Apache-2.0
-
-
-
-## [github.com/NYTimes/gziphandler](https://github.com/NYTimes/gziphandler)
-
-Distributed under the following license(s):
-
-* Apache-2.0
-
-
-
-## [github.com/PuerkitoBio/purell](https://github.com/PuerkitoBio/purell)
-
-Distributed under the following license(s):
-
-* BSD-3-Clause
-
-
-
-## [github.com/PuerkitoBio/urlesc](https://github.com/PuerkitoBio/urlesc)
-
-Distributed under the following license(s):
-
-* BSD-3-Clause
-
-
-
-## [github.com/alecthomas/template](https://github.com/alecthomas/template)
-
-Distributed under the following license(s):
-
-* BSD-3-Clause
-
-
-
-## [github.com/alecthomas/units](https://github.com/alecthomas/units)
+## [github.com/beorn7/perks](https://github.com/beorn7/perks)
 
 Distributed under the following license(s):
 
@@ -172,7 +116,7 @@ Distributed under the following license(s):
 
 
 
-## [github.com/beorn7/perks](https://github.com/beorn7/perks)
+## [github.com/cespare/xxhash/v2](https://github.com/cespare/xxhash)
 
 Distributed under the following license(s):
 
@@ -188,55 +132,7 @@ Distributed under the following license(s):
 
 
 
-## [github.com/docker/spdystream](https://github.com/docker/spdystream)
-
-Distributed under the following license(s):
-
-* Apache-2.0
-
-
-
-## [github.com/elazarl/goproxy](https://github.com/elazarl/goproxy)
-
-Distributed under the following license(s):
-
-* BSD-3-Clause
-
-
-
-## [github.com/emicklei/go-restful](https://github.com/emicklei/go-restful)
-
-Distributed under the following license(s):
-
-* MIT
-
-
-
-## [github.com/evanphx/json-patch](https://github.com/evanphx/json-patch)
-
-Distributed under the following license(s):
-
-* BSD-3-Clause
-
-
-
-## [github.com/fsnotify/fsnotify](https://github.com/fsnotify/fsnotify)
-
-Distributed under the following license(s):
-
-* BSD-3-Clause
-
-
-
-## [github.com/go-kit/kit](https://github.com/go-kit/kit)
-
-Distributed under the following license(s):
-
-* MIT
-
-
-
-## [github.com/go-logfmt/logfmt](https://github.com/go-logfmt/logfmt)
+## [github.com/emicklei/go-restful/v3](https://github.com/emicklei/go-restful)
 
 Distributed under the following license(s):
 
@@ -268,27 +164,11 @@ Distributed under the following license(s):
 
 
 
-## [github.com/go-openapi/spec](https://github.com/go-openapi/spec)
-
-Distributed under the following license(s):
-
-* Apache-2.0
-
-
-
 ## [github.com/go-openapi/swag](https://github.com/go-openapi/swag)
 
 Distributed under the following license(s):
 
 * Apache-2.0
-
-
-
-## [github.com/go-stack/stack](https://github.com/go-stack/stack)
-
-Distributed under the following license(s):
-
-* MIT
 
 
 
@@ -300,19 +180,19 @@ Distributed under the following license(s):
 
 
 
-## [github.com/golang/groupcache](https://github.com/golang/groupcache)
-
-Distributed under the following license(s):
-
-* Apache-2.0
-
-
-
 ## [github.com/golang/protobuf](https://github.com/golang/protobuf)
 
 Distributed under the following license(s):
 
 * BSD-3-Clause
+
+
+
+## [github.com/google/gnostic](https://github.com/google/gnostic)
+
+Distributed under the following license(s):
+
+* Apache-2.0
 
 
 
@@ -332,51 +212,19 @@ Distributed under the following license(s):
 
 
 
-## [github.com/googleapis/gnostic](https://github.com/googleapis/gnostic)
-
-Distributed under the following license(s):
-
-* Apache-2.0
-
-
-
-## [github.com/gophercloud/gophercloud](https://github.com/gophercloud/gophercloud)
-
-Distributed under the following license(s):
-
-* Apache-2.0
-
-
-
-## [github.com/gregjones/httpcache](https://github.com/gregjones/httpcache)
-
-Distributed under the following license(s):
-
-* MIT
-
-
-
-## [github.com/hashicorp/golang-lru](https://github.com/hashicorp/golang-lru)
-
-Distributed under the following license(s):
-
-* MPL-2.0
-
-
-
-## [github.com/hpcloud/tail](https://github.com/hpcloud/tail)
-
-Distributed under the following license(s):
-
-* MIT
-
-
-
 ## [github.com/imdario/mergo](https://github.com/imdario/mergo)
 
 Distributed under the following license(s):
 
 * BSD-3-Clause
+
+
+
+## [github.com/josharian/intern](https://github.com/josharian/intern)
+
+Distributed under the following license(s):
+
+* MIT
 
 
 
@@ -388,55 +236,7 @@ Distributed under the following license(s):
 
 
 
-## [github.com/julienschmidt/httprouter](https://github.com/julienschmidt/httprouter)
-
-Distributed under the following license(s):
-
-* BSD-3-Clause
-
-
-
-## [github.com/kisielk/errcheck](https://github.com/kisielk/errcheck)
-
-Distributed under the following license(s):
-
-* MIT
-
-
-
-## [github.com/kisielk/gotool](https://github.com/kisielk/gotool)
-
-Distributed under the following license(s):
-
-* BSD-3-Clause
-
-
-
-## [github.com/konsorten/go-windows-terminal-sequences](https://github.com/konsorten/go-windows-terminal-sequences)
-
-Distributed under the following license(s):
-
-* MIT
-
-
-
-## [github.com/kr/logfmt](https://github.com/kr/logfmt)
-
-Distributed under the following license(s):
-
-* MIT
-
-
-
 ## [github.com/kr/pretty](https://github.com/kr/pretty)
-
-Distributed under the following license(s):
-
-* MIT
-
-
-
-## [github.com/kr/pty](https://github.com/kr/pty)
 
 Distributed under the following license(s):
 
@@ -492,23 +292,7 @@ Distributed under the following license(s):
 
 
 
-## [github.com/mwitkow/go-conntrack](https://github.com/mwitkow/go-conntrack)
-
-Distributed under the following license(s):
-
-* Apache-2.0
-
-
-
-## [github.com/mxk/go-flowrate](https://github.com/mxk/go-flowrate)
-
-Distributed under the following license(s):
-
-* BSD-3-Clause
-
-
-
-## [github.com/onsi/ginkgo](https://github.com/onsi/ginkgo)
+## [github.com/onsi/ginkgo/v2](https://github.com/onsi/ginkgo)
 
 Distributed under the following license(s):
 
@@ -524,11 +308,11 @@ Distributed under the following license(s):
 
 
 
-## [github.com/peterbourgon/diskv](https://github.com/peterbourgon/diskv)
+## [github.com/pkg/errors](https://github.com/pkg/errors)
 
 Distributed under the following license(s):
 
-* MIT
+* BSD-2-Clause
 
 
 
@@ -556,14 +340,6 @@ Distributed under the following license(s):
 
 
 
-## [github.com/spf13/afero](https://github.com/spf13/afero)
-
-Distributed under the following license(s):
-
-* Apache-2.0
-
-
-
 ## [github.com/spf13/pflag](https://github.com/spf13/pflag)
 
 Distributed under the following license(s):
@@ -577,14 +353,6 @@ Distributed under the following license(s):
 Distributed under the following license(s):
 
 * MIT
-
-
-
-## [golang.org/x/crypto](https://golang.org/x/crypto)
-
-Distributed under the following license(s):
-
-* BSD-3-Clause
 
 
 
@@ -604,7 +372,7 @@ Distributed under the following license(s):
 
 
 
-## [golang.org/x/sync](https://golang.org/x/sync)
+## [golang.org/x/sys](https://golang.org/x/sys)
 
 Distributed under the following license(s):
 
@@ -612,7 +380,7 @@ Distributed under the following license(s):
 
 
 
-## [golang.org/x/sys](https://golang.org/x/sys)
+## [golang.org/x/term](https://golang.org/x/term)
 
 Distributed under the following license(s):
 
@@ -636,14 +404,6 @@ Distributed under the following license(s):
 
 
 
-## [golang.org/x/tools](https://golang.org/x/tools)
-
-Distributed under the following license(s):
-
-* BSD-3-Clause
-
-
-
 ## [google.golang.org/appengine](https://google.golang.org/appengine)
 
 Distributed under the following license(s):
@@ -652,11 +412,11 @@ Distributed under the following license(s):
 
 
 
-## [gopkg.in/alecthomas/kingpin.v2](https://gopkg.in/alecthomas/kingpin.v2)
+## [google.golang.org/protobuf](https://google.golang.org/protobuf)
 
 Distributed under the following license(s):
 
-* MIT
+* BSD-3-Clause
 
 
 
@@ -668,23 +428,7 @@ Distributed under the following license(s):
 
 
 
-## [gopkg.in/fsnotify.v1](https://gopkg.in/fsnotify.v1)
-
-Distributed under the following license(s):
-
-* BSD-3-Clause
-
-
-
 ## [gopkg.in/inf.v0](https://gopkg.in/inf.v0)
-
-Distributed under the following license(s):
-
-* BSD-3-Clause
-
-
-
-## [gopkg.in/tomb.v1](https://gopkg.in/tomb.v1)
 
 Distributed under the following license(s):
 
@@ -700,7 +444,7 @@ Distributed under the following license(s):
 
 
 
-## [k8s.io/gengo](https://github.com/kubernetes/gengo)
+## [k8s.io/klog/v2](https://github.com/kubernetes/klog)
 
 Distributed under the following license(s):
 
@@ -708,7 +452,7 @@ Distributed under the following license(s):
 
 
 
-## [k8s.io/klog](https://github.com/kubernetes/klog)
+## [k8s.io/kube-openapi](https://github.com/kubernetes/kube-openapi)
 
 Distributed under the following license(s):
 
@@ -724,7 +468,15 @@ Distributed under the following license(s):
 
 
 
-## [sigs.k8s.io/structured-merge-diff](https://sigs.k8s.io/structured-merge-diff)
+## [sigs.k8s.io/json](https://sigs.k8s.io/json)
+
+Distributed under the following license(s):
+
+* Apache-2.0
+
+
+
+## [sigs.k8s.io/structured-merge-diff/v4](https://sigs.k8s.io/structured-merge-diff/v4)
 
 Distributed under the following license(s):
 
