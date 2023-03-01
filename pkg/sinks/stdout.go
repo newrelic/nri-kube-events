@@ -5,8 +5,8 @@ package sinks
 
 import (
 	"encoding/json"
+	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/newrelic/nri-kube-events/pkg/events"
@@ -26,7 +26,7 @@ func (stdoutSink) HandleEvent(event events.KubeEvent) error {
 	b, err := json.Marshal(event)
 
 	if err != nil {
-		return errors.Wrap(err, "stdoutSink: could not marshal event")
+		return fmt.Errorf("stdoutSink: could not marshal event: %w", err)
 	}
 
 	logrus.Infof(string(b))

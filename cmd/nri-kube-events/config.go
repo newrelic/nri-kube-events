@@ -3,11 +3,11 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 
@@ -25,12 +25,15 @@ func loadConfig(file io.Reader) (config, error) {
 
 	contents, err := ioutil.ReadAll(file)
 	if err != nil {
-		return cfg, errors.Wrap(err, "could not read configuration file")
+		return cfg, fmt.Errorf("could not read configuration file: %w", err)
 	}
 
 	err = yaml.Unmarshal(contents, &cfg)
+	if err != nil {
+		return cfg, fmt.Errorf("could not parse configuration file: %w", err)
+	}
 
-	return cfg, errors.Wrap(err, "could not parse configuration file")
+	return cfg, nil
 }
 
 func mustLoadConfigFile(configFile string) config {

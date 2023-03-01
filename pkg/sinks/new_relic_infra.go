@@ -17,7 +17,6 @@ import (
 	sdkArgs "github.com/newrelic/infra-integrations-sdk/args"
 	sdkEvent "github.com/newrelic/infra-integrations-sdk/data/event"
 	sdkIntegration "github.com/newrelic/infra-integrations-sdk/integration"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/sethgrid/pester"
@@ -52,7 +51,7 @@ func createNewRelicInfraSink(config SinkConfig, integrationVersion string) (even
 
 	i, err := sdkIntegration.New(newRelicSDKName, integrationVersion, sdkIntegration.Args(&args))
 	if err != nil {
-		return nil, errors.Wrap(err, "error while initializing New Relic SDK integration")
+		return nil, fmt.Errorf("error while initializing New Relic SDK integration: %w", err)
 	}
 
 	logrus.Debugf("NewRelic sink configuration: agentTimeout=%s, clusterName=%s, agentEndpoint=%s",
@@ -120,13 +119,13 @@ func (ns *newRelicInfraSink) HandleEvent(kubeEvent events.KubeEvent) error {
 	e, err := ns.createEntity(kubeEvent)
 
 	if err != nil {
-		return errors.Wrap(err, "unable to create entity")
+		return fmt.Errorf("unable to create entity: %w", err)
 	}
 
 	flattenedEvent, err := flattenStruct(kubeEvent)
 
 	if err != nil {
-		return errors.Wrap(err, "could not flatten EventData struct")
+		return fmt.Errorf("could not flatten EventData struct: %w", err)
 	}
 
 	ns.decorateEvent(flattenedEvent)
@@ -138,13 +137,15 @@ func (ns *newRelicInfraSink) HandleEvent(kubeEvent events.KubeEvent) error {
 	)
 	err = e.AddEvent(event)
 	if err != nil {
-		return errors.Wrap(err, "couldn't add event")
+		return fmt.Errorf("couldn't add event: %w", err)
 	}
 
-	return errors.Wrap(
-		ns.sendIntegrationPayloadToAgent(),
-		"error sending data to agent",
-	)
+	err = ns.sendIntegrationPayloadToAgent()
+	if err != nil {
+		return fmt.Errorf("error sending data to agent: %w", err)
+	}
+
+	return nil
 }
 
 // createEntity creates the entity related to the event.
@@ -154,7 +155,7 @@ func (ns *newRelicInfraSink) createEntity(kubeEvent events.KubeEvent) (*sdkInteg
 
 	e, err := ns.sdkIntegration.Entity(entityName, entityType)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not initialise new SDK Entity")
+		return nil, fmt.Errorf("could not initialize new SDK Entity: %w", err)
 	}
 
 	return e, nil
@@ -193,7 +194,7 @@ func (ns *newRelicInfraSink) sendIntegrationPayloadToAgent() error {
 
 	request, err := http.NewRequest("POST", ns.agentEndpoint, bytes.NewBuffer(jsonBytes))
 	if err != nil {
-		return errors.Wrap(err, "unable to prepare request")
+		return fmt.Errorf("unable to prepare request: %w", err)
 	}
 
 	resp, err := ns.pesterClient.Do(request)
