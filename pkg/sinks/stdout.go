@@ -9,6 +9,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/newrelic/nri-kube-events/pkg/common"
 	"github.com/newrelic/nri-kube-events/pkg/events"
 )
 
@@ -22,7 +23,7 @@ func createStdoutSink(_ SinkConfig, _ string) (events.Sink, error) {
 
 type stdoutSink struct{}
 
-func (stdoutSink) HandleEvent(event events.KubeEvent) error {
+func (stdoutSink) HandleEvent(event common.KubeEvent) error {
 	b, err := json.Marshal(event)
 
 	if err != nil {

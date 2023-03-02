@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/newrelic/nri-kube-events/pkg/common"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	log "github.com/sirupsen/logrus"
@@ -146,7 +147,7 @@ type stubSink struct {
 	stubData string
 }
 
-func (s *stubSink) HandleEvent(kubeEvent KubeEvent) error {
+func (s *stubSink) HandleEvent(kubeEvent common.KubeEvent) error {
 	args := s.Called(kubeEvent)
 	return args.Error(0)
 }
@@ -175,13 +176,13 @@ func TestRouter_Run(t *testing.T) {
 
 	stubSink.On("HandleEvent", mock.AnythingOfType("KubeEvent")).Run(func(args mock.Arguments) {
 		log.Info("stub called")
-		ake := args.Get(0).(KubeEvent)
+		ake := args.Get(0).(common.KubeEvent)
 		assert.Equal(t, ke, ake.Event)
 		defer close(stopChan)
 	}).Return(nil).Once()
 
 	go func() {
-		r.workQueue <- KubeEvent{
+		r.workQueue <- common.KubeEvent{
 			Event: ke,
 		}
 	}()
@@ -218,7 +219,7 @@ func TestRouter_RunError(t *testing.T) {
 	}).Return(expectedError).Once()
 
 	go func() {
-		r.workQueue <- KubeEvent{
+		r.workQueue <- common.KubeEvent{
 			Event: ke,
 		}
 	}()

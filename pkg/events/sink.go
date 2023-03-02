@@ -6,13 +6,14 @@ package events
 import (
 	"time"
 
+	"github.com/newrelic/nri-kube-events/pkg/common"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Sink receives events from the router, process and publish them to a certain
 // destination (stdout, NewRelic platform, etc.).
 type Sink interface {
-	HandleEvent(kubeEvent KubeEvent) error
+	HandleEvent(kubeEvent common.KubeEvent) error
 }
 
 type observedSink struct {
@@ -20,7 +21,7 @@ type observedSink struct {
 	observer prometheus.Observer
 }
 
-func (o *observedSink) HandleEvent(kubeEvent KubeEvent) error {
+func (o *observedSink) HandleEvent(kubeEvent common.KubeEvent) error {
 	t := time.Now()
 	defer func() { o.observer.Observe(time.Since(t).Seconds()) }()
 

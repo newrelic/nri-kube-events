@@ -15,7 +15,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/newrelic/nri-kube-events/pkg/events"
+	"github.com/newrelic/nri-kube-events/pkg/common"
 )
 
 func TestFormatEntityID(t *testing.T) {
@@ -58,7 +58,7 @@ func TestFormatEntityID(t *testing.T) {
 
 		entityType, entityName := formatEntityID(
 			testCase.clusterName,
-			events.KubeEvent{
+			common.KubeEvent{
 				Event: &v1.Event{
 					InvolvedObject: testCase.involvedObject,
 				},
@@ -118,7 +118,7 @@ func TestNewRelicSinkIntegration(t *testing.T) {
 		},
 	}
 	sink, _ := createNewRelicInfraSink(config, "0.0.0")
-	err = sink.HandleEvent(events.KubeEvent{
+	err = sink.HandleEvent(common.KubeEvent{
 		Verb: "ADDED",
 		Event: &v1.Event{
 			Message: "The event message",
@@ -151,7 +151,7 @@ func TestNewRelicInfraSink_HandleEvent_AddEventError(t *testing.T) {
 		},
 	}
 	sink, _ := createNewRelicInfraSink(config, "0.0.0")
-	err := sink.HandleEvent(events.KubeEvent{
+	err := sink.HandleEvent(common.KubeEvent{
 		Verb: "ADDED",
 		Event: &v1.Event{
 			Message: "",
@@ -181,7 +181,7 @@ func TestNewRelicInfraSink_HandleEvent_AddEventError(t *testing.T) {
 }
 
 func TestFlattenStruct(t *testing.T) {
-	got, _ := flattenStruct(events.KubeEvent{Verb: "UPDATE", Event: &v1.Event{
+	got, _ := flattenStruct(common.KubeEvent{Verb: "UPDATE", Event: &v1.Event{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test",
 			Labels: map[string]string{

@@ -22,6 +22,7 @@ import (
 	"github.com/sethgrid/pester"
 	"github.com/sirupsen/logrus"
 
+	"github.com/newrelic/nri-kube-events/pkg/common"
 	"github.com/newrelic/nri-kube-events/pkg/events"
 )
 
@@ -112,8 +113,7 @@ type newRelicInfraSink struct {
 }
 
 // HandleEvent sends the event to the New Relic Agent
-func (ns *newRelicInfraSink) HandleEvent(kubeEvent events.KubeEvent) error {
-
+func (ns *newRelicInfraSink) HandleEvent(kubeEvent common.KubeEvent) error {
 	defer ns.sdkIntegration.Clear()
 
 	e, err := ns.createEntity(kubeEvent)
@@ -149,8 +149,7 @@ func (ns *newRelicInfraSink) HandleEvent(kubeEvent events.KubeEvent) error {
 }
 
 // createEntity creates the entity related to the event.
-func (ns *newRelicInfraSink) createEntity(kubeEvent events.KubeEvent) (*sdkIntegration.Entity, error) {
-
+func (ns *newRelicInfraSink) createEntity(kubeEvent common.KubeEvent) (*sdkIntegration.Entity, error) {
 	entityType, entityName := formatEntityID(ns.clusterName, kubeEvent)
 
 	e, err := ns.sdkIntegration.Entity(entityName, entityType)
@@ -171,7 +170,7 @@ func (ns *newRelicInfraSink) createEntity(kubeEvent events.KubeEvent) (*sdkInteg
 //
 // Example node entityName:
 // ("k8s:fsi-cluster-explorer:node", "worker-node-1")
-func formatEntityID(clusterName string, kubeEvent events.KubeEvent) (string, string) {
+func formatEntityID(clusterName string, kubeEvent common.KubeEvent) (string, string) {
 	parts := []string{newRelicNamespace}
 
 	parts = append(parts, clusterName)

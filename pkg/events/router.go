@@ -4,6 +4,7 @@
 package events
 
 import (
+	"github.com/newrelic/nri-kube-events/pkg/common"
 	"github.com/newrelic/nri-kube-events/pkg/router"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -33,14 +34,6 @@ var (
 	}, []string{"sink"})
 )
 
-// KubeEvent represents a Kubernetes event. It specifies if this is the first
-// time the event is seen or if it's an update to a previous event.
-type KubeEvent struct {
-	Verb     string    `json:"verb"`
-	Event    *v1.Event `json:"event"`
-	OldEvent *v1.Event `json:"old_event,omitempty"`
-}
-
 // Router listens for events coming from a SharedIndexInformer,
 // and forwards them to the registered sinks
 type Router struct {
@@ -48,7 +41,7 @@ type Router struct {
 	sinks map[string]Sink
 
 	// all updates & adds will be appended to this queue
-	workQueue chan KubeEvent
+	workQueue chan common.KubeEvent
 }
 
 // NewRouter returns a new Router which listens to the given SharedIndexInformer,
@@ -63,17 +56,17 @@ func NewRouter(informer cache.SharedIndexInformer, sinks map[string]Sink, opts .
 	// wait for the event handlers to finish, they should return quickly
 	// Therefore we push to a queue and handle it in another goroutine
 	// See: https://github.com/kubernetes/client-go/blob/c8dc69f8a8bf8d8640493ce26688b26c7bfde8e6/tools/cache/shared_informer.go#L111
-	workQueue := make(chan KubeEvent, config.WorkQueueLength())
+	workQueue := make(chan common.KubeEvent, config.WorkQueueLength())
 
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			workQueue <- KubeEvent{
+			workQueue <- common.KubeEvent{
 				Event: obj.(*v1.Event),
 				Verb:  "ADDED",
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			workQueue <- KubeEvent{
+			workQueue <- common.KubeEvent{
 				Event:    newObj.(*v1.Event),
 				OldEvent: oldObj.(*v1.Event),
 				Verb:     "UPDATE",
@@ -130,7 +123,7 @@ func (r *Router) Run(stopChan <-chan struct{}) {
 	}
 }
 
-func (r *Router) publishEvent(kubeEvent KubeEvent) {
+func (r *Router) publishEvent(kubeEvent common.KubeEvent) {
 	for name, sink := range r.sinks {
 
 		eventsReceivedTotal.WithLabelValues(name).Inc()
