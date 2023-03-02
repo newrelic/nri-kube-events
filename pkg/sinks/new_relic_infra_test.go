@@ -4,7 +4,7 @@ package sinks
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -55,7 +55,6 @@ func TestFormatEntityID(t *testing.T) {
 	}
 
 	for i, testCase := range tt {
-
 		entityType, entityName := formatEntityID(
 			testCase.clusterName,
 			common.KubeEvent{
@@ -78,7 +77,7 @@ func TestNewRelicSinkIntegration_HandleEvent_Success(t *testing.T) {
 	_ = os.Setenv("METADATA", "true")
 	_ = os.Setenv("NRI_KUBE_EVENTS_myCustomAttribute", "attrValue")
 	defer os.Clearenv()
-	expectedPostJSON, err := ioutil.ReadFile("./testdata/event_data.json")
+	expectedPostJSON, err := os.ReadFile("./testdata/event_data.json")
 	if err != nil {
 		t.Fatalf("could not read test_post_data.json: %v", err)
 	}
@@ -88,19 +87,19 @@ func TestNewRelicSinkIntegration_HandleEvent_Success(t *testing.T) {
 	}
 
 	responseHandler := func(w http.ResponseWriter, r *http.Request) {
-		body, err := ioutil.ReadAll(r.Body)
+		body, err2 := io.ReadAll(r.Body)
 
 		defer func() {
 			_ = r.Body.Close()
 		}()
 
-		if err != nil {
-			t.Fatalf("error reading request body: %v", err)
+		if err2 != nil {
+			t.Fatalf("error reading request body: %v", err2)
 		}
 
 		var postData interface{}
-		if err = json.Unmarshal(body, &postData); err != nil {
-			t.Fatalf("error unmarshalling request body: %v", err)
+		if err2 = json.Unmarshal(body, &postData); err2 != nil {
+			t.Fatalf("error unmarshalling request body: %v", err2)
 		}
 
 		if diff := cmp.Diff(expectedData, postData); diff != "" {

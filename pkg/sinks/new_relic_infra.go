@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
@@ -185,7 +184,7 @@ func formatEntityID(clusterName string, kubeEvent common.KubeEvent) (string, str
 func (ns *newRelicInfraSink) sendIntegrationPayloadToAgent() error {
 	jsonBytes, err := json.Marshal(ns.sdkIntegration)
 	if err != nil {
-		return fmt.Errorf("unable to marshal data: %v", err)
+		return fmt.Errorf("unable to marshal data: %w", err)
 	}
 
 	request, err := http.NewRequest("POST", ns.agentEndpoint, bytes.NewBuffer(jsonBytes))
@@ -197,7 +196,7 @@ func (ns *newRelicInfraSink) sendIntegrationPayloadToAgent() error {
 
 	if err != nil {
 		ns.metrics.httpTotalFailures.Inc()
-		return fmt.Errorf("HTTP transport error: %v", err)
+		return fmt.Errorf("HTTP transport error: %w", err)
 	}
 
 	disposeBody(resp)
@@ -219,7 +218,7 @@ func (ns *newRelicInfraSink) sendIntegrationPayloadToAgent() error {
 // If the Body is not both read to EOF and closed, the Client's underlying RoundTripper (typically Transport)
 // may not be able to re-use a persistent TCP connection to the server for a subsequent "keep-alive" request.
 func disposeBody(response *http.Response) {
-	if _, err := io.Copy(ioutil.Discard, response.Body); err != nil {
+	if _, err := io.Copy(io.Discard, response.Body); err != nil {
 		logrus.Debugf("warning: could not discard response body: %v", err)
 	}
 	if err := response.Body.Close(); err != nil {

@@ -70,7 +70,6 @@ func Create(configs []SinkConfig, integrationVersion string) (map[string]Sink, e
 	sinks := make(map[string]Sink)
 
 	for _, sinkConf := range configs {
-
 		var ok bool
 		var factory sinkFactory
 

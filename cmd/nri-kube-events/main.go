@@ -134,7 +134,7 @@ func createEventsInformer(stopChan <-chan struct{}) (cache.SharedIndexInformer, 
 	sharedInformers.Start(stopChan)
 
 	// wait for the internal cache to sync. This is the only time the cache will be filled,
-	// since we've set resync to 0. This behaviour is very important,
+	// since we've set resync to 0. This behavior is very important,
 	// because we will delete the cache to prevent duplicate events from being sent.
 	// If we remove this cache-deletion and you restart nri-kube-events, we will sent lots of duplicated events
 	sharedInformers.WaitForCacheSync(stopChan)
