@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/newrelic/nri-kube-events/pkg/common"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	log "github.com/sirupsen/logrus"
@@ -14,12 +13,14 @@ import (
 	"github.com/stretchr/testify/mock"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/cache"
+
+	"github.com/newrelic/nri-kube-events/pkg/common"
 )
 
 func TestNewRouter(t *testing.T) {
 	type args struct {
 		informer *MockSharedIndexInformer
-		sinks    map[string]Sink
+		handlers map[string]EventHandler
 	}
 	tests := []struct {
 		name   string
@@ -88,17 +89,17 @@ func TestNewRouter(t *testing.T) {
 			name: "sinks",
 			args: args{
 				informer: new(MockSharedIndexInformer),
-				sinks: map[string]Sink{
+				handlers: map[string]EventHandler{
 					"stub": &stubSink{stubData: "some data"},
 				},
 			},
 			assert: func(t *testing.T, args args, r *Router) {
-				assert.Len(t, r.sinks, 1)
-				s, ok := r.sinks["stub"]
+				assert.Len(t, r.handlers, 1)
+				s, ok := r.handlers["stub"]
 				assert.True(t, ok)
 				assert.NotNil(t, s)
-				assert.Equal(t, args.sinks["stub"], s.(*observedSink).sink)
-				obs := s.(*observedSink).observer
+				assert.Equal(t, args.handlers["stub"], s.(*observedEventHandler).EventHandler)
+				obs := s.(*observedEventHandler).Observer
 				assert.NotNil(t, obs)
 				h := obs.(prometheus.Histogram)
 				m := dto.Metric{}
@@ -106,7 +107,7 @@ func TestNewRouter(t *testing.T) {
 				name := "sink"
 				value := "stub"
 				// Check correct label pair added
-				assert.Equal(t, []*dto.LabelPair{&dto.LabelPair{Name: &name, Value: &value}}, m.Label)
+				assert.Equal(t, []*dto.LabelPair{{Name: &name, Value: &value}}, m.Label)
 			},
 		},
 	}
@@ -117,7 +118,7 @@ func TestNewRouter(t *testing.T) {
 				On("AddEventHandler", mock.AnythingOfType("cache.ResourceEventHandlerFuncs")).
 				Once()
 
-			r := NewRouter(tt.args.informer, tt.args.sinks)
+			r := NewRouter(tt.args.informer, tt.args.handlers)
 			assert.NotNil(t, r)
 			tt.assert(t, tt.args, r)
 			tt.args.informer.AssertExpectations(t)
@@ -143,7 +144,7 @@ func (m *MockSharedIndexInformer) AddEventHandler(handler cache.ResourceEventHan
 
 type stubSink struct {
 	mock.Mock
-	Sink
+	EventHandler
 	stubData string
 }
 
@@ -156,11 +157,11 @@ func TestRouter_Run(t *testing.T) {
 	informer := new(MockSharedIndexInformer)
 	informer.SetupMock()
 	stubSink := new(stubSink)
-	sinks := map[string]Sink{
+	handlers := map[string]EventHandler{
 		"stub": stubSink,
 	}
 
-	r := NewRouter(informer, sinks)
+	r := NewRouter(informer, handlers)
 	stopChan := make(chan struct{})
 
 	wg := sync.WaitGroup{}
@@ -195,11 +196,11 @@ func TestRouter_RunError(t *testing.T) {
 	informer := new(MockSharedIndexInformer)
 	informer.SetupMock()
 	stubSink := new(stubSink)
-	sinks := map[string]Sink{
+	handlers := map[string]EventHandler{
 		"stub": stubSink,
 	}
 
-	r := NewRouter(informer, sinks)
+	r := NewRouter(informer, handlers)
 	stopChan := make(chan struct{})
 
 	wg := sync.WaitGroup{}

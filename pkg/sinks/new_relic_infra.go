@@ -23,11 +23,10 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/newrelic/nri-kube-events/pkg/common"
-	"github.com/newrelic/nri-kube-events/pkg/events"
 )
 
 func init() {
-	registerSink("newRelicInfra", createNewRelicInfraSink)
+	register("newRelicInfra", createNewRelicInfraSink)
 }
 
 const (
@@ -37,8 +36,7 @@ const (
 	defaultAgentHTTPTimeout = time.Second * 10
 )
 
-func createNewRelicInfraSink(config SinkConfig, integrationVersion string) (events.Sink, error) {
-
+func createNewRelicInfraSink(config SinkConfig, integrationVersion string) (Sink, error) {
 	clusterName := config.MustGetString("clusterName")
 	agentEndpoint := config.MustGetString("agentEndpoint")
 	agentHTTPTimeout := config.GetDurationOr("agentHTTPTimeout", defaultAgentHTTPTimeout)
@@ -185,7 +183,6 @@ func formatEntityID(clusterName string, kubeEvent common.KubeEvent) (string, str
 }
 
 func (ns *newRelicInfraSink) sendIntegrationPayloadToAgent() error {
-
 	jsonBytes, err := json.Marshal(ns.sdkIntegration)
 	if err != nil {
 		return fmt.Errorf("unable to marshal data: %v", err)
@@ -238,7 +235,6 @@ func (ns *newRelicInfraSink) decorateEvent(flattenedEvent map[string]interface{}
 }
 
 func flattenStruct(v interface{}) (map[string]interface{}, error) {
-
 	m := make(map[string]interface{})
 
 	data, err := json.Marshal(v)

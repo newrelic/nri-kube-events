@@ -14,7 +14,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/newrelic/nri-kube-events/pkg/common"
-	"github.com/newrelic/nri-kube-events/pkg/events"
 	"github.com/newrelic/nri-kube-events/pkg/sinks"
 )
 
@@ -23,7 +22,7 @@ const newRelicInfraSinkID = "newRelicInfra"
 
 // TestAgentSink is an instrumented infra-agent sink for testing e2e reception and processing.
 type TestAgentSink struct {
-	agentSink         events.Sink
+	agentSink         sinks.Sink
 	httpServer        *httptest.Server
 	eventReceivedChan chan struct{}
 	receivedEvents    []sdkEvent.Event
@@ -46,7 +45,7 @@ func NewTestAgentSink() *TestAgentSink {
 		},
 	}
 
-	createdSinks, err := sinks.CreateSinks([]sinks.SinkConfig{agentSinkConfig}, "0.0.0")
+	createdSinks, err := sinks.Create([]sinks.SinkConfig{agentSinkConfig}, "0.0.0")
 	if err != nil {
 		log.Fatalf("error creating infra sink: %v", err)
 	}

@@ -58,7 +58,7 @@ func main() {
 		buildDate)
 	cfg := mustLoadConfigFile(*configFile)
 
-	activeSinks, err := sinks.CreateSinks(cfg.Sinks, integrationVersion)
+	activeSinks, err := sinks.Create(cfg.Sinks, integrationVersion)
 	if err != nil {
 		logrus.Fatalf("could not create sinks: %v", err)
 	}
@@ -75,12 +75,18 @@ func main() {
 		router.WithWorkQueueLength(cfg.WorkQueueLength), // will ignore null values
 	}
 
-	router := events.NewRouter(eventsInformer, activeSinks, opts...)
+	// TODO(vihangm): Cleanup interfaces to avoid having to do this conversion.
+	activeEventHandlers := make(map[string]events.EventHandler)
+	for name, sink := range activeSinks {
+		activeEventHandlers[name] = sink
+	}
+
+	eventRouter := events.NewRouter(eventsInformer, activeEventHandlers, opts...)
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		router.Run(stopChan)
+		eventRouter.Run(stopChan)
 	}()
 
 	go servePrometheus(*promAddr)
