@@ -23,6 +23,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/newrelic/nri-kube-events/pkg/events"
+	"github.com/newrelic/nri-kube-events/pkg/router"
 	"github.com/newrelic/nri-kube-events/pkg/sinks"
 )
 
@@ -70,8 +71,8 @@ func main() {
 		logrus.Fatalf("could not create EventsInformer: %v", err)
 	}
 
-	opts := []events.RouterConfigOption{
-		events.WithWorkQueueLength(cfg.WorkQueueLength), // will ignore null values
+	opts := []router.ConfigOption{
+		router.WithWorkQueueLength(cfg.WorkQueueLength), // will ignore null values
 	}
 
 	router := events.NewRouter(eventsInformer, activeSinks, opts...)

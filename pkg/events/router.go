@@ -4,6 +4,7 @@
 package events
 
 import (
+	"github.com/newrelic/nri-kube-events/pkg/router"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/sirupsen/logrus"
@@ -52,24 +53,17 @@ type Router struct {
 
 // NewRouter returns a new Router which listens to the given SharedIndexInformer,
 // and forwards all incoming events to the given sinks
-func NewRouter(informer cache.SharedIndexInformer, sinks map[string]Sink, opts ...RouterConfigOption) *Router {
-
-	// default config values for our Router
-	config := routerConfig{
-		workQueueLength: 1024,
-	}
-
-	for _, opt := range opts {
-		if err := opt(&config); err != nil {
-			logrus.Fatalf("Error with Router configuration: %v", err)
-		}
+func NewRouter(informer cache.SharedIndexInformer, sinks map[string]Sink, opts ...router.ConfigOption) *Router {
+	config, err := router.NewConfig(opts...)
+	if err != nil {
+		logrus.Fatalf("Error with Router configuration: %v", err)
 	}
 
 	// According to the shared_informer source code it's not designed to
 	// wait for the event handlers to finish, they should return quickly
 	// Therefore we push to a queue and handle it in another goroutine
 	// See: https://github.com/kubernetes/client-go/blob/c8dc69f8a8bf8d8640493ce26688b26c7bfde8e6/tools/cache/shared_informer.go#L111
-	workQueue := make(chan KubeEvent, config.workQueueLength)
+	workQueue := make(chan KubeEvent, config.WorkQueueLength())
 
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
