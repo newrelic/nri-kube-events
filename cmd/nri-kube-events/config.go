@@ -20,7 +20,6 @@ type config struct {
 }
 
 func loadConfig(file io.Reader) (config, error) {
-
 	var cfg config
 
 	contents, err := ioutil.ReadAll(file)

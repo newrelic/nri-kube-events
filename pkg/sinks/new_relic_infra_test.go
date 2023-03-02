@@ -55,7 +55,6 @@ func TestFormatEntityID(t *testing.T) {
 	}
 
 	for i, testCase := range tt {
-
 		entityType, entityName := formatEntityID(
 			testCase.clusterName,
 			common.KubeEvent{

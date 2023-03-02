@@ -196,7 +196,6 @@ func isEventSubset(old, new *sdkEvent.Event) bool {
 				return false
 			}
 		}
-
 	}
 
 	return true
