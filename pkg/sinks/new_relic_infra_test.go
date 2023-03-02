@@ -4,7 +4,7 @@ package sinks
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -77,7 +77,7 @@ func TestNewRelicSinkIntegration_HandleEvent_Success(t *testing.T) {
 	_ = os.Setenv("METADATA", "true")
 	_ = os.Setenv("NRI_KUBE_EVENTS_myCustomAttribute", "attrValue")
 	defer os.Clearenv()
-	expectedPostJSON, err := ioutil.ReadFile("./testdata/event_data.json")
+	expectedPostJSON, err := os.ReadFile("./testdata/event_data.json")
 	if err != nil {
 		t.Fatalf("could not read test_post_data.json: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestNewRelicSinkIntegration_HandleEvent_Success(t *testing.T) {
 	}
 
 	responseHandler := func(w http.ResponseWriter, r *http.Request) {
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 
 		defer func() {
 			_ = r.Body.Close()

@@ -5,7 +5,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 
 	"github.com/sirupsen/logrus"
@@ -22,7 +21,7 @@ type config struct {
 func loadConfig(file io.Reader) (config, error) {
 	var cfg config
 
-	contents, err := ioutil.ReadAll(file)
+	contents, err := io.ReadAll(file)
 	if err != nil {
 		return cfg, fmt.Errorf("could not read configuration file: %w", err)
 	}

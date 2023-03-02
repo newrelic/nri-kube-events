@@ -2,7 +2,7 @@ package integration
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -78,7 +78,7 @@ func (tas *TestAgentSink) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	defer r.Body.Close() // nolint:errcheck
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Fatalf("error reading request body: %v", err)
 	}

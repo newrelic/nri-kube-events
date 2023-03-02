@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
@@ -219,7 +218,7 @@ func (ns *newRelicInfraSink) sendIntegrationPayloadToAgent() error {
 // If the Body is not both read to EOF and closed, the Client's underlying RoundTripper (typically Transport)
 // may not be able to re-use a persistent TCP connection to the server for a subsequent "keep-alive" request.
 func disposeBody(response *http.Response) {
-	if _, err := io.Copy(ioutil.Discard, response.Body); err != nil {
+	if _, err := io.Copy(io.Discard, response.Body); err != nil {
 		logrus.Debugf("warning: could not discard response body: %v", err)
 	}
 	if err := response.Body.Close(); err != nil {
