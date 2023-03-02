@@ -13,6 +13,7 @@ import (
 	sdkEvent "github.com/newrelic/infra-integrations-sdk/data/event"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/newrelic/nri-kube-events/pkg/common"
 	"github.com/newrelic/nri-kube-events/pkg/events"
 	"github.com/newrelic/nri-kube-events/pkg/sinks"
 )
@@ -61,7 +62,7 @@ func NewTestAgentSink() *TestAgentSink {
 }
 
 // HandleEvent sends a notification to the event received channel and then forwards it to the underlying sink.
-func (tas *TestAgentSink) HandleEvent(kubeEvent events.KubeEvent) error {
+func (tas *TestAgentSink) HandleEvent(kubeEvent common.KubeEvent) error {
 	tas.eventReceivedChan <- struct{}{}
 	return tas.agentSink.HandleEvent(kubeEvent)
 }
