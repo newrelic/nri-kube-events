@@ -87,19 +87,19 @@ func TestNewRelicSinkIntegration_HandleEvent_Success(t *testing.T) {
 	}
 
 	responseHandler := func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
+		body, err2 := io.ReadAll(r.Body)
 
 		defer func() {
 			_ = r.Body.Close()
 		}()
 
-		if err != nil {
-			t.Fatalf("error reading request body: %v", err)
+		if err2 != nil {
+			t.Fatalf("error reading request body: %v", err2)
 		}
 
 		var postData interface{}
-		if err = json.Unmarshal(body, &postData); err != nil {
-			t.Fatalf("error unmarshalling request body: %v", err)
+		if err2 = json.Unmarshal(body, &postData); err2 != nil {
+			t.Fatalf("error unmarshalling request body: %v", err2)
 		}
 
 		if diff := cmp.Diff(expectedData, postData); diff != "" {
