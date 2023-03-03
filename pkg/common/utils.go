@@ -5,9 +5,18 @@ package common
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"unicode/utf8"
+
+	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubectl/pkg/scheme"
 )
+
+const SplitMaxCols = 16
+const NRDBLimit = 4095
 
 // LimitSplit splits the input string into multiple strings at the specified limit
 // taking care not to split mid-rune.
@@ -31,6 +40,39 @@ func LimitSplit(input string, limit int) []string {
 		splits = append(splits, input)
 	}
 	return splits
+}
+
+// K8SObjSetGVK modifies the runtime object to include GVK info.
+func K8SObjSetGVK(obj runtime.Object) {
+	gvks, _, err := scheme.Scheme.ObjectKinds(obj)
+	if err != nil {
+		log.Warnf("missing apiVersion or kind and cannot assign it; %v", err)
+		return
+	}
+
+	for _, gvk := range gvks {
+		if len(gvk.Kind) == 0 {
+			continue
+		}
+		if len(gvk.Version) == 0 || gvk.Version == runtime.APIVersionInternal {
+			continue
+		}
+		obj.GetObjectKind().SetGroupVersionKind(gvk)
+		break
+	}
+}
+
+func GetObjNamespaceAndName(obj runtime.Object) (string, string, error) {
+	accessor := meta.NewAccessor()
+	var errs []error
+
+	ns, err := accessor.Namespace(obj)
+	errs = append(errs, err)
+
+	name, err := accessor.Name(obj)
+	errs = append(errs, err)
+
+	return ns, name, errors.Join(errs...)
 }
 
 func FlattenStruct(v interface{}) (map[string]interface{}, error) {

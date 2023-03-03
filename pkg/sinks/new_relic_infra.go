@@ -14,6 +14,7 @@ import (
 	"time"
 
 	sdkArgs "github.com/newrelic/infra-integrations-sdk/args"
+	sdkAttr "github.com/newrelic/infra-integrations-sdk/data/attribute"
 	sdkEvent "github.com/newrelic/infra-integrations-sdk/data/event"
 	sdkIntegration "github.com/newrelic/infra-integrations-sdk/integration"
 	"github.com/prometheus/client_golang/prometheus"
@@ -21,6 +22,7 @@ import (
 	"github.com/sethgrid/pester"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
+	"k8s.io/kubectl/pkg/describe"
 
 	"github.com/newrelic/nri-kube-events/pkg/common"
 )
@@ -82,22 +84,37 @@ func createNewRelicInfraSinkMetrics() newRelicInfraSinkMetrics {
 	return newRelicInfraSinkMetrics{
 		httpTotalFailures: promauto.NewCounter(prometheus.CounterOpts{
 			Namespace: "nr",
-			Subsystem: "kube_events",
+			Subsystem: "http_sink",
 			Name:      "infra_sink_http_failures_total",
 			Help:      "Total amount of http failures connecting to the Agent",
 		}),
 		httpResponses: promauto.NewCounterVec(prometheus.CounterOpts{
 			Namespace: "nr",
-			Subsystem: "kube_events",
+			Subsystem: "http_sink",
 			Name:      "infra_sink_http_responses_total",
 			Help:      "Total amount of http responses, per code, from the New Relic Infra Agent",
 		}, []string{"code"}),
+		descSizes: promauto.NewHistogramVec(prometheus.HistogramOpts{
+			Namespace: "nr",
+			Subsystem: "k8s_descriptions",
+			Name:      "size",
+			Help:      "Sizes of the object describe output",
+			Buckets:   prometheus.ExponentialBuckets(1<<11, 2, 6),
+		}, []string{"obj_kind"}),
+		descErr: promauto.NewCounterVec(prometheus.CounterOpts{
+			Namespace: "nr",
+			Subsystem: "k8s_descriptions",
+			Name:      "err",
+			Help:      "Total errors encountered when trying to describe an object",
+		}, []string{"obj_kind"}),
 	}
 }
 
 type newRelicInfraSinkMetrics struct {
 	httpTotalFailures prometheus.Counter
 	httpResponses     *prometheus.CounterVec
+	descSizes         *prometheus.HistogramVec
+	descErr           *prometheus.CounterVec
 }
 
 // The newRelicInfraSink implements the Sink interface.
@@ -110,12 +127,76 @@ type newRelicInfraSink struct {
 	metrics        newRelicInfraSinkMetrics
 }
 
+// HandleObject sends the descriptions for the object to the New Relic Agent
+func (ns *newRelicInfraSink) HandleObject(kubeObj common.KubeObject) error {
+	defer ns.sdkIntegration.Clear()
+
+	common.K8SObjSetGVK(kubeObj.Obj)
+	objKind := kubeObj.Obj.GetObjectKind().GroupVersionKind().Kind
+
+	desc, err := describe.DefaultObjectDescriber.DescribeObject(kubeObj.Obj)
+	if err != nil {
+		ns.metrics.descErr.WithLabelValues(objKind).Inc()
+		return fmt.Errorf("failed to describe object: %w", err)
+	}
+	ns.metrics.descSizes.WithLabelValues(objKind).Observe(float64(len(desc)))
+
+	descSplits := common.LimitSplit(desc, common.NRDBLimit)
+	if len(descSplits) == 0 {
+		return nil
+	}
+
+	objNS, objName, err := common.GetObjNamespaceAndName(kubeObj.Obj)
+	if err != nil {
+		return fmt.Errorf("failed to get object namespace/name: %w", err)
+	}
+
+	e, err := ns.sdkIntegration.Entity(objName, fmt.Sprintf("k8s:%s:%s:%s", ns.clusterName, objNS, strings.ToLower(objKind)))
+	if err != nil {
+		return fmt.Errorf("failed to create entity: %w", err)
+	}
+
+	e.AddAttributes(
+		sdkAttr.Attr("clusterName", ns.clusterName),
+		sdkAttr.Attr("displayName", e.Metadata.Name),
+	)
+
+	extraAttrs := make(map[string]interface{})
+	extraAttrs["clusterName"] = ns.clusterName
+	extraAttrs["type"] = fmt.Sprintf("%s.Description", objKind)
+
+	summary := descSplits[0]
+	for i := 1; i < common.SplitMaxCols; i++ {
+		key := fmt.Sprintf("summary.part[%d]", i)
+		val := ""
+		if i < len(descSplits) {
+			val = descSplits[i]
+		}
+		extraAttrs[key] = val
+	}
+
+	ns.decorateAttrs(extraAttrs)
+
+	err = e.AddEvent(sdkEvent.NewWithAttributes(summary, newRelicCategory, extraAttrs))
+	if err != nil {
+		return fmt.Errorf("couldn't add event: %w", err)
+	}
+
+	err = ns.sendIntegrationPayloadToAgent()
+	if err != nil {
+		return fmt.Errorf("error sending data to agent: %w", err)
+	}
+
+	return nil
+}
+
 // HandleEvent sends the event to the New Relic Agent
 func (ns *newRelicInfraSink) HandleEvent(kubeEvent common.KubeEvent) error {
 	defer ns.sdkIntegration.Clear()
 
-	e, err := ns.createEntity(kubeEvent)
+	entityType, entityName := formatEntityID(ns.clusterName, kubeEvent)
 
+	e, err := ns.sdkIntegration.Entity(entityName, entityType)
 	if err != nil {
 		return fmt.Errorf("unable to create entity: %w", err)
 	}
@@ -126,7 +207,7 @@ func (ns *newRelicInfraSink) HandleEvent(kubeEvent common.KubeEvent) error {
 		return fmt.Errorf("could not flatten EventData struct: %w", err)
 	}
 
-	ns.decorateEvent(flattenedEvent)
+	ns.decorateAttrs(flattenedEvent)
 
 	event := sdkEvent.NewWithAttributes(
 		kubeEvent.Event.Message,
@@ -144,18 +225,6 @@ func (ns *newRelicInfraSink) HandleEvent(kubeEvent common.KubeEvent) error {
 	}
 
 	return nil
-}
-
-// createEntity creates the entity related to the event.
-func (ns *newRelicInfraSink) createEntity(kubeEvent common.KubeEvent) (*sdkIntegration.Entity, error) {
-	entityType, entityName := formatEntityID(ns.clusterName, kubeEvent)
-
-	e, err := ns.sdkIntegration.Entity(entityName, entityType)
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize new SDK Entity: %w", err)
-	}
-
-	return e, nil
 }
 
 // formatEntity returns an entity id information as tuple of (entityType, entityName).
@@ -229,9 +298,9 @@ func disposeBody(response *http.Response) {
 	}
 }
 
-func (ns *newRelicInfraSink) decorateEvent(flattenedEvent map[string]interface{}) {
-	flattenedEvent["eventRouterVersion"] = ns.sdkIntegration.IntegrationVersion
-	flattenedEvent["integrationVersion"] = ns.sdkIntegration.IntegrationVersion
-	flattenedEvent["integrationName"] = ns.sdkIntegration.Name
-	flattenedEvent["clusterName"] = ns.clusterName
+func (ns *newRelicInfraSink) decorateAttrs(attrs map[string]interface{}) {
+	attrs["eventRouterVersion"] = ns.sdkIntegration.IntegrationVersion
+	attrs["integrationVersion"] = ns.sdkIntegration.IntegrationVersion
+	attrs["integrationName"] = ns.sdkIntegration.Name
+	attrs["clusterName"] = ns.clusterName
 }
