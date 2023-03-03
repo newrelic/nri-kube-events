@@ -66,10 +66,7 @@ func main() {
 	wg := &sync.WaitGroup{}
 	stopChan := listenForStopSignal()
 
-	eventsInformer, err := createEventsInformer(stopChan)
-	if err != nil {
-		logrus.Fatalf("could not create EventsInformer: %v", err)
-	}
+	eventsInformer := createEventsInformer(stopChan)
 
 	opts := []router.ConfigOption{
 		router.WithWorkQueueLength(cfg.WorkQueueLength), // will ignore null values
@@ -119,7 +116,7 @@ func listenForStopSignal() <-chan struct{} {
 
 // createEventsInformer creates a SharedIndexInformer that will listen for Events.
 // Only events happening after creation will be returned, existing events are discarded.
-func createEventsInformer(stopChan <-chan struct{}) (cache.SharedIndexInformer, error) {
+func createEventsInformer(stopChan <-chan struct{}) cache.SharedIndexInformer {
 	clientset, err := getClientset(*kubeConfig)
 	if err != nil {
 		logrus.Fatalf("could not create kubernetes client: %v", err)
@@ -147,7 +144,7 @@ func createEventsInformer(stopChan <-chan struct{}) (cache.SharedIndexInformer, 
 		}
 	}
 
-	return eventsInformer, nil
+	return eventsInformer
 }
 
 // getClientset returns a kubernetes clientset.
