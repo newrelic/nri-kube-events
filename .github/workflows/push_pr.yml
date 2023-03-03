@@ -109,13 +109,28 @@ jobs:
   test-integration:
     name: Run integration tests
     runs-on: ubuntu-20.04
-    needs: [ build ]
     timeout-minutes: 10
+    env:
+      DOCKER_BUILDKIT: '1'
     strategy:
       max-parallel: 4
       fail-fast: false
       matrix:
-        kubernetes-version: [ "v1.16.15", "v1.17.17", "v1.18.20", "v1.19.14", "v1.20.10", "v1.21.4", "v1.22.0" ]
+        k8sVersion: [ v1.16.15, v1.21.14, v1.22.17, v1.23.17, v1.24.11, v1.25.7, v1.26.2 ]
+        cri: [ docker, containerd ]
+        exclude:
+          - k8sVersion: v1.16.15
+            cri: containerd
+          - k8sVersion: v1.21.14
+            cri: containerd
+          - k8sVersion: v1.22.17
+            cri: containerd
+          - k8sVersion: v1.24.11
+            cri: docker
+          - k8sVersion: v1.25.7
+            cri: docker
+          - k8sVersion: v1.26.2
+            cri: docker
     steps:
       - uses: actions/checkout@v3
         with:
@@ -126,8 +141,10 @@ jobs:
       - name: Setup Minikube
         uses: manusa/actions-setup-minikube@v2.7.2
         with:
-          minikube version: v1.20.0
-          kubernetes version: ${{ matrix.kubernetes-version }}
+          minikube version: v1.29.0
+          kubernetes version: ${{ matrix.k8sVersion }}
+          container runtime: ${{ matrix.cri }}
+          driver: docker
           github token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/cache@v3
         with:
@@ -145,9 +162,12 @@ jobs:
       - name: Create image for chart testing
         run: |
           GOOS=linux GOARCH=amd64 make compile # Set GOOS and GOARCH explicitly since Dockerfile expects them in the binary name
-          DOCKER_BUILDKIT=1 docker build -t e2e/nri-kube-events:test  .
+          docker build -t e2e/nri-kube-events:test .
           minikube image load e2e/nri-kube-events:test
           kubectl create ns ct
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
       - uses: helm/chart-testing-action@v2.3.1
       - name: Test install charts
         run: ct install --namespace ct --config .github/ct.yaml --debug
