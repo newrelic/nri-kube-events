@@ -16,6 +16,7 @@ import (
 // destination (stdout, NewRelic platform, etc.).
 type Sink interface {
 	HandleEvent(kubeEvent common.KubeEvent) error
+	HandleObject(kubeObject common.KubeObject) error
 }
 
 // SinkConfig defines the name and config map of an `Sink`

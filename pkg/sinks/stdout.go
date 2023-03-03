@@ -32,3 +32,14 @@ func (stdoutSink) HandleEvent(event common.KubeEvent) error {
 	logrus.Infof(string(b))
 	return nil
 }
+
+func (stdoutSink) HandleObject(object common.KubeObject) error {
+	b, err := json.Marshal(object)
+
+	if err != nil {
+		return fmt.Errorf("stdoutSink: could not marshal object: %w", err)
+	}
+
+	logrus.Infof(string(b))
+	return nil
+}

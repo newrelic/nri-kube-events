@@ -21,6 +21,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 
+	"github.com/newrelic/nri-kube-events/pkg/descriptions"
 	"github.com/newrelic/nri-kube-events/pkg/events"
 	"github.com/newrelic/nri-kube-events/pkg/router"
 	"github.com/newrelic/nri-kube-events/pkg/sinks"
@@ -60,25 +61,46 @@ func main() {
 	wg := &sync.WaitGroup{}
 	stopChan := listenForStopSignal()
 
-	eventsInformer := createEventsInformer(stopChan)
-
 	opts := []router.ConfigOption{
 		router.WithWorkQueueLength(cfg.WorkQueueLength), // will ignore null values
 	}
 
-	// TODO(vihangm): Cleanup interfaces to avoid having to do this conversion.
-	activeEventHandlers := make(map[string]events.EventHandler)
-	for name, sink := range activeSinks {
-		activeEventHandlers[name] = sink
+	if cfg.CaptureEvents == nil || *cfg.CaptureEvents {
+		eventsInformer := createEventsInformer(stopChan)
+		activeEventHandlers := make(map[string]events.EventHandler)
+
+		for name, sink := range activeSinks {
+			activeEventHandlers[name] = sink
+		}
+
+		eventRouter := events.NewRouter(eventsInformer, activeEventHandlers, opts...)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			eventRouter.Run(stopChan)
+		}()
 	}
 
-	eventRouter := events.NewRouter(eventsInformer, activeEventHandlers, opts...)
+	if cfg.CaptureDescribe == nil || *cfg.CaptureDescribe {
+		resync := DefaultDescribeRefresh
+		if cfg.DescribeRefresh != nil {
+			resync = *cfg.DescribeRefresh
+		}
+		resourceInformers := createInformers(stopChan, resync)
+		activeObjectHandlers := make(map[string]descriptions.ObjectHandler)
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		eventRouter.Run(stopChan)
-	}()
+		for name, sink := range activeSinks {
+			activeObjectHandlers[name] = sink
+		}
+
+		descRouter := descriptions.NewRouter(resourceInformers, activeObjectHandlers, opts...)
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			descRouter.Run(stopChan)
+		}()
+	}
 
 	go servePrometheus(*promAddr)
 
@@ -146,6 +168,26 @@ func createEventsInformer(stopChan <-chan struct{}) cache.SharedIndexInformer {
 	}
 
 	return eventsInformer
+}
+
+// createInformers creates a SharedIndexInformer that will listen for resources we care aobut.
+func createInformers(stopChan <-chan struct{}, resync time.Duration) []cache.SharedIndexInformer {
+	clientset, err := getClientset(*kubeConfig)
+	if err != nil {
+		logrus.Fatalf("could not create kubernetes client: %v", err)
+	}
+
+	sharedInformers := informers.NewSharedInformerFactory(clientset, resync)
+
+	daemonsetsInformer := sharedInformers.Apps().V1().DaemonSets().Informer()
+	namespacesInformer := sharedInformers.Core().V1().Namespaces().Informer()
+	nodesInformer := sharedInformers.Core().V1().Nodes().Informer()
+	podsInformer := sharedInformers.Core().V1().Pods().Informer()
+	servicesInformer := sharedInformers.Core().V1().Services().Informer()
+
+	sharedInformers.Start(stopChan)
+
+	return []cache.SharedIndexInformer{podsInformer, servicesInformer, nodesInformer, namespacesInformer, daemonsetsInformer}
 }
 
 // getClientset returns a kubernetes clientset.

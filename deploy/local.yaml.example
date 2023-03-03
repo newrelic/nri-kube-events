@@ -15,9 +15,20 @@ kind: ClusterRole
 metadata:
   name: nri-kube-events
 rules:
-  - apiGroups: [""]
-    resources: ["events"]
-    verbs: ["get", "watch", "list"]
+- apiGroups:
+  - ""
+  - apps
+  resources:
+  - "daemonsets"
+  - "events"
+  - "namespaces"
+  - "nodes"
+  - "pods"
+  - "services"
+  verbs:
+  - "get"
+  - "watch"
+  - "list"
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -81,7 +92,7 @@ spec:
             - name: config-volume
               mountPath: /app/config
         - name: infra-agent
-          image: newrelic/k8s-events-forwarder:1.39.1
+          image: newrelic/k8s-events-forwarder:1.40.1
           resources:
             limits:
               memory: 128Mi
