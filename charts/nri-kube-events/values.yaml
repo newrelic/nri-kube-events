@@ -34,13 +34,22 @@ images:
   # - name: regsecret
 
 # -- Resources available for this pod
-resources:
-  limits:
-    cpu: 100m
-    memory: 128Mi
-  requests:
-    cpu: 100m
-    memory: 128Mi
+resources: {}
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+forwarder:
+  resources:
+    limits:
+      cpu: 300m
+      memory: 500Mi
+    requests:
+      cpu: 100m
+      memory: 150Mi
 
 rbac:
   # -- Specifies whether RBAC resources should be created
