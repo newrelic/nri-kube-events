@@ -45,11 +45,11 @@ resources: {}
 forwarder:
   resources:
     limits:
-      cpu: 300m
-      memory: 500Mi
+      cpu: 100m
+      memory: 128Mi
     requests:
       cpu: 100m
-      memory: 150Mi
+      memory: 128Mi
 
 rbac:
   # -- Specifies whether RBAC resources should be created
