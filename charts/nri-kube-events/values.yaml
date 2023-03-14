@@ -42,7 +42,7 @@ resources: {}
   #   cpu: 100m
   #   memory: 128Mi
 
-# -- Resources for the agent/forwarder container
+# -- Resources for the forwarder sidecar container
 forwarder:
   resources: {}
     # limits:
