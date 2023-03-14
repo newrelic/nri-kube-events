@@ -33,7 +33,7 @@ images:
   pullSecrets: []
   # - name: regsecret
 
-# -- Resources available for this pod
+# -- Resources for the integration container
 resources: {}
   # limits:
   #   cpu: 100m
@@ -42,6 +42,7 @@ resources: {}
   #   cpu: 100m
   #   memory: 128Mi
 
+# -- Resources for the agent/forwarder container
 forwarder:
   resources: {}
     # limits:
