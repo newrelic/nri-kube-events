@@ -5,3 +5,7 @@ target-branch: main
 
 chart-repos:
   - newrelic=https://helm-charts.newrelic.com
+
+# Charts will be released manually.
+check-version-increment: false
+
