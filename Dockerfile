@@ -1,6 +1,4 @@
 FROM --platform=$BUILDPLATFORM golang:1.19-alpine AS build
-WORKDIR /src
-COPY . .
 
 # Set by docker automatically
 ARG TARGETOS TARGETARCH
@@ -13,6 +11,13 @@ ARG DATE="Sun Jan  1 00:00:00 UTC 2023"
 ARG GOOS=$TARGETOS
 ARG GOARCH=$TARGETARCH
 
+WORKDIR /src
+
+COPY go.mod .
+COPY go.sum .
+RUN go mod download
+
+COPY . .
 RUN go build \
     -ldflags="-X 'main.integrationVersion=${TAG}' -X 'main.gitCommit=${COMMIT}' -X 'main.buildDate=${DATE}'" \
     -o bin/nri-kube-events ./cmd/nri-kube-events
