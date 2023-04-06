@@ -168,10 +168,10 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: nri-kube-events
-          path: nri-kube-events.tar
       - name: Load image for chart testing
         run: |
           minikube image load nri-kube-events.tar
+          minikube image ls
           kubectl create ns ct
       - uses: actions/setup-python@v4
         with:
