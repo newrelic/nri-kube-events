@@ -1,12 +1,23 @@
-FROM alpine:3.17.3
+FROM --platform=$BUILDPLATFORM golang:1.19-alpine AS build
+WORKDIR /src
+COPY . .
 
 # Set by docker automatically
-# If building with `docker build`, make sure to set GOOS/GOARCH explicitly when calling make:
-# `make compile GOOS=something GOARCH=something`
-# Otherwise the makefile will not append them to the binary name and docker build will fail.
-ARG TARGETOS
-ARG TARGETARCH
+ARG TARGETOS TARGETARCH
 
+# Need to be set manually
+ARG TAG=dev
+ARG COMMIT=unknown
+ARG DATE="Sun Jan  1 00:00:00 UTC 2023"
+
+ARG GOOS=$TARGETOS
+ARG GOARCH=$TARGETARCH
+
+RUN go build \
+    -ldflags="-X 'main.integrationVersion=${TAG}' -X 'main.gitCommit=${COMMIT}' -X 'main.buildDate=${DATE}'" \
+    -o bin/nri-kube-events ./cmd/nri-kube-events
+
+FROM alpine:3.17.3
 WORKDIR /app
 
 RUN apk add --no-cache --upgrade \
@@ -15,10 +26,9 @@ RUN apk add --no-cache --upgrade \
     && adduser -D -H -u 1000 -G nri-kube-events nri-kube-events
 EXPOSE 8080
 
-ADD --chmod=755 bin/nri-kube-events-${TARGETOS}-${TARGETARCH} ./
-RUN mv nri-kube-events-${TARGETOS}-${TARGETARCH} nri-kube-events
-
 USER nri-kube-events
+
+COPY --chown=nri-kube-events:nri-kube-events --from=build /src/bin/nri-kube-events ./
 
 # Enable custom attributes decoration in the infra SDK
 ENV METADATA=true

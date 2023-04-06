@@ -154,15 +154,23 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      - name: Cache docker images
-        run: |
-          docker pull nginx
       - name: Run e2e tests
         run: make test-integration
-      - name: Create image for chart testing
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Build docker image
+        uses: docker/build-push-action@v4
+        with:
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          context: .
+          platforms: |
+            linux/amd64
+          tags: e2e/nri-kube-events:test
+      - name: Load image for chart testing
         run: |
-          GOOS=linux GOARCH=amd64 make compile # Set GOOS and GOARCH explicitly since Dockerfile expects them in the binary name
-          docker build -t e2e/nri-kube-events:test .
           minikube image load e2e/nri-kube-events:test
           kubectl create ns ct
       - uses: actions/setup-python@v4
