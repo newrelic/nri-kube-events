@@ -13,6 +13,9 @@ ARG GOARCH=$TARGETARCH
 
 WORKDIR /src
 
+# We don't expect the go.mod/go.sum to change frequently.
+# So splitting out the mod download helps create another layer
+# that should cache well.
 COPY go.mod .
 COPY go.sum .
 RUN go mod download
