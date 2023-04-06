@@ -56,6 +56,37 @@ jobs:
             fi
           done
 
+  docker-build:
+    name: Build docker image for integration tests
+    runs-on: ubuntu-20.04
+    timeout-minutes: 10
+    env:
+      DOCKER_BUILDKIT: '1'
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Build docker image
+        uses: docker/build-push-action@v4
+        with:
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          context: .
+          outputs: type=docker,dest=nri-kube-events.tar
+          platforms: |
+            linux/amd64
+          tags: e2e/nri-kube-events:test
+      - name: Upload Image
+        uses: actions/upload-artifact@v3
+        with:
+          name: nri-kube-events
+          path: nri-kube-events.tar
+          retention-days: 1
+
   static-analysis:
     name: Run all static analysis checks
     runs-on: ubuntu-latest
@@ -93,6 +124,7 @@ jobs:
   test-integration:
     name: Run integration tests
     runs-on: ubuntu-20.04
+    needs: [ docker-build ]
     timeout-minutes: 10
     env:
       DOCKER_BUILDKIT: '1'
@@ -132,23 +164,14 @@ jobs:
           github token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run e2e tests
         run: make test-integration
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Build docker image
-        uses: docker/build-push-action@v4
+      - name: Download Image
+        uses: actions/download-artifact@v3
         with:
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          context: .
-          load: true
-          platforms: |
-            linux/amd64
-          tags: e2e/nri-kube-events:test
+          name: nri-kube-events
+          path: nri-kube-events.tar
       - name: Load image for chart testing
         run: |
-          minikube image load e2e/nri-kube-events:test
+          minikube image load nri-kube-events.tar
           kubectl create ns ct
       - uses: actions/setup-python@v4
         with:
