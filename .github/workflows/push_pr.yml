@@ -166,6 +166,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           context: .
+          load: true
           platforms: |
             linux/amd64
           tags: e2e/nri-kube-events:test
