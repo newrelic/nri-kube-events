@@ -7,6 +7,7 @@ release:
 tests:
   - it: has the correct sinks when default values used
     set:
+      licenseKey: us-whatever
       cluster: a-cluster
     asserts:
       - equal:
@@ -21,6 +22,7 @@ tests:
 
   - it: honors agentHTTPTimeout
     set:
+      licenseKey: us-whatever
       cluster: a-cluster
       agentHTTPTimeout: 10s
     asserts:
@@ -36,6 +38,7 @@ tests:
 
   - it: has the correct sinks defined in local values
     set:
+      licenseKey: us-whatever
       cluster: a-cluster
       sinks:
         stdout: true
@@ -49,6 +52,7 @@ tests:
 
   - it: has another document generated with the proper config set
     set:
+      licenseKey: us-whatever
       cluster: a-cluster
       sinks:
         stdout: false
