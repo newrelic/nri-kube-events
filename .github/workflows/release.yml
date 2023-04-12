@@ -34,7 +34,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           build-args: |
-            "COMMIT=${{ git.sha }}"
+            "COMMIT=${{ github.sha }}"
             "DATE=${{ env.DATE }}"
             "TAG=${{ env.TAG }}"
           cache-from: type=gha
