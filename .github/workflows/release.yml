@@ -17,11 +17,11 @@ jobs:
       - name: Prerelease image tags
         if: ${{ github.event.release.prerelease }}
         run: |
-          echo "DOCKER_IMAGE_TAGS=nri-kube-events:${{ env.TAG }}-pre" >> $GITHUB_ENV
+          echo "DOCKER_IMAGE_TAGS=newrelic/nri-kube-events:${{ env.TAG }}-pre" >> $GITHUB_ENV
       - name: Release image tags
         if: ${{ ! github.event.release.prerelease }}
         run: |
-          echo "DOCKER_IMAGE_TAGS=nri-kube-events:${{ env.TAG }},nri-kube-events:latest" >> $GITHUB_ENV
+          echo "DOCKER_IMAGE_TAGS=newrelic/nri-kube-events:${{ env.TAG }},newrelic/nri-kube-events:latest" >> $GITHUB_ENV
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
