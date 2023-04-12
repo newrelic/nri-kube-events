@@ -11,7 +11,7 @@ tests:
       licenseKey: us-whatever
     asserts:
       - equal:
-          path: data."newrelic-infra.yml"
+          path: data["newrelic-infra.yml"]
           value: |
             is_forward_only: true
             http_server_enabled: true
@@ -25,7 +25,7 @@ tests:
       verboseLog: true
     asserts:
       - equal:
-          path: data."newrelic-infra.yml"
+          path: data["newrelic-infra.yml"]
           value: |
             is_forward_only: true
             http_server_enabled: true

@@ -11,7 +11,7 @@ tests:
       cluster: a-cluster
     asserts:
       - equal:
-          path: data.config\.yaml
+          path: data["config.yaml"]
           value: |-
             sinks:
               - name: newRelicInfra
@@ -27,7 +27,7 @@ tests:
       agentHTTPTimeout: 10s
     asserts:
       - equal:
-          path: data.config\.yaml
+          path: data["config.yaml"]
           value: |-
             sinks:
               - name: newRelicInfra
@@ -45,7 +45,7 @@ tests:
         newRelicInfra: false
     asserts:
       - equal:
-          path: data.config\.yaml
+          path: data["config.yaml"]
           value: |-
             sinks:
               - name: stdout
@@ -59,6 +59,6 @@ tests:
         newRelicInfra: false
     asserts:
       - equal:
-          path: data.config\.yaml
+          path: data["config.yaml"]
           value: |-
             sinks:
