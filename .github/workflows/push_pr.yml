@@ -129,23 +129,15 @@ jobs:
     env:
       DOCKER_BUILDKIT: '1'
     strategy:
-      max-parallel: 4
+      max-parallel: 3
       fail-fast: false
       matrix:
-        k8sVersion: [ v1.16.15, v1.21.14, v1.22.17, v1.23.17, v1.24.11, v1.25.7, v1.26.2 ]
-        cri: [ docker, containerd ]
-        exclude:
+        k8sVersion: [ v1.24.13, v1.25.9, v1.26.4, v1.27.1 ]
+        cri: [ containerd ]
+        include:
           - k8sVersion: v1.16.15
-            cri: containerd
-          - k8sVersion: v1.21.14
-            cri: containerd
-          - k8sVersion: v1.22.17
-            cri: containerd
-          - k8sVersion: v1.24.11
             cri: docker
-          - k8sVersion: v1.25.7
-            cri: docker
-          - k8sVersion: v1.26.2
+          - k8sVersion: v1.23.17
             cri: docker
     steps:
       - uses: actions/checkout@v3
