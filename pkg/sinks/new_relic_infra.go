@@ -119,7 +119,7 @@ func (ns *newRelicInfraSink) HandleEvent(kubeEvent common.KubeEvent) error {
 		return fmt.Errorf("unable to create entity: %w", err)
 	}
 
-	flattenedEvent, err := flattenStruct(kubeEvent)
+	flattenedEvent, err := common.FlattenStruct(kubeEvent)
 
 	if err != nil {
 		return fmt.Errorf("could not flatten EventData struct: %w", err)
@@ -231,54 +231,4 @@ func (ns *newRelicInfraSink) decorateEvent(flattenedEvent map[string]interface{}
 	flattenedEvent["integrationVersion"] = ns.sdkIntegration.IntegrationVersion
 	flattenedEvent["integrationName"] = ns.sdkIntegration.Name
 	flattenedEvent["clusterName"] = ns.clusterName
-}
-
-func flattenStruct(v interface{}) (map[string]interface{}, error) {
-	m := make(map[string]interface{})
-
-	data, err := json.Marshal(v)
-	if err != nil {
-		return nil, err
-	}
-	var unflattened map[string]interface{}
-	err = json.Unmarshal(data, &unflattened)
-	if err != nil {
-		return nil, err
-	}
-
-	var doFlatten func(string, interface{}, map[string]interface{})
-
-	doFlatten = func(key string, v interface{}, m map[string]interface{}) {
-		switch parsedType := v.(type) {
-		case map[string]interface{}:
-			for k, n := range parsedType {
-				doFlatten(key+"."+k, n, m)
-			}
-		case []interface{}:
-			for i, n := range parsedType {
-				doFlatten(key+fmt.Sprintf("[%d]", i), n, m)
-			}
-		case string:
-			// ignore empty strings
-			if parsedType == "" {
-				return
-			}
-
-			m[key] = v
-
-		default:
-			// ignore nil values
-			if v == nil {
-				return
-			}
-
-			m[key] = v
-		}
-	}
-
-	for k, v := range unflattened {
-		doFlatten(k, v, m)
-	}
-
-	return m, nil
 }

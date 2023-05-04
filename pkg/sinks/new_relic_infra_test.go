@@ -178,37 +178,3 @@ func TestNewRelicInfraSink_HandleEvent_AddEventError(t *testing.T) {
 		t.Errorf("wanted error with message '%s' got: '%v'", wantedError, err)
 	}
 }
-
-func TestFlattenStruct(t *testing.T) {
-	got, _ := flattenStruct(common.KubeEvent{Verb: "UPDATE", Event: &v1.Event{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test",
-			Labels: map[string]string{
-				"test_label1": "test_value1",
-				"test_label2": "test_value2",
-			},
-			Finalizers: []string{"1", "2"},
-		},
-		Count: 10,
-		InvolvedObject: v1.ObjectReference{
-			Kind:      "Pod",
-			Namespace: "test_namespace",
-		},
-	}})
-
-	want := map[string]interface{}{
-		"event.count":                       float64(10),
-		"event.metadata.name":               "test",
-		"event.metadata.labels.test_label1": "test_value1",
-		"event.metadata.labels.test_label2": "test_value2",
-		"event.involvedObject.kind":         "Pod",
-		"event.involvedObject.namespace":    "test_namespace",
-		"event.metadata.finalizers[0]":      "1",
-		"event.metadata.finalizers[1]":      "2",
-		"verb":                              "UPDATE",
-	}
-
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("flattenStruct() mismatch (-want +got):\n%s", diff)
-	}
-}
