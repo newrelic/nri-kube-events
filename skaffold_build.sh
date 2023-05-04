@@ -1,9 +1,11 @@
 #!/bin/bash -e
 
-MAKE_TARGET="docker"
-if [ "$PUSH_IMAGE" = true ]; then
-  MAKE_TARGET="docker-push"
-fi
+export DOCKER_BUILDKIT=1
+export DOCKER_IMAGE_NAME="${IMAGE}"
 
-pushd "$BUILD_CONTEXT" > /dev/null
-DOCKER_IMAGE_NAME="$IMAGE"  make "$MAKE_TARGET"
+pushd "${BUILD_CONTEXT}" > /dev/null
+make docker
+
+if [[ "${PUSH_IMAGE}" = true ]]; then
+  docker push "${DOCKER_IMAGE_NAME}"
+fi
