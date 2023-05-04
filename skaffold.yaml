@@ -14,7 +14,7 @@ build:
         - go.mod
         - skaffold_build.sh
   tagPolicy:
-    sha256: {}
+    dateTime: {}
 manifests:
   rawYaml:
   - deploy/local.yaml
