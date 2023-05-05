@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -25,10 +24,6 @@ import (
 	"github.com/newrelic/nri-kube-events/pkg/events"
 	"github.com/newrelic/nri-kube-events/pkg/router"
 	"github.com/newrelic/nri-kube-events/pkg/sinks"
-)
-
-const (
-	integrationName = "nri-kube-events"
 )
 
 var (
@@ -49,8 +44,7 @@ func main() {
 	setLogLevel(*logLevel, logrus.InfoLevel)
 
 	logrus.Infof(
-		"New Relic %s integration Version: %s, Platform: %s, GoVersion: %s, GitCommit: %s, BuildDate: %s",
-		strings.Title(strings.Replace(integrationName, "com.newrelic.", "", 1)),
+		"New Relic Kube Events integration Version: %s, Platform: %s, GoVersion: %s, GitCommit: %s, BuildDate: %s",
 		integrationVersion,
 		fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
 		runtime.Version(),
@@ -94,7 +88,14 @@ func main() {
 
 func servePrometheus(addr string) {
 	logrus.Infof("Serving Prometheus metrics on %s", addr)
-	err := http.ListenAndServe(addr, promhttp.Handler())
+
+	server := &http.Server{
+		Addr:              addr,
+		ReadHeaderTimeout: 3 * time.Second,
+		Handler:           promhttp.Handler(),
+	}
+
+	err := server.ListenAndServe()
 	logrus.Fatalf("Could not serve Prometheus on %s: %v", addr, err)
 }
 
