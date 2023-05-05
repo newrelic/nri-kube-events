@@ -3,17 +3,15 @@
 package main
 
 import (
-	"bytes"
 	"strings"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/newrelic/nri-kube-events/pkg/sinks"
 )
 
-func TestConfigParse(t *testing.T) {
-	conf := strings.NewReader(`
+var testConf = `
 workQueueLength: 1337
 sinks:
 - name: stdout
@@ -23,54 +21,49 @@ sinks:
   config:
     agentEndpoint: "http://infra-agent.default:8001/v1/data"
     clusterName: "minikube"
-`)
+`
 
-	got, err := loadConfig(conf)
+func TestConfigParse(t *testing.T) {
+	workQueueLength := 1337
 
-	if err != nil {
-		t.Fatalf("unexpected error while parsing config: %v", err)
-	}
-
-	want := config{
-		WorkQueueLength: intPtr(1337),
-		Sinks: []sinks.SinkConfig{
-			{
-				Name: "stdout",
-				Config: map[string]string{
-					"verbose": "true",
+	tests := []struct {
+		serialized string
+		parsed     config
+	}{
+		{
+			serialized: testConf,
+			parsed: config{
+				WorkQueueLength: &workQueueLength,
+				Sinks: []sinks.SinkConfig{
+					{
+						Name: "stdout",
+						Config: map[string]string{
+							"verbose": "true",
+						},
+					},
+					{
+						Name: "newRelicInfra",
+						Config: map[string]string{
+							"clusterName":   "minikube",
+							"agentEndpoint": "http://infra-agent.default:8001/v1/data",
+						},
+					},
 				},
 			},
-			{
-				Name: "newRelicInfra",
-				Config: map[string]string{
-					"clusterName":   "minikube",
-					"agentEndpoint": "http://infra-agent.default:8001/v1/data",
-				},
+		},
+		{
+			serialized: "",
+			parsed: config{
+				WorkQueueLength: nil,
+				Sinks:           []sinks.SinkConfig(nil),
 			},
 		},
 	}
 
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("loadConfig() mismatch (-want +got):\n%s", diff)
+	for _, test := range tests {
+		conf := strings.NewReader(test.serialized)
+		got, err := loadConfig(conf)
+		assert.NoError(t, err)
+		assert.Equal(t, test.parsed, got)
 	}
 }
-
-func TestNilValues(t *testing.T) {
-	var b bytes.Reader
-	got, err := loadConfig(&b)
-
-	if err != nil {
-		t.Fatalf("unexpected error while parsing config: %v", err)
-	}
-
-	want := config{
-		WorkQueueLength: nil,
-		Sinks:           []sinks.SinkConfig(nil),
-	}
-
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("loadConfig() mismatch (-want +got):\n%s", diff)
-	}
-}
-
-func intPtr(val int) *int { return &val }
