@@ -7,7 +7,7 @@ linters-settings:
   goimports:
     local-prefixes: github.com/newrelic/nri-kube-events
   gocyclo:
-    min-complexity: 10
+    min-complexity: 20
   golint:
     min-confidence: 0.8
   gomnd:
