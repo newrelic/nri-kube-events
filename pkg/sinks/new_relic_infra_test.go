@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -54,7 +54,7 @@ func TestFormatEntityID(t *testing.T) {
 		},
 	}
 
-	for i, testCase := range tt {
+	for _, testCase := range tt {
 		entityType, entityName := formatEntityID(
 			testCase.clusterName,
 			common.KubeEvent{
@@ -64,12 +64,8 @@ func TestFormatEntityID(t *testing.T) {
 			},
 		)
 
-		if diff := cmp.Diff(entityName, testCase.expectedEntityName); diff != "" {
-			t.Errorf("[%d] formatEntityID() name mismatch (-want +got):\n%s", i, diff)
-		}
-		if diff := cmp.Diff(entityType, testCase.expectedEntityType); diff != "" {
-			t.Errorf("[%d] formatEntityID() type mismatch (-want +got):\n%s", i, diff)
-		}
+		assert.Equal(t, testCase.expectedEntityName, entityName)
+		assert.Equal(t, testCase.expectedEntityType, entityType)
 	}
 }
 
@@ -102,10 +98,7 @@ func TestNewRelicSinkIntegration_HandleEvent_Success(t *testing.T) {
 			t.Fatalf("error unmarshalling request body: %v", err2)
 		}
 
-		if diff := cmp.Diff(expectedData, postData); diff != "" {
-			t.Errorf("request mismatch (-want +got):\n%s", diff)
-		}
-
+		assert.Equal(t, expectedData, postData)
 		w.WriteHeader(http.StatusNoContent)
 	}
 	var testServer = httptest.NewServer(http.HandlerFunc(responseHandler))
