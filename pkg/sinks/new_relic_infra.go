@@ -20,6 +20,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/sethgrid/pester"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
 
 	"github.com/newrelic/nri-kube-events/pkg/common"
 )
@@ -187,7 +188,9 @@ func (ns *newRelicInfraSink) sendIntegrationPayloadToAgent() error {
 		return fmt.Errorf("unable to marshal data: %w", err)
 	}
 
-	request, err := http.NewRequest("POST", ns.agentEndpoint, bytes.NewBuffer(jsonBytes))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	request, err := http.NewRequestWithContext(ctx, "POST", ns.agentEndpoint, bytes.NewBuffer(jsonBytes))
 	if err != nil {
 		return fmt.Errorf("unable to prepare request: %w", err)
 	}

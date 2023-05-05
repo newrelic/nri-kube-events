@@ -14,6 +14,7 @@ import (
 	"time"
 
 	sdkEvent "github.com/newrelic/infra-integrations-sdk/data/event"
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
@@ -166,6 +167,7 @@ func Test_Sink_receives_common_Pod_creation_events(t *testing.T) {
 		_ = e.Encode(agentMock.Events())
 		t.Fatalf("Event was not captured")
 	}
+	assert.NoError(t, agentMock.Errors())
 }
 
 func Test_Sink_receives_common_Pod_deletion_events(t *testing.T) {
@@ -244,6 +246,7 @@ func Test_Sink_receives_common_Pod_deletion_events(t *testing.T) {
 		e.Encode(event) // nolint:errcheck
 		t.Fatalf("Event was not captured")
 	}
+	assert.NoError(t, agentMock.Errors())
 }
 
 // nsName performs basic sanitization on the test name to convert it to an acceptable namespace name.

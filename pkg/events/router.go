@@ -77,7 +77,7 @@ func NewRouter(informer cache.SharedIndexInformer, handlers map[string]EventHand
 	// See: https://github.com/kubernetes/client-go/blob/c8dc69f8a8bf8d8640493ce26688b26c7bfde8e6/tools/cache/shared_informer.go#L111
 	workQueue := make(chan common.KubeEvent, config.WorkQueueLength())
 
-	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			workQueue <- common.KubeEvent{
 				Event: obj.(*v1.Event),

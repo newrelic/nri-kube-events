@@ -2,6 +2,8 @@ package integration
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -19,6 +21,7 @@ import (
 
 // Must be in sync with unexported name in pkg/sinks/new_relic_infra.go:32.
 const newRelicInfraSinkID = "newRelicInfra"
+const sinkChanBuffer = 128
 
 // TestAgentSink is an instrumented infra-agent sink for testing e2e reception and processing.
 type TestAgentSink struct {
@@ -27,13 +30,15 @@ type TestAgentSink struct {
 	eventReceivedChan chan struct{}
 	receivedEvents    []sdkEvent.Event
 	mtx               *sync.RWMutex
+
+	errs []error
 }
 
 // NewTestAgentSink returns an instrumented infra-agent sink for testing.
 func NewTestAgentSink() *TestAgentSink {
 	mockedAgentSink := &TestAgentSink{
 		mtx:               &sync.RWMutex{},
-		eventReceivedChan: make(chan struct{}, 128),
+		eventReceivedChan: make(chan struct{}, sinkChanBuffer),
 	}
 	mockedAgentSink.httpServer = httptest.NewServer(mockedAgentSink)
 
@@ -77,15 +82,15 @@ func (tas *TestAgentSink) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		} `json:"data"`
 	}
 
-	defer r.Body.Close() // nolint:errcheck
 	body, err := io.ReadAll(r.Body)
+	_ = r.Body.Close()
 	if err != nil {
-		log.Fatalf("error reading request body: %v", err)
+		tas.errs = append(tas.errs, fmt.Errorf("error reading request body: %w", err))
 	}
 
 	err = json.Unmarshal(body, &ev)
 	if err != nil {
-		log.Fatalf("error unmarshalling request body: %v", err)
+		tas.errs = append(tas.errs, fmt.Errorf("error unmarshalling request body: %w", err))
 	}
 
 	if len(ev.Data) == 0 {
@@ -96,6 +101,10 @@ func (tas *TestAgentSink) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 
 	tas.receivedEvents = append(tas.receivedEvents, ev.Data[0].Events...)
 	rw.WriteHeader(http.StatusNoContent) // Return 204 as the infra-agent does.
+}
+
+func (tas *TestAgentSink) Errors() error {
+	return errors.Join(tas.errs...)
 }
 
 // Has relaxedly checks whether the mocked agent has received an event.
