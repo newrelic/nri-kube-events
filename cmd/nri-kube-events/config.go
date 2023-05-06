@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
@@ -13,9 +14,15 @@ import (
 	"github.com/newrelic/nri-kube-events/pkg/sinks"
 )
 
+const DefaultDescribeRefresh = 24 * time.Hour
+
 type config struct {
 	WorkQueueLength *int `yaml:"workQueueLength"`
 	Sinks           []sinks.SinkConfig
+
+	CaptureEvents   *bool          `yaml:"captureEvents"`
+	CaptureDescribe *bool          `yaml:"captureDescribe"`
+	DescribeRefresh *time.Duration `yaml:"describeRefresh"`
 }
 
 func loadConfig(file io.Reader) (config, error) {

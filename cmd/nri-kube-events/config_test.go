@@ -5,6 +5,7 @@ package main
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -12,6 +13,9 @@ import (
 )
 
 var testConf = `
+captureEvents: false
+captureDescribe: true
+describeRefresh: 3h
 workQueueLength: 1337
 sinks:
 - name: stdout
@@ -24,6 +28,9 @@ sinks:
 `
 
 func TestConfigParse(t *testing.T) {
+	captureEvents := false
+	captureDescribe := true
+	describeRefresh := 3 * time.Hour
 	workQueueLength := 1337
 
 	tests := []struct {
@@ -33,6 +40,9 @@ func TestConfigParse(t *testing.T) {
 		{
 			serialized: testConf,
 			parsed: config{
+				CaptureEvents:   &captureEvents,
+				CaptureDescribe: &captureDescribe,
+				DescribeRefresh: &describeRefresh,
 				WorkQueueLength: &workQueueLength,
 				Sinks: []sinks.SinkConfig{
 					{
