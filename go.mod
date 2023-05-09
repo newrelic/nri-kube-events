@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/newrelic/infra-integrations-sdk v3.7.3+incompatible
 	github.com/prometheus/client_golang v1.15.0
-	github.com/prometheus/client_model v0.3.0
+	github.com/prometheus/client_model v0.4.0
 	github.com/sethgrid/pester v1.2.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.2
