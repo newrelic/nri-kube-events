@@ -14,14 +14,6 @@ can be found at https://github.com/newrelic/infrastructure-agent/.
 
 
 
-## [github.com/google/go-cmp](https://github.com/google/go-cmp)
-
-Distributed under the following license(s):
-
-* BSD-3-Clause
-
-
-
 ## [github.com/newrelic/infra-integrations-sdk](https://github.com/newrelic/infra-integrations-sdk)
 
 Distributed under the following license(s):
@@ -70,6 +62,14 @@ Distributed under the following license(s):
 
 
 
+## [golang.org/x/net](https://golang.org/x/net)
+
+Distributed under the following license(s):
+
+* BSD-3-Clause
+
+
+
 ## [gopkg.in/yaml.v3](https://gopkg.in/yaml.v3)
 
 Distributed under the following license(s):
@@ -95,6 +95,14 @@ Distributed under the following license(s):
 
 
 ## [k8s.io/client-go](https://github.com/kubernetes/client-go)
+
+Distributed under the following license(s):
+
+* Apache-2.0
+
+
+
+## [k8s.io/kubectl](https://github.com/kubernetes/kubectl)
 
 Distributed under the following license(s):
 
@@ -133,6 +141,30 @@ Distributed under the following license(s):
 
 
 ## [github.com/emicklei/go-restful/v3](https://github.com/emicklei/go-restful)
+
+Distributed under the following license(s):
+
+* MIT
+
+
+
+## [github.com/evanphx/json-patch](https://github.com/evanphx/json-patch)
+
+Distributed under the following license(s):
+
+* BSD-3-Clause
+
+
+
+## [github.com/fatih/camelcase](https://github.com/fatih/camelcase)
+
+Distributed under the following license(s):
+
+* MIT
+
+
+
+## [github.com/go-errors/errors](https://github.com/go-errors/errors)
 
 Distributed under the following license(s):
 
@@ -188,6 +220,14 @@ Distributed under the following license(s):
 
 
 
+## [github.com/google/btree](https://github.com/google/btree)
+
+Distributed under the following license(s):
+
+* Apache-2.0
+
+
+
 ## [github.com/google/gnostic](https://github.com/google/gnostic)
 
 Distributed under the following license(s):
@@ -196,7 +236,23 @@ Distributed under the following license(s):
 
 
 
+## [github.com/google/go-cmp](https://github.com/google/go-cmp)
+
+Distributed under the following license(s):
+
+* BSD-3-Clause
+
+
+
 ## [github.com/google/gofuzz](https://github.com/google/gofuzz)
+
+Distributed under the following license(s):
+
+* Apache-2.0
+
+
+
+## [github.com/google/shlex](https://github.com/google/shlex)
 
 Distributed under the following license(s):
 
@@ -212,11 +268,27 @@ Distributed under the following license(s):
 
 
 
+## [github.com/gregjones/httpcache](https://github.com/gregjones/httpcache)
+
+Distributed under the following license(s):
+
+* MIT
+
+
+
 ## [github.com/imdario/mergo](https://github.com/imdario/mergo)
 
 Distributed under the following license(s):
 
 * BSD-3-Clause
+
+
+
+## [github.com/inconshreveable/mousetrap](https://github.com/inconshreveable/mousetrap)
+
+Distributed under the following license(s):
+
+* Apache-2.0
 
 
 
@@ -252,6 +324,14 @@ Distributed under the following license(s):
 
 
 
+## [github.com/liggitt/tabwriter](https://github.com/liggitt/tabwriter)
+
+Distributed under the following license(s):
+
+* BSD-3-Clause
+
+
+
 ## [github.com/mailru/easyjson](https://github.com/mailru/easyjson)
 
 Distributed under the following license(s):
@@ -284,6 +364,14 @@ Distributed under the following license(s):
 
 
 
+## [github.com/monochromegane/go-gitignore](https://github.com/monochromegane/go-gitignore)
+
+Distributed under the following license(s):
+
+* MIT
+
+
+
 ## [github.com/munnerz/goautoneg](https://github.com/munnerz/goautoneg)
 
 Distributed under the following license(s):
@@ -301,6 +389,14 @@ Distributed under the following license(s):
 
 
 ## [github.com/onsi/gomega](https://github.com/onsi/gomega)
+
+Distributed under the following license(s):
+
+* MIT
+
+
+
+## [github.com/peterbourgon/diskv](https://github.com/peterbourgon/diskv)
 
 Distributed under the following license(s):
 
@@ -340,6 +436,30 @@ Distributed under the following license(s):
 
 
 
+## [github.com/rogpeppe/go-internal](https://github.com/rogpeppe/go-internal)
+
+Distributed under the following license(s):
+
+* BSD-3-Clause
+
+
+
+## [github.com/sergi/go-diff](https://github.com/sergi/go-diff)
+
+Distributed under the following license(s):
+
+* MIT
+
+
+
+## [github.com/spf13/cobra](https://github.com/spf13/cobra)
+
+Distributed under the following license(s):
+
+* Apache-2.0
+
+
+
 ## [github.com/spf13/pflag](https://github.com/spf13/pflag)
 
 Distributed under the following license(s):
@@ -356,7 +476,15 @@ Distributed under the following license(s):
 
 
 
-## [golang.org/x/net](https://golang.org/x/net)
+## [github.com/xlab/treeprint](https://github.com/xlab/treeprint)
+
+Distributed under the following license(s):
+
+* MIT
+
+
+
+## [go.starlark.net](https://go.starlark.net)
 
 Distributed under the following license(s):
 
@@ -444,6 +572,14 @@ Distributed under the following license(s):
 
 
 
+## [k8s.io/cli-runtime](https://github.com/kubernetes/cli-runtime)
+
+Distributed under the following license(s):
+
+* Apache-2.0
+
+
+
 ## [k8s.io/klog/v2](https://github.com/kubernetes/klog)
 
 Distributed under the following license(s):
@@ -469,6 +605,22 @@ Distributed under the following license(s):
 
 
 ## [sigs.k8s.io/json](https://sigs.k8s.io/json)
+
+Distributed under the following license(s):
+
+* Apache-2.0
+
+
+
+## [sigs.k8s.io/kustomize/api](https://sigs.k8s.io/kustomize/api)
+
+Distributed under the following license(s):
+
+* Apache-2.0
+
+
+
+## [sigs.k8s.io/kustomize/kyaml](https://sigs.k8s.io/kustomize/kyaml)
 
 Distributed under the following license(s):
 
