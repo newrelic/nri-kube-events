@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net/http"
@@ -102,13 +103,17 @@ func main() {
 		}()
 	}
 
-	go servePrometheus(*promAddr)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		servePrometheus(*promAddr, stopChan)
+	}()
 
 	wg.Wait()
 	logrus.Infoln("Shutdown complete")
 }
 
-func servePrometheus(addr string) {
+func servePrometheus(addr string, stopChan <-chan struct{}) {
 	logrus.Infof("Serving Prometheus metrics on %s", addr)
 
 	server := &http.Server{
@@ -117,8 +122,14 @@ func servePrometheus(addr string) {
 		Handler:           promhttp.Handler(),
 	}
 
-	err := server.ListenAndServe()
-	logrus.Fatalf("Could not serve Prometheus on %s: %v", addr, err)
+	go func() {
+		err := server.ListenAndServe()
+		logrus.Fatalf("Could not serve Prometheus on %s: %v", addr, err)
+	}()
+
+	<-stopChan
+	err := server.Shutdown(context.Background())
+	logrus.WithError(err).Warn("Failed to gracefully shutdown prometheus server")
 }
 
 // listenForStopSignal returns a channel that will be closed
