@@ -107,7 +107,8 @@ jobs:
         continue-on-error: ${{ github.event_name != 'pull_request' }}
         with:
           only-new-issues: true
-          args: --timeout=5m
+          skip-pkg-cache: true
+          skip-build-cache: true
 
   test:
     name: Run unit tests
