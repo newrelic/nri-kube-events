@@ -136,9 +136,18 @@ func (m *MockSharedIndexInformer) SetupMock() {
 		Once()
 }
 
+type stubResourceEventHandlerRegistration struct {
+	mock.Mock
+}
+
+func (s *stubResourceEventHandlerRegistration) HasSynced() bool {
+	s.Called()
+	return true
+}
+
 func (m *MockSharedIndexInformer) AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error) {
 	m.Called(handler)
-	return struct{}{}, nil
+	return &stubResourceEventHandlerRegistration{}, nil
 }
 
 type stubSink struct {
