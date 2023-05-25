@@ -190,15 +190,31 @@ func createInformers(stopChan <-chan struct{}, resync time.Duration) []cache.Sha
 
 	sharedInformers := informers.NewSharedInformerFactory(clientset, resync)
 
+	cronjobsInformer := sharedInformers.Batch().V1().CronJobs().Informer()
 	daemonsetsInformer := sharedInformers.Apps().V1().DaemonSets().Informer()
+	deploymentInformer := sharedInformers.Apps().V1().Deployments().Informer()
 	namespacesInformer := sharedInformers.Core().V1().Namespaces().Informer()
 	nodesInformer := sharedInformers.Core().V1().Nodes().Informer()
+	jobsInformer := sharedInformers.Batch().V1().Jobs().Informer()
+	pvInformer := sharedInformers.Core().V1().PersistentVolumes().Informer()
+	pvcInformer := sharedInformers.Core().V1().PersistentVolumeClaims().Informer()
 	podsInformer := sharedInformers.Core().V1().Pods().Informer()
 	servicesInformer := sharedInformers.Core().V1().Services().Informer()
 
 	sharedInformers.Start(stopChan)
 
-	return []cache.SharedIndexInformer{podsInformer, servicesInformer, nodesInformer, namespacesInformer, daemonsetsInformer}
+	return []cache.SharedIndexInformer{
+		cronjobsInformer,
+		daemonsetsInformer,
+		deploymentInformer,
+		namespacesInformer,
+		nodesInformer,
+		jobsInformer,
+		pvInformer,
+		pvcInformer,
+		podsInformer,
+		servicesInformer,
+	}
 }
 
 // getClientset returns a kubernetes clientset.
