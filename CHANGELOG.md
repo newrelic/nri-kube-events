@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 2.1.1
+
+### What's Changed
+* Bump app and chart version by @vihangm in https://github.com/newrelic/nri-kube-events/pull/250
+* chore(deps): update newrelic/k8s-events-forwarder docker tag to v1.43.0 by @renovate in https://github.com/newrelic/nri-kube-events/pull/251
+* chore(deps): bump github.com/sirupsen/logrus from 1.9.2 to 1.9.3 by @dependabot in https://github.com/newrelic/nri-kube-events/pull/252
+* chore(deps): bump github.com/stretchr/testify from 1.8.3 to 1.8.4 by @dependabot in https://github.com/newrelic/nri-kube-events/pull/253
+* chore(deps): bump alpine from 3.18.0 to 3.18.2 by @dependabot in https://github.com/newrelic/nri-kube-events/pull/254
+* chore(deps): bump github.com/prometheus/client_golang from 1.15.1 to 1.16.0 by @dependabot in https://github.com/newrelic/nri-kube-events/pull/255
+
+
+**Full Changelog**: https://github.com/newrelic/nri-kube-events/compare/v2.1.0...v2.1.1
+
+
+
 ## 1.9.3
 
 ### Added
