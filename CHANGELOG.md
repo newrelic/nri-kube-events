@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 * Update Changelog by @xqi-nr in https://github.com/newrelic/nri-kube-events/pull/257
 * Bump Chart Versions by @xqi-nr in https://github.com/newrelic/nri-kube-events/pull/258
 * chore(deps): update newrelic/k8s-events-forwarder docker tag to v1.43.1 by @renovate in https://github.com/newrelic/nri-kube-events/pull/259
+* Upgrade Apimachinery Lib by @xqi-nr in https://github.com/newrelic/nri-kube-events/pull/260
 
 
 **Full Changelog**: https://github.com/newrelic/nri-kube-events/compare/v2.1.1...v2.1.2
