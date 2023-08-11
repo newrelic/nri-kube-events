@@ -4,6 +4,8 @@
     // Disable the creation of this issue that renovate updates with the pending issue we follow with Zenhub:
     ":disableDependencyDashboard"
   ],
+  // Label PRs with `dependencies`.
+  "labels": ["dependencies"],
   "enabledManagers": [
     // Enable regex manager for image parsing. Go dependencies are managed by Dependabot.
     "regex",
