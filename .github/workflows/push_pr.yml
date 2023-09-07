@@ -133,20 +133,16 @@ jobs:
       max-parallel: 4
       fail-fast: false
       matrix:
-        k8sVersion: [ v1.16.15, v1.21.14, v1.22.17, v1.23.17, v1.24.11, v1.25.7, v1.26.2 ]
+        k8sVersion: [ "1.23.17", "1.24.17", "1.25.13", "1.26.8", "1.27.5" ]
         cri: [ docker, containerd ]
         exclude:
-          - k8sVersion: v1.16.15
-            cri: containerd
-          - k8sVersion: v1.21.14
-            cri: containerd
-          - k8sVersion: v1.22.17
-            cri: containerd
-          - k8sVersion: v1.24.11
+          - k8sVersion: v1.24.17
             cri: docker
-          - k8sVersion: v1.25.7
+          - k8sVersion: v1.25.13
             cri: docker
-          - k8sVersion: v1.26.2
+          - k8sVersion: v1.26.8
+            cri: docker
+          - k8sVersion: v1.27.5
             cri: docker
     steps:
       - uses: actions/checkout@v3
