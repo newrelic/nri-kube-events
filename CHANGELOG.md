@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+### Enhancement
+- Update K8s Versions in E2E Tests by @xqi-nr in [#275](https://github.com/newrelic/nri-kube-events/pull/275)
+
 ## 2.1.2
 
 ## What's Changed
