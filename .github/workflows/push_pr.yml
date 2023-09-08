@@ -134,16 +134,7 @@ jobs:
       fail-fast: false
       matrix:
         k8sVersion: [ "1.23.17", "1.24.17", "1.25.13", "1.26.8", "1.27.5" ]
-        cri: [ docker, containerd ]
-        exclude:
-          - k8sVersion: v1.24.17
-            cri: docker
-          - k8sVersion: v1.25.13
-            cri: docker
-          - k8sVersion: v1.26.8
-            cri: docker
-          - k8sVersion: v1.27.5
-            cri: docker
+        cri: [ containerd ]
     steps:
       - uses: actions/checkout@v3
         with:
