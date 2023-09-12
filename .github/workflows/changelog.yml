@@ -9,10 +9,15 @@ on:
 jobs:
   changelog-entry:
     runs-on: ubuntu-latest
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'dependencies') && !contains(github.event.pull_request.labels.*.name, 'Skip Changelog')}}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'dependencies') && !contains(github.event.pull_request.labels.*.name, 'Skip Changelog') && !startsWith(github.head_ref, 'renovate/')}}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      - name: Debug Labels
+        run: |
+          echo "${{ toJson(github.event.pull_request.labels[*].name) }}"
+          echo "Should Run: ${{ !contains(github.event.pull_request.labels.*.name, 'dependencies') && !contains(github.event.pull_request.labels.*.name, 'Skip Changelog')}}"
+
       - name: Check for CHANGELOG file changes
         run: |
           # Only the latest commit of the feature branch is available
