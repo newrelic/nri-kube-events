@@ -6,3 +6,6 @@ deploy/local.yaml
 
 # Downloaded chart dependencies
 **/charts/*.tgz
+
+# Release toolkit
+CHANGELOG.partial.md
