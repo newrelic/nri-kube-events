@@ -13,7 +13,7 @@ jobs:
     name: Build and push docker images
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build args
         run: |
           echo "DATE=`date`" >> $GITHUB_ENV
