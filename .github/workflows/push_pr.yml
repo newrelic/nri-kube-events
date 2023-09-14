@@ -59,7 +59,7 @@ jobs:
 
   docker-build:
     name: Build docker image for integration tests
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 10
     env:
       DOCKER_BUILDKIT: '1'
@@ -125,7 +125,7 @@ jobs:
 
   test-integration:
     name: Run integration tests
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs: [ docker-build ]
     timeout-minutes: 10
     env:
