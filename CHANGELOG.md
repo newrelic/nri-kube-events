@@ -7,8 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-### bugfix
-- Fix typo in release.yml workflow by @juanjjaramillo in https://github.com/newrelic/nri-kube-events/pull/293
+## v2.2.1 - 2023-09-15
+
+### 🐞 Bug fixes
+- Fix typo in release.yml workflow by @juanjjaramillo in [https://github.com/newrelic/nri-kube-events/pull/293](https://github.com/newrelic/nri-kube-events/pull/293)
 
 ## v2.2.0 - 2023-09-15
 
