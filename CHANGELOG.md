@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-### bugfix
+## v2.2.2 - 2023-09-15
+
+### 🐞 Bug fixes
 - Fix job step in release.yml workflow by @juanjjaramillo in [#296](https://github.com/newrelic/nri-kube-events/pull/296)
 
 ## v2.2.1 - 2023-09-15
