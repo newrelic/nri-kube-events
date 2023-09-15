@@ -24,7 +24,7 @@ jobs:
           echo "DATE=`date`" >> $GITHUB_ENV
           echo "${{ github.event.release.tag_name }}" | grep -E '^[v]?[0-9.]*[0-9]$'
           echo "TAG=$(echo "${{ github.event.release.tag_name }}" | sed 's/^v//')" >> $GITHUB_ENV
-          echo "new-version=$DOCKER_IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "new-version=$TAG" >> $GITHUB_OUTPUT
       - name: Prerelease image tags
         if: ${{ github.event.release.prerelease }}
         run: |
