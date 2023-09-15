@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-### Enhancement
+## v2.2.0 - 2023-09-15
+
+### 🚀 Enhancements
 - Update K8s Versions in E2E Tests by @xqi-nr in [#275](https://github.com/newrelic/nri-kube-events/pull/275)
+
+### ⛓️ Dependencies
+- Updated kubernetes packages to v0.28.2
+- Updated golang version
 
 ## 2.1.2
 
