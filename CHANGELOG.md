@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+### bugfix
+- Make changelog.yml workflow run when labels change by @juanjjaramillo in [#301](https://github.com/newrelic/nri-kube-events/pull/301)
+- Add debugging information to the workflow by @juanjjaramillo in [#300](https://github.com/newrelic/nri-kube-events/pull/300)
+
 ## v2.2.2 - 2023-09-15
 
 ### 🐞 Bug fixes
