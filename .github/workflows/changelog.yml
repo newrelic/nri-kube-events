@@ -5,6 +5,7 @@ name: changelog
 
 on:
   pull_request:
+  label:
 
 jobs:
   changelog-entry:
