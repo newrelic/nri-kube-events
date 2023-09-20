@@ -64,7 +64,7 @@ jobs:
     needs: [ docker-integration ]
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
     # run only for releases (not prereleases)
     if: ${{ ! github.event.release.prerelease }}
