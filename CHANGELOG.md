@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+### bugfix
+- Update GITHUB_TOKEN permissions to allow for job to open a PR by @juanjjaramillo in [#303](https://github.com/newrelic/nri-kube-events/pull/303)
+
 ## v2.2.3 - 2023-09-20
 
 ### 🐞 Bug fixes
