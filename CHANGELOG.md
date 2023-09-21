@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+### bugfix
+
+- Update `GITHUB_TOKEN` permissions to allow for chart releasing by @juanjjaramillo in [#305](https://github.com/newrelic/nri-kube-events/pull/305)
+
 ## v2.2.6 - 2023-09-20
 
 ### 🐞 Bug fixes
