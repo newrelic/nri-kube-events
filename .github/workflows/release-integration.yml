@@ -1,0 +1,26 @@
+name: Pre-release and Release pipeline
+
+on:
+  release:
+    types: [prereleased, released]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  release-integration:
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: newrelic/k8s-metadata-injection/.github/workflows/release-integration-reusable.yml@main
+    with:
+      repo_name: nri-kube-events
+      artifact_path: bin/
+      docker_image_name: newrelic/nri-kube-events
+      chart_directory: charts/nri-kube-events
+    secrets:
+      dockerhub_username: ${{ secrets.FSI_DOCKERHUB_USERNAME }}
+      dockerhub_token: ${{ secrets.FSI_DOCKERHUB_TOKEN }}
+      gh_token: ${{ secrets.GITHUB_TOKEN }}
+      slack_channel: ${{ secrets.K8S_AGENTS_SLACK_CHANNEL }}
+      slack_token: ${{ secrets.K8S_AGENTS_SLACK_TOKEN }}
