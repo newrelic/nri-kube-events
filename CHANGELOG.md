@@ -7,8 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-### enhancement
+## v2.3.0 - 2023-09-28
 
+### 🚀 Enhancements
 - Improved CI pipeline for better reliability by @juanjjaramillo
 
 ## v2.2.7 - 2023-09-21
