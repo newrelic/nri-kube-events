@@ -11,9 +11,8 @@ on:
 
 jobs:
   trigger-prerelease:
-    uses: newrelic/coreint-automation/.github/workflows/trigger_prerelease.yaml@main
+    uses: newrelic/k8s-metadata-injection/.github/workflows/trigger-prerelease-reusable.yml@main
     with:
-      rt-included-files: go.mod,go.sum,build/Dockerfile
       bot_email: '${{ vars.K8S_AGENTS_BOT_EMAIL }}'
       bot_name: '${{ vars.K8S_AGENTS_BOT_NAME }}'
     secrets:
