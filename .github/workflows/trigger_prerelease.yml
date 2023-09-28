@@ -10,8 +10,8 @@ on:
     - cron: "0 12 * * 1" # Monday at 12pm UTC or 5am PT
 
 jobs:
-  prerelease:
-    uses: newrelic/coreint-automation/.github/workflows/trigger_prerelease.yaml@v1
+  trigger-prerelease:
+    uses: newrelic/coreint-automation/.github/workflows/trigger_prerelease.yaml@main
     with:
       rt-included-files: go.mod,go.sum,build/Dockerfile
       bot_email: '${{ vars.K8S_AGENTS_BOT_EMAIL }}'
