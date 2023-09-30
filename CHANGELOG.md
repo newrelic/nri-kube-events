@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+## v2.2.9 - 2023-09-30
+
+### ⛓️ Dependencies
+- Updated github.com/prometheus/client_model digest to baaa038
+- Updated alpine to v3.18.4
+- Updated github.com/prometheus/client_model digest
+
 ## v2.2.8 - 2023-09-29
 
 ### ⛓️ Dependencies
