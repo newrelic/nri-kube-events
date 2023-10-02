@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+## v2.2.10 - 2023-10-02
+
+### ⛓️ Dependencies
+- Updated github.com/prometheus/client_model digest to baaa038
+
 ## v2.2.9 - 2023-09-30
 
 ### ⛓️ Dependencies
