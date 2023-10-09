@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+## v2.2.11 - 2023-10-09
+
+### ⛓️ Dependencies
+- Updated github.com/prometheus/client_model to v0.5.0 - [Changelog 🔗](https://github.com/prometheus/client_model/releases/tag/v0.5.0)
+
 ## v2.2.10 - 2023-10-02
 
 ### ⛓️ Dependencies
