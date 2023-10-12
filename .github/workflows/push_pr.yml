@@ -150,7 +150,7 @@ jobs:
           kubernetes version: ${{ matrix.k8sVersion }}
           driver: docker
           github token: ${{ secrets.GITHUB_TOKEN }}
-          start args: "--nodes=2 --container-runtime=${{ matrix.cri }}"
+          start args: "--container-runtime=${{ matrix.cri }}"
       - name: Run e2e tests
         run: make test-integration
       - name: Download Image
