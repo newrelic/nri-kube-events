@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-### bugfix
+## v2.2.12 - 2023-10-16
+
+### 🐞 Bug fixes
 - Address CVE-2023-44487 and CVE-2023-39325 by juanjjaramillo in [#326](https://github.com/newrelic/nri-kube-events/pull/326)
 
 ## v2.2.11 - 2023-10-09
