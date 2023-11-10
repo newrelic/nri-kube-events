@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+### enhancement
+- Add full k8s support by @svetlanabrennan
+
 ## v2.3.0 - 2023-10-30
 
 ### 🚀 Enhancements
