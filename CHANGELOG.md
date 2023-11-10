@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## Unreleased
 
 ### enhancement
-- Replace k8s v1.28.0-rc.1 with k8s 1.28.3 support  by @svetlanabrennan in [#338](https://github.com/newrelic/nri-kube-events/pull/338)
+- Replace k8s v1.28.0-rc.1 with k8s 1.28.3 support by @svetlanabrennan in [#338](https://github.com/newrelic/nri-kube-events/pull/338)
 
 ## v2.3.0 - 2023-10-30
 
