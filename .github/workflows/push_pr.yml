@@ -151,7 +151,7 @@ jobs:
           driver: docker
           github token: ${{ secrets.GITHUB_TOKEN }}
           start args: "--container-runtime=${{ matrix.cri }}"
-      - name: Run e2e tests
+      - name: Run integreation tests
         run: make test-integration
       - name: Download Image
         uses: actions/download-artifact@v3
