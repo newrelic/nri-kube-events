@@ -1,0 +1,58 @@
+description: |
+  End-to-end tests for nri-kube-events
+
+custom_test_key: clusterName
+
+scenarios:
+  - description: |
+      This scenario will verify that metrics from a k8s Cluster are correctly collected.
+    before:
+      - helm dependency update ../charts/internal/e2e-resources
+      - helm dependency update ../charts/nri-kube-events
+      - helm upgrade --install ${SCENARIO_TAG}-resources --namespace nr-${SCENARIO_TAG} --create-namespace ../charts/internal/e2e-resources
+      - helm upgrade --install ${SCENARIO_TAG} --namespace nr-${SCENARIO_TAG} --create-namespace ../charts/nri-kube-events --values e2e-values.yml --set global.licenseKey=${LICENSE_KEY} --set global.cluster=${SCENARIO_TAG}
+    after:
+      - kubectl logs --selector app.kubernetes.io/name=nri-kube-events --namespace nr-${SCENARIO_TAG} --all-containers --prefix=true
+      - kubectl get pods --namespace nr-${SCENARIO_TAG}
+      - helm delete ${SCENARIO_TAG}-resources --namespace nr-${SCENARIO_TAG}
+      - helm delete ${SCENARIO_TAG} --namespace nr-${SCENARIO_TAG}
+    tests:
+      nrqls:
+        - query: FROM InfrastructureEvent SELECT latest(event.involvedObject.kind) AS 'Kind' WHERE category = 'kubernetes' AND event.type = 'Warning' AND event.metadata.namespace = 'nr-${SCENARIO_TAG}' AND event.involvedObject.name like '${SCENARIO_TAG}-resources-deployment-%'
+          expected_results:
+            - key: "Kind"
+              value: "Pod"
+        - query: FROM InfrastructureEvent SELECT latest(event.reason) AS 'Reason' WHERE category = 'kubernetes' AND event.type = 'Warning' AND event.metadata.namespace = 'nr-${SCENARIO_TAG}' AND event.involvedObject.name like '${SCENARIO_TAG}-resources-deployment-%'
+          expected_results:
+            - key: "Reason"
+              value: "BackOff"
+        - query: FROM InfrastructureEvent SELECT latest(event.count) AS 'Count' WHERE category = 'kubernetes' AND event.type = 'Warning' AND event.metadata.namespace = 'nr-${SCENARIO_TAG}' AND event.involvedObject.name like '${SCENARIO_TAG}-resources-deployment-%'
+          expected_results:
+            - key: "Count"
+              lowerBoundedValue: 1.0
+        - query: FROM InfrastructureEvent SELECT latest(event.involvedObject.apiVersion) AS 'API Version' WHERE category = 'kubernetes' AND event.type = 'Warning' AND event.metadata.namespace = 'nr-${SCENARIO_TAG}' AND event.involvedObject.name like '${SCENARIO_TAG}-resources-deployment-%'
+          expected_results:
+            - key: "API Version"
+              value: "v1"
+        - query: FROM InfrastructureEvent SELECT latest(event.involvedObject.fieldPath) AS 'Field Path' WHERE category = 'kubernetes' AND event.type = 'Warning' AND event.metadata.namespace = 'nr-${SCENARIO_TAG}' AND event.involvedObject.name like '${SCENARIO_TAG}-resources-deployment-%'
+          expected_results:
+            - key: "Field Path"
+              value: "spec.containers{failing-container}"
+        - query: FROM InfrastructureEvent SELECT latest(event.source.component) AS 'Component' WHERE category = 'kubernetes' AND event.type = 'Warning' AND event.metadata.namespace = 'nr-${SCENARIO_TAG}' AND event.involvedObject.name like '${SCENARIO_TAG}-resources-deployment-%'
+          expected_results:
+            - key: "Component"
+              value: "kubelet"
+        - query: FROM InfrastructureEvent SELECT latest(eventRouterVersion) AS 'Router Version' WHERE category = 'kubernetes' AND event.type = 'Warning' AND event.metadata.namespace = 'nr-${SCENARIO_TAG}' AND event.involvedObject.name like '${SCENARIO_TAG}-resources-deployment-%'
+          expected_results:
+            - key: "Router Version"
+              value: "dev"
+        - query: FROM InfrastructureEvent SELECT latest(integrationName) AS 'Integration Name' WHERE category = 'kubernetes' AND event.type = 'Warning' AND event.metadata.namespace = 'nr-${SCENARIO_TAG}' AND event.involvedObject.name like '${SCENARIO_TAG}-resources-deployment-%'
+          expected_results:
+            - key: "Integration Name"
+              value: "kube_events"
+        - query: FROM InfrastructureEvent SELECT latest(verb) AS 'Verb' WHERE category = 'kubernetes' AND event.type = 'Warning' AND event.metadata.namespace = 'nr-${SCENARIO_TAG}' AND event.involvedObject.name like '${SCENARIO_TAG}-resources-deployment-%'
+          expected_results:
+            - key: "Verb"
+              value: "UPDATE"
+      entities: []
+      metrics: []

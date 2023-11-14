@@ -1,0 +1,5 @@
+images:
+  integration:
+    repository: e2e/nri-kube-events
+    tag: e2e
+    pullPolicy: Never
