@@ -1,0 +1,7 @@
+# Deploy a dummy deployment
+deployment:
+  enabled: true
+
+# Variables for filesystem testing
+fileSystemTest:
+  fileName: 'pi.txt'

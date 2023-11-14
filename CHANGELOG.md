@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
+### enhancement
+- Create E2E resources Helm chart by @juanjjaramillo in [#341](https://github.com/newrelic/nri-kube-events/pull/341)
 
 ## v2.4.0 - 2023-11-13
 
