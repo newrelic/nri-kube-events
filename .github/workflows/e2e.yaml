@@ -9,6 +9,7 @@ on:
 
 jobs:
   e2eTests:
+    name: E2E Tests
     # Do not run e2e tests if PR has skip-e2e label
     if: ${{ ! contains(github.event.pull_request.labels.*.name, 'ci/skip-e2e') }}
     runs-on: ubuntu-latest
