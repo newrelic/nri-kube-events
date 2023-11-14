@@ -99,6 +99,9 @@ Cache check complete in 39.444528ms
 This might take up to a minute to start, but this should start the application
 in your Minikube cluster with 2 sinks enabled!
 
+### E2E Tests
+See the [E2E README](./e2e/README.md) for more details regarding running E2E tests.
+
 ## Configuration
 
 nri-kube-events uses a YAML file to configure the application. The structure is
