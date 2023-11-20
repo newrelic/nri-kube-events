@@ -6,7 +6,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
-### enhancement
+
+## v2.5.0 - 2023-11-20
+
+### 🚀 Enhancements
 - Create E2E workflow by @juanjjaramillo in [#343](https://github.com/newrelic/nri-kube-events/pull/343)
 - Create E2E tests by @juanjjaramillo in [#342](https://github.com/newrelic/nri-kube-events/pull/342)
 - Create E2E resources Helm chart by @juanjjaramillo in [#341](https://github.com/newrelic/nri-kube-events/pull/341)
