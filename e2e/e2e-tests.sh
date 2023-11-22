@@ -69,6 +69,7 @@ function parse_args() {
 
     if [[ totalArgs -lt 10 ]]; then
         help
+        exit 1
     fi
 }
 
