@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
+### enhancement
+- Trigger release creation by @juanjjaramillo [#351](https://github.com/newrelic/nri-kube-events/pull/351)
 
 ## v2.6.0 - 2023-12-06
 
