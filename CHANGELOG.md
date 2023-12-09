@@ -6,8 +6,15 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
-### enhancement
+
+## v2.7.0 - 2023-12-09
+
+### 🚀 Enhancements
 - Trigger release creation by @juanjjaramillo [#351](https://github.com/newrelic/nri-kube-events/pull/351)
+
+### ⛓️ Dependencies
+- Updated alpine to v3.19.0
+- Updated go to v1.21.5
 
 ## v2.6.0 - 2023-12-06
 
