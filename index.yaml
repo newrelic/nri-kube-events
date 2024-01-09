@@ -2,6 +2,48 @@ apiVersion: v1
 entries:
   nri-kube-events:
   - apiVersion: v2
+    appVersion: 2.7.2
+    created: "2024-01-09T00:44:21.634743913Z"
+    dependencies:
+    - name: common-library
+      repository: https://helm-charts.newrelic.com
+      version: 1.1.1
+    description: A Helm chart to deploy the New Relic Kube Events router
+    digest: d5294793abd786dca900e1de94ce11a34eeadd3f1a142876c6f12d826a8be637
+    home: https://docs.newrelic.com/docs/integrations/kubernetes-integration/kubernetes-events/install-kubernetes-events-integration
+    icon: https://newrelic.com/themes/custom/curio/assets/mediakit/NR_logo_Horizontal.svg
+    keywords:
+    - infrastructure
+    - newrelic
+    - monitoring
+    maintainers:
+    - name: nserrino
+      url: https://github.com/nserrino
+    - name: philkuz
+      url: https://github.com/philkuz
+    - name: htroisi
+      url: https://github.com/htroisi
+    - name: juanjjaramillo
+      url: https://github.com/juanjjaramillo
+    - name: svetlanabrennan
+      url: https://github.com/svetlanabrennan
+    - name: nrepai
+      url: https://github.com/nrepai
+    - name: csongnr
+      url: https://github.com/csongnr
+    - name: vuqtran88
+      url: https://github.com/vuqtran88
+    - name: xqi-nr
+      url: https://github.com/xqi-nr
+    name: nri-kube-events
+    sources:
+    - https://github.com/newrelic/nri-kube-events/
+    - https://github.com/newrelic/nri-kube-events/tree/main/charts/nri-kube-events
+    - https://github.com/newrelic/infrastructure-agent/
+    urls:
+    - https://github.com/newrelic/nri-kube-events/releases/download/nri-kube-events-3.7.2/nri-kube-events-3.7.2.tgz
+    version: 3.7.2
+  - apiVersion: v2
     appVersion: 2.7.1
     created: "2024-01-01T12:12:40.026087826Z"
     dependencies:
@@ -1387,4 +1429,4 @@ entries:
     urls:
     - https://github.com/newrelic/nri-kube-events/releases/download/nri-kube-events-1.14.0/nri-kube-events-1.14.0.tgz
     version: 1.14.0
-generated: "2024-01-01T12:12:40.026342781Z"
+generated: "2024-01-09T00:44:21.635068661Z"
