@@ -154,7 +154,7 @@ jobs:
       - name: Run integreation tests
         run: make test-integration
       - name: Download Image
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: nri-kube-events
       - name: Load image for chart testing
