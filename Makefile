@@ -2,7 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 INTEGRATION  = nri-kube-events
 DOCKER_IMAGE_NAME ?= newrelic/nri-kube-events
-BUILD_TARGET ?= bin/$(INTEGRATION)
+BIN_DIR = ./bin
+BUILD_TARGET ?= $(BIN_DIR)/$(INTEGRATION)
+TEST_COVERAGE_DIR := $(BIN_DIR)/test-coverage
 
 DATE := $(shell date)
 TAG ?= dev
@@ -16,7 +18,7 @@ build: clean test compile
 
 clean:
 	@echo "=== $(INTEGRATION) === [ clean ]: Removing binaries and coverage file..."
-	@rm -rfv bin
+	@rm -rfv $(BIN_DIR)
 
 fmt:
 	@echo "=== $(INTEGRATION) === [ fmt ]: Running Gofmt...."
@@ -29,7 +31,8 @@ compile:
 test: test-unit
 test-unit:
 	@echo "=== $(INTEGRATION) === [ test ]: Running unit tests..."
-	@go test -v -race ./...
+	@mkdir -p $(TEST_COVERAGE_DIR)
+	@go test ./... -v -count=1 -coverprofile=$(TEST_COVERAGE_DIR)/coverage.out -covermode=count
 
 test-integration:
 	@echo "=== $(INTEGRATION) === [ test ]: Running integration tests..."
