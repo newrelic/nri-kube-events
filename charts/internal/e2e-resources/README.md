@@ -9,8 +9,8 @@ This chart creates E2E resources for nri-kube-events.
 | Name | Email | Url |
 | ---- | ------ | --- |
 | juanjjaramillo |  | <https://github.com/juanjjaramillo> |
-| svetlanabrennan |  | <https://github.com/svetlanabrennan> |
 | csongnr |  | <https://github.com/csongnr> |
+| dbudziwojskiNR |  | <https://github.com/dbudziwojskiNR> |
 
 ## Values
 
