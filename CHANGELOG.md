@@ -6,7 +6,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
-### enhancement
+
+## v2.8.0 - 2024-02-05
+
+### 🚀 Enhancements
 - Add Codecov @dbudziwojskiNR [#364](https://github.com/newrelic/nri-kube-events/pull/364)
 
 ## v2.7.4 - 2024-01-29
