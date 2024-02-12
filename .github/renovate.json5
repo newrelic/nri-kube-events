@@ -2,17 +2,4 @@
   "extends": [
     "github>newrelic/k8s-agents-automation:renovate-base.json5"
   ],
-  "customManagers": [
-    {
-      "description": "Update Helm values",
-      "customType": "regex",
-      "fileMatch": [
-        "(^|/)values\.ya?ml$",
-      ],
-      "matchStrings": [
-        "\\s+repository: (?<depName>.+)\\s+tag: (?<currentValue>.+)",
-      ],
-      "datasourceTemplate": "docker",
-    },
-  ],
 }
