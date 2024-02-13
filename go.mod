@@ -3,7 +3,7 @@ module github.com/newrelic/nri-kube-events
 go 1.21.6
 
 require (
-	github.com/newrelic/infra-integrations-sdk v3.8.0+incompatible
+	github.com/newrelic/infra-integrations-sdk v3.8.1+incompatible
 	github.com/prometheus/client_golang v1.18.0
 	github.com/prometheus/client_model v0.5.0
 	github.com/sethgrid/pester v1.2.0
