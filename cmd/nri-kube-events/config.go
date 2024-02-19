@@ -23,6 +23,9 @@ type config struct {
 	CaptureEvents   *bool          `yaml:"captureEvents"`
 	CaptureDescribe *bool          `yaml:"captureDescribe"`
 	DescribeRefresh *time.Duration `yaml:"describeRefresh"`
+
+	ExcludeEventsFilter   []string `yaml:"excludeEventsFilter"`
+	ExcludeDescribeFilter []string `yaml:"excludeDescribeFilter"`
 }
 
 func loadConfig(file io.Reader) (config, error) {

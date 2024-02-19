@@ -117,7 +117,7 @@ func TestNewRouter(t *testing.T) {
 				On("AddEventHandler", mock.AnythingOfType("cache.ResourceEventHandlerFuncs")).
 				Once()
 
-			r := NewRouter(tt.args.informer, tt.args.handlers)
+			r := NewRouter(tt.args.informer, tt.args.handlers, []string{})
 			assert.NotNil(t, r)
 			tt.assert(t, tt.args, r)
 			tt.args.informer.AssertExpectations(t)
@@ -169,7 +169,7 @@ func TestRouter_Run(t *testing.T) {
 		"stub": stubSink,
 	}
 
-	r := NewRouter(informer, handlers)
+	r := NewRouter(informer, handlers, []string{})
 	stopChan := make(chan struct{})
 
 	wg := sync.WaitGroup{}
@@ -208,7 +208,7 @@ func TestRouter_RunError(t *testing.T) {
 		"stub": stubSink,
 	}
 
-	r := NewRouter(informer, handlers)
+	r := NewRouter(informer, handlers, []string{})
 	stopChan := make(chan struct{})
 
 	wg := sync.WaitGroup{}
@@ -241,4 +241,115 @@ func TestRouter_RunError(t *testing.T) {
 	assert.NoError(t, c.Write(&m))
 	expCnt := float64(1)
 	assert.Equal(t, expCnt, *m.Counter.Value)
+}
+
+func TestRouter_FilterEvent(t *testing.T) {
+	testCases := []struct {
+		name           string
+		event          *v1.Event
+		exludeFilter   []string
+		expectedCalled bool
+	}{
+		{
+			name: "No filter",
+			event: &v1.Event{
+				Action: "Some old action",
+			},
+			exludeFilter:   []string{},
+			expectedCalled: true,
+		},
+		{
+			name: "Filter",
+			event: &v1.Event{
+				Action: "Some old action",
+			},
+			exludeFilter:   []string{"e.Action == 'Some old action'"},
+			expectedCalled: false,
+		},
+		{
+			name: "Filter not matching",
+			event: &v1.Event{
+				Action: "Some old action",
+			},
+			exludeFilter:   []string{"e.Action == 'Some new action'"},
+			expectedCalled: true,
+		},
+		{
+			name: "Multiple filters",
+			event: &v1.Event{
+				Action: "Some old action",
+			},
+			exludeFilter:   []string{"e.Action == 'Some old action'", "e.Action == 'Some new action'"},
+			expectedCalled: false,
+		},
+		{
+			name: "Multiple filters not matching",
+			event: &v1.Event{
+				Action: "Some old action",
+			},
+			exludeFilter:   []string{"e.Action == 'Some new action'", "e.Action == 'Some newer action'"},
+			expectedCalled: true,
+		},
+		{
+			name: "Multiple filters matching",
+			event: &v1.Event{
+				Action: "Some old action",
+			},
+			exludeFilter:   []string{"e.Action == 'Some old action'", "e.Action == 'Some old action'"},
+			expectedCalled: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			informer := new(MockSharedIndexInformer)
+			informer.SetupMock()
+			stubSink := new(stubSink)
+			handlers := map[string]EventHandler{
+				"stub": stubSink,
+			}
+			r := NewRouter(informer, handlers, tc.exludeFilter)
+
+			stopChan := make(chan struct{})
+
+			ke := tc.event
+
+			go func() {
+				r.workQueue <- common.KubeEvent{
+					Event: ke,
+				}
+			}()
+
+			//sleep for a bit to allow the worker to process the event
+			time.Sleep(3 * time.Second)
+
+			if tc.expectedCalled {
+				stubSink.On("HandleEvent", mock.AnythingOfType("KubeEvent")).Run(func(args mock.Arguments) {
+					defer close(stopChan)
+				}).Return(nil).Once()
+
+				wg := sync.WaitGroup{}
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					r.Run(stopChan)
+				}()
+
+				wg.Wait()
+				stubSink.AssertExpectations(t)
+
+			} else {
+				wg := sync.WaitGroup{}
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					time.Sleep(2 * time.Second)
+					close(stopChan)
+				}()
+
+				wg.Wait()
+				stubSink.AssertNotCalled(t, "HandleEvent")
+			}
+		})
+	}
 }
