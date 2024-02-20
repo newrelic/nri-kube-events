@@ -83,6 +83,7 @@ tests:
   - it: has a linux node selector by default
     set:
       cluster: my-cluster
+      licenseKey: us-whatever
     asserts:
       - equal:
           path: spec.template.spec.nodeSelector
@@ -92,6 +93,7 @@ tests:
   - it: has a linux node selector and additional selectors
     set:
       cluster: my-cluster
+      licenseKey: us-whatever
       nodeSelector:
         aCoolTestLabel: aCoolTestValue
     asserts:
