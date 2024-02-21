@@ -21,3 +21,5 @@ data:
     captureDescribe: {{ .Values.scrapers.descriptions.enabled }}
     describeRefresh: {{ .Values.scrapers.descriptions.resyncPeriod | default "24h" }}
     captureEvents: {{ .Values.scrapers.events.enabled }}
+    excludeEventsFilter: {{ .Values.scrapers.events.excludeFilter }}
+    excludeDescribeFilter: {{ .Values.scrapers.descriptions.excludeFilter }}

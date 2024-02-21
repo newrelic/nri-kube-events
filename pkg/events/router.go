@@ -120,7 +120,7 @@ func NewRouter(informer cache.SharedIndexInformer, handlers map[string]EventHand
 	var programms []*vm.Program
 
 	for _, filter := range filters {
-		program, err := expr.Compile(filter, expr.Env(env))
+		program, err := expr.Compile(filter, expr.Env(env), expr.AsBool())
 		if err != nil {
 			logrus.Fatalf("could not compile expression: %v", err)
 		}
