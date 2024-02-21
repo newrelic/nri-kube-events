@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
+### enhancement
+- Add linux node selector @dbudziwojskiNR [#378](https://github.com/newrelic/nri-kube-events/pull/378)
 
 ## v2.8.2 - 2024-02-19
 
