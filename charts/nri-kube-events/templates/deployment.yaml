@@ -42,7 +42,15 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           {{- end }}
-          args: ["-config", "/app/config/config.yaml", "-loglevel", "debug"]
+          args: 
+            - "-config"
+            - "/app/config/config.yaml"
+            - "-loglevel"
+            {{- if .Values.verboseLog }}
+            - "debug"
+            {{- else }}
+            - "info"
+            {{- end }}
           volumeMounts:
             - name: config-volume
               mountPath: /app/config
