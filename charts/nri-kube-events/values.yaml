@@ -34,7 +34,8 @@ images:
   # - name: regsecret
 
 # -- Resources for the integration container
-resources: {}
+resources:
+  {}
   # limits:
   #   cpu: 100m
   #   memory: 128Mi
@@ -44,7 +45,8 @@ resources: {}
 
 # -- Resources for the forwarder sidecar container
 forwarder:
-  resources: {}
+  resources:
+    {}
     # limits:
     #   cpu: 100m
     #   memory: 128Mi
@@ -94,8 +96,10 @@ scrapers:
   descriptions:
     enabled: true
     resyncPeriod: "24h"
+    excludeFilter: []
   events:
     enabled: true
+    excludeFilter: []
 
 # -- Sets pod's priorityClassName. Can be configured also with `global.priorityClassName`
 priorityClassName: ""
