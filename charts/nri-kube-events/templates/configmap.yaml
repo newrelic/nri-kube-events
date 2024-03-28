@@ -21,5 +21,9 @@ data:
     captureDescribe: {{ .Values.scrapers.descriptions.enabled }}
     describeRefresh: {{ .Values.scrapers.descriptions.resyncPeriod | default "24h" }}
     captureEvents: {{ .Values.scrapers.events.enabled }}
-    excludeEventsFilter: {{ .Values.scrapers.events.excludeFilter }}
-    excludeDescribeFilter: {{ .Values.scrapers.descriptions.excludeFilter }}
+    {{- if .Values.scrapers.events.excludeFilter }}
+    excludeEventsFilter: {{ toYaml .Values.scrapers.events.excludeFilter | nindent 6 }}
+    {{- end }}
+    {{- if .Values.scrapers.descriptions.excludeFilter }}
+    excludeDescribeFilter: {{ toYaml .Values.scrapers.descriptions.excludeFilter | nindent 6 }}
+    {{- end }}
