@@ -20,6 +20,7 @@ spec:
         {{- toYaml .Values.podAnnotations | nindent 8}}
       {{- end }}
       labels:
+        config-hash: {{ toJson .Values | sha256sum | trunc 10 }}
         {{- include "newrelic.common.labels.podLabels" . | nindent 8 }}
     spec:
       {{- with include "nri-kube-events.compatibility.images.renderPullSecrets" . }}
@@ -42,7 +43,15 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           {{- end }}
-          args: ["-config", "/app/config/config.yaml", "-loglevel", "debug"]
+          args: 
+            - "-config"
+            - "/app/config/config.yaml"
+            - "-loglevel"
+            {{- if .Values.verboseLog }}
+            - "debug"
+            {{- else }}
+            - "info"
+            {{- end }}
           volumeMounts:
             - name: config-volume
               mountPath: /app/config

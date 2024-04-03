@@ -6,6 +6,8 @@ package events
 import (
 	"time"
 
+	"github.com/expr-lang/expr"
+	"github.com/expr-lang/expr/vm"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/sirupsen/logrus"
@@ -49,6 +51,9 @@ type Router struct {
 
 	// all updates & adds will be appended to this queue
 	workQueue chan common.KubeEvent
+
+	// all events will be filtered by this list of filters
+	excludeFilterProgramms []*vm.Program
 }
 
 type observedEventHandler struct {
@@ -65,7 +70,7 @@ func (o *observedEventHandler) HandleEvent(kubeEvent common.KubeEvent) error {
 
 // NewRouter returns a new Router which listens to the given SharedIndexInformer,
 // and forwards all incoming events to the given sinks
-func NewRouter(informer cache.SharedIndexInformer, handlers map[string]EventHandler, opts ...router.ConfigOption) *Router {
+func NewRouter(informer cache.SharedIndexInformer, handlers map[string]EventHandler, filters []string, opts ...router.ConfigOption) *Router {
 	config, err := router.NewConfig(opts...)
 	if err != nil {
 		logrus.Fatalf("Error with Router configuration: %v", err)
@@ -106,9 +111,26 @@ func NewRouter(informer cache.SharedIndexInformer, handlers map[string]EventHand
 		}
 	}
 
+	env := map[string]interface{}{
+		"e":    v1.Event{},
+		"old":  v1.Event{},
+		"verb": "",
+	}
+
+	var programms []*vm.Program
+
+	for _, filter := range filters {
+		program, err := expr.Compile(filter, expr.Env(env), expr.AsBool())
+		if err != nil {
+			logrus.Fatalf("could not compile expression: %v", err)
+		}
+		programms = append(programms, program)
+	}
+
 	return instrument(&Router{
-		handlers:  observedSinks,
-		workQueue: workQueue,
+		handlers:               observedSinks,
+		excludeFilterProgramms: programms,
+		workQueue:              workQueue,
 	})
 }
 
@@ -147,6 +169,11 @@ func (r *Router) Run(stopChan <-chan struct{}) {
 }
 
 func (r *Router) publishEvent(kubeEvent common.KubeEvent) {
+	if r.FilterEvent(kubeEvent) {
+		logrus.Debugf("Filtered event: %v", kubeEvent)
+		return
+	}
+
 	for name, handler := range r.handlers {
 		eventsReceivedTotal.WithLabelValues(name).Inc()
 
@@ -155,4 +182,23 @@ func (r *Router) publishEvent(kubeEvent common.KubeEvent) {
 			eventsFailuresTotal.WithLabelValues(name).Inc()
 		}
 	}
+}
+
+func (r *Router) FilterEvent(event common.KubeEvent) bool {
+	env := map[string]interface{}{
+		"e":    event.Event,
+		"old":  event.OldEvent,
+		"verb": event.Verb,
+	}
+	for _, program := range r.excludeFilterProgramms {
+		output, err := expr.Run(program, env)
+		if err != nil {
+			logrus.Fatalf("could not run expression: %v", err)
+		}
+
+		if output.(bool) {
+			return true
+		}
+	}
+	return false
 }

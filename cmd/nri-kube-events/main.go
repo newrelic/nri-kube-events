@@ -74,7 +74,8 @@ func main() {
 			activeEventHandlers[name] = sink
 		}
 
-		eventRouter := events.NewRouter(eventsInformer, activeEventHandlers, opts...)
+		excludeFilter := cfg.ExcludeEventsFilter
+		eventRouter := events.NewRouter(eventsInformer, activeEventHandlers, excludeFilter, opts...)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -94,7 +95,8 @@ func main() {
 			activeObjectHandlers[name] = sink
 		}
 
-		descRouter := descriptions.NewRouter(resourceInformers, activeObjectHandlers, opts...)
+		excludeFilter := cfg.ExcludeDescribeFilter
+		descRouter := descriptions.NewRouter(resourceInformers, activeObjectHandlers, excludeFilter, opts...)
 
 		wg.Add(1)
 		go func() {
