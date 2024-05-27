@@ -1,6 +1,6 @@
 module github.com/newrelic/nri-kube-events
 
-go 1.22.2
+go 1.22.3
 
 require (
 	github.com/newrelic/infra-integrations-sdk v3.8.2+incompatible
