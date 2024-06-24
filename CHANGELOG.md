@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-### enhancement
+## v2.10.0 - 2024-06-24
+
+### 🚀 Enhancements
 - Add 1.29 and 1.30 support and drop 1.25 and 1.24 @dbudziwojskiNR [#409](https://github.com/newrelic/nri-kube-events/pull/409)
+
+### ⛓️ Dependencies
+- Updated alpine to v3.20.1
 
 ## v2.9.10 - 2024-06-17
 
