@@ -25,7 +25,7 @@ RUN go build \
     -ldflags="-X 'main.integrationVersion=${TAG}' -X 'main.gitCommit=${COMMIT}' -X 'main.buildDate=${DATE}'" \
     -o bin/nri-kube-events ./cmd/nri-kube-events
 
-FROM alpine:3.20.1
+FROM alpine:3.20.2
 WORKDIR /app
 
 RUN apk add --no-cache --upgrade \
