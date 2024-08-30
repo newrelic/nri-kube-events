@@ -69,7 +69,7 @@ jobs:
           fi
 
       - name: Run E2E tests
-        uses: newrelic/newrelic-integration-e2e-action@a97ced80a4841c8c6261d1f9dca6706b1d89acb1 # v1.11.0
+        uses: newrelic/newrelic-integration-e2e-action@fd53fc95e287dcd7b5bd86a4a25d653aadf407d0 # v1.11.1
         env:
           EXCEPTIONS_SOURCE_FILE: ${{ steps.exceptions-version.outputs.exceptions }}-exceptions.yml
         with:
