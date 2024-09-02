@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+## v2.10.5 - 2024-09-02
+
+### ⛓️ Dependencies
+- Updated golang version
+- Updated kubernetes packages to v0.31.0
+- Updated github.com/prometheus/client_golang to v1.20.2 - [Changelog 🔗](https://github.com/prometheus/client_golang/releases/tag/v1.20.2)
+
 ## v2.10.4 - 2024-08-19
 
 ### ⛓️ Dependencies
