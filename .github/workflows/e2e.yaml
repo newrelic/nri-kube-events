@@ -29,9 +29,9 @@ jobs:
           go-version-file: 'go.mod'
 
       - name: Setup Minikube
-        uses: manusa/actions-setup-minikube@92af4db914ab207f837251cd53eb7060e6477614 # v2.11.0
+        uses: manusa/actions-setup-minikube@a4e4e6a9358e4716d1398048e11660975c35dc54 # v2.12.0
         with:
-          minikube version: v1.33.1
+          minikube version: v1.34.0
           kubernetes version: ${{ matrix.k8sVersion }}
           driver: docker
           start args: "--container-runtime=${{ matrix.cri }}"
