@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## v2.11.0 - 2024-10-17
 
 ### 🚀 Enhancements
-- Add 1.31 support and drop 1.26 @zeitlerc [#444](https://github.com/newrelic/nri-kube-events/pull/444)
+- Add 1.31 support and drop 1.26 @zeitlerc [#434](https://github.com/newrelic/nri-kube-events/pull/434)
 
 ## v2.10.8 - 2024-10-07
 
