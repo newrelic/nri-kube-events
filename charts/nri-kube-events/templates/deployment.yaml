@@ -20,7 +20,7 @@ spec:
         {{- toYaml .Values.podAnnotations | nindent 8}}
       {{- end }}
       labels:
-        config-hash: {{ toJson .Values | sha256sum | quote }}
+        config-hash: {{ toJson .Values | sha256sum | trunc 50 | quote }}
         {{- include "newrelic.common.labels.podLabels" . | nindent 8 }}
     spec:
       {{- with include "nri-kube-events.compatibility.images.renderPullSecrets" . }}
