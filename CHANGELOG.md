@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+### enhancement
+- Update and clean linters @dbudziwojskiNR [#441](https://github.com/newrelic/nri-kube-events/pull/441)
+
 ## v2.11.1 - 2024-11-04
 
 ### ⛓️ Dependencies
