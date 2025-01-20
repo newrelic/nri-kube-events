@@ -2,6 +2,36 @@ apiVersion: v1
 entries:
   nri-kube-events:
   - apiVersion: v2
+    appVersion: 2.11.6
+    created: "2025-01-20T12:14:43.796961456Z"
+    dependencies:
+    - name: common-library
+      repository: https://helm-charts.newrelic.com
+      version: 1.3.1
+    description: A Helm chart to deploy the New Relic Kube Events router
+    digest: 710174624b4b967e5e36ea630b659da0e37a4255e89f15f93fef7295264a84d6
+    home: https://docs.newrelic.com/docs/integrations/kubernetes-integration/kubernetes-events/install-kubernetes-events-integration
+    icon: https://newrelic.com/themes/custom/curio/assets/mediakit/NR_logo_Horizontal.svg
+    keywords:
+    - infrastructure
+    - newrelic
+    - monitoring
+    maintainers:
+    - name: juanjjaramillo
+      url: https://github.com/juanjjaramillo
+    - name: csongnr
+      url: https://github.com/csongnr
+    - name: dbudziwojskiNR
+      url: https://github.com/dbudziwojskiNR
+    name: nri-kube-events
+    sources:
+    - https://github.com/newrelic/nri-kube-events/
+    - https://github.com/newrelic/nri-kube-events/tree/main/charts/nri-kube-events
+    - https://github.com/newrelic/infrastructure-agent/
+    urls:
+    - https://github.com/newrelic/nri-kube-events/releases/download/nri-kube-events-3.11.6/nri-kube-events-3.11.6.tgz
+    version: 3.11.6
+  - apiVersion: v2
     appVersion: 2.11.5
     created: "2025-01-13T12:15:40.265093448Z"
     dependencies:
@@ -2413,4 +2443,4 @@ entries:
     urls:
     - https://github.com/newrelic/nri-kube-events/releases/download/nri-kube-events-1.14.0/nri-kube-events-1.14.0.tgz
     version: 1.14.0
-generated: "2025-01-13T12:15:40.265297423Z"
+generated: "2025-01-20T12:14:43.79717162Z"
