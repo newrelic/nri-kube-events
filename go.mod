@@ -10,12 +10,12 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.32.1
-	k8s.io/apimachinery v0.32.1
-	k8s.io/client-go v0.32.1
+	k8s.io/api v0.32.2
+	k8s.io/apimachinery v0.32.2
+	k8s.io/client-go v0.32.2
 	// Remove the replace directives at the bottom of this file
 	// when upgrading to v0.28 or above
-	k8s.io/kubectl v0.32.1
+	k8s.io/kubectl v0.32.2
 )
 
 require (
@@ -72,7 +72,7 @@ require (
 	google.golang.org/protobuf v1.36.1 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	k8s.io/cli-runtime v0.32.1 // indirect
+	k8s.io/cli-runtime v0.32.2 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f // indirect
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 // indirect
@@ -87,6 +87,6 @@ require (
 // We need a kubectl release that includes https://github.com/kubernetes/kubectl/commit/4bd3f1b03dacd034c35d9b7f188e0c5bacf91fad
 // The apimachinery replacement is for compatibility with the given kubectl version.
 replace (
-	k8s.io/apimachinery => k8s.io/apimachinery v0.32.1
-	k8s.io/kubectl => k8s.io/kubectl v0.32.1
+	k8s.io/apimachinery => k8s.io/apimachinery v0.32.2
+	k8s.io/kubectl => k8s.io/kubectl v0.32.2
 )
