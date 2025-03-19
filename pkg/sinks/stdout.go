@@ -29,7 +29,7 @@ func (stdoutSink) HandleEvent(event common.KubeEvent) error {
 		return fmt.Errorf("stdoutSink: could not marshal event: %w", err)
 	}
 
-	logrus.Infof(string(b))
+	logrus.Info(string(b))
 	return nil
 }
 
@@ -40,6 +40,6 @@ func (stdoutSink) HandleObject(object common.KubeObject) error {
 		return fmt.Errorf("stdoutSink: could not marshal object: %w", err)
 	}
 
-	logrus.Infof(string(b))
+	logrus.Info(string(b))
 	return nil
 }
