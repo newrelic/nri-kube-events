@@ -152,6 +152,11 @@ func Test_Sink_receives_common_Pod_creation_events(t *testing.T) {
 		t.Fatalf("Event was not captured")
 	}
 
+	// TODO(kpattaswamy): Once the latest 5 versions of Kubernetes contain the same container creation
+	// events, we should move this logic back up.
+	// For context, as of version 1.32 in Kubernetes, the event summary and event message contain a colon after
+	// the word "container". Since these tests aim to provide coverage across the latest 5 versions of
+	// Kubernetes, we check to see if either an older or newer container creation evevnt exist in the agent.
 	pre1dot32CreateEvent := sdkEvent.Event{
 		Summary:  "Created container " + testpod.Spec.Containers[0].Name,
 		Category: "kubernetes",
