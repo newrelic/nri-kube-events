@@ -58,7 +58,7 @@ jobs:
           echo "exceptions=$MINOR" >> $GITHUB_OUTPUT
 
       - name: Run E2E tests
-        uses: newrelic/newrelic-integration-e2e-action@fd53fc95e287dcd7b5bd86a4a25d653aadf407d0 # v1.11.1
+        uses: newrelic/newrelic-integration-e2e-action@c548a33a0c2941a4db4899ded766923eb3178e0e # v1.12.0
         env:
           EXCEPTIONS_SOURCE_FILE: ${{ steps.exceptions-version.outputs.exceptions }}-exceptions.yml
         with:
