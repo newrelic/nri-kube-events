@@ -1,28 +1,6 @@
-run:
-  timeout: 5m
-
-linters-settings:
-  dupl:
-    threshold: 100
-  goimports:
-    local-prefixes: github.com/newrelic/nri-kube-events
-  gocyclo:
-    min-complexity: 20
-  mnd:
-    checks:
-      - argument
-      - case
-      - condition
-      - return
-  govet:
-    enable:
-      - shadow
-      - fieldalignment
-  misspell:
-    locale: US
-
+version: "2"
 linters:
-  disable-all: true
+  default: none
   enable:
     - bodyclose
     - copyloopvar
@@ -35,11 +13,8 @@ linters:
     - gocognit
     - gocritic
     - gocyclo
-    - gofmt
-    - goimports
     - goprintffuncname
     - gosec
-    - gosimple
     - govet
     - ineffassign
     - misspell
@@ -51,9 +26,49 @@ linters:
     - revive
     - rowserrcheck
     - staticcheck
-    - stylecheck
-    - typecheck
     - unconvert
     - unparam
     - unused
     - whitespace
+  settings:
+    dupl:
+      threshold: 100
+    gocyclo:
+      min-complexity: 20
+    govet:
+      enable:
+        - shadow
+        - fieldalignment
+    misspell:
+      locale: US
+    mnd:
+      checks:
+        - argument
+        - case
+        - condition
+        - return
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/newrelic/nri-kube-events
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
