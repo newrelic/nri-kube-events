@@ -74,6 +74,9 @@ Options that can be defined globally include `affinity`, `nodeSelector`, `tolera
 
 ## Maintainers
 
-* [juanjjaramillo](https://github.com/juanjjaramillo)
-* [csongnr](https://github.com/csongnr)
+* [danielstokes](https://github.com/danielstokes)
 * [dbudziwojskiNR](https://github.com/dbudziwojskiNR)
+* [kondracek-nr](https://github.com/kondracek-nr)
+* [kpattaswamy](https://github.com/kpattaswamy)
+* [Philip-R-Beckwith](https://github.com/Philip-R-Beckwith)
+* [TmNguyen12](https://github.com/TmNguyen12)
