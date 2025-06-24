@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.24.4-alpine3.22 AS build
 
 # Set by docker automatically
 ARG TARGETOS TARGETARCH
@@ -25,7 +25,7 @@ RUN go build \
     -ldflags="-X 'main.integrationVersion=${TAG}' -X 'main.gitCommit=${COMMIT}' -X 'main.buildDate=${DATE}'" \
     -o bin/nri-kube-events ./cmd/nri-kube-events
 
-FROM alpine:3.21.3
+FROM alpine:3.22.0
 WORKDIR /app
 
 RUN apk add --no-cache --upgrade \
