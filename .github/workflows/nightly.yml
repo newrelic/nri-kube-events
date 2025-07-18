@@ -8,6 +8,9 @@ on:
       - master
       - main
 
+permissions:
+  contents: read
+
 env:
   ORIGINAL_REPO_NAME: ${{ github.event.repository.full_name }}
 
