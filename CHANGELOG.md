@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+### enhancement
+- Improve stability of GHAs @dbudziwojskiNR [#488](https://github.com/newrelic/nri-kube-events/pull/488)
+
 ## v2.13.4 - 2025-07-21
 
 ### ⛓️ Dependencies
