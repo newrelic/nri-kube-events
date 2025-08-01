@@ -37,6 +37,7 @@ jobs:
           minikube version: v1.36.0
           kubernetes version: ${{ matrix.k8sVersion }}
           driver: docker
+          github token: ${{ secrets.GITHUB_TOKEN }}
           start args: "--container-runtime=${{ matrix.cri }}"
 
       - name: Build and load Images
