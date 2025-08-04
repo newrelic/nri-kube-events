@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-### enhancement
+## v2.14.0 - 2025-08-04
+
+### 🚀 Enhancements
 - Improve stability of GHAs @dbudziwojskiNR [#488](https://github.com/newrelic/nri-kube-events/pull/488)
+
+### ⛓️ Dependencies
+- Updated github.com/prometheus/client_golang to v1.23.0 - [Changelog 🔗](https://github.com/prometheus/client_golang/releases/tag/v1.23.0)
+- Updated kubernetes packages to v0.33.3
 
 ## v2.13.4 - 2025-07-21
 
