@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+### enhancement
+- Add v1.33 support and drop support for v1.28 @TmNguyen12
+
 ## v2.14.0 - 2025-08-04
 
 ### 🚀 Enhancements
