@@ -145,7 +145,7 @@ jobs:
       max-parallel: 5
       fail-fast: false
       matrix:
-        k8sVersion: ["v.1.33.0", "v1.32.0", "v1.31.0", "v1.30.0", "v1.29.5"]
+        k8sVersion: ["v1.33.0", "v1.32.0", "v1.31.0", "v1.30.0", "v1.29.5"]
         cri: [ containerd ]
     steps:
       - uses: actions/checkout@v4
