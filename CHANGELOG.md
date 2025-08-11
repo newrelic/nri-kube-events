@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-### enhancement
+## v2.15.0 - 2025-08-11
+
+### 🚀 Enhancements
 - Add v1.33 support and drop support for v1.28 @TmNguyen12 [#492](https://github.com/newrelic/nri-kube-events/pull/492)
 
 ## v2.14.0 - 2025-08-04
