@@ -173,7 +173,7 @@ jobs:
           minikube image load nri-kube-events.tar
           minikube image ls
           kubectl create ns ct
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
       - uses: helm/chart-testing-action@v2.7.0
