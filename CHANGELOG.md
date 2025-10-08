@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+### enhancement
+- Add support for k8s v1.34.0, remove support for v1.29.5 @TmNguyen12 []()
+
 ## v2.15.2 - 2025-09-15
 
 ### ⛓️ Dependencies
