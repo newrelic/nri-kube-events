@@ -13,8 +13,6 @@ require (
 	k8s.io/api v0.34.1
 	k8s.io/apimachinery v0.34.1
 	k8s.io/client-go v0.34.1
-	// Remove the replace directives at the bottom of this file
-	// when upgrading to v0.28 or above
 	k8s.io/kubectl v0.34.1
 )
 
@@ -82,11 +80,3 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
-
-// These can be removed once kubectl v0.28 or above is released
-// We need a kubectl release that includes https://github.com/kubernetes/kubectl/commit/4bd3f1b03dacd034c35d9b7f188e0c5bacf91fad
-// The apimachinery replacement is for compatibility with the given kubectl version.
-// replace (
-// 	k8s.io/apimachinery => k8s.io/apimachinery v0.33.3
-// 	k8s.io/kubectl => k8s.io/kubectl v0.33.3
-// )
