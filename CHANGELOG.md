@@ -7,11 +7,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-### enhancement
-- Add support for k8s v1.34.0, remove support for v1.29.5 @TmNguyen12 [#505](https://github.com/newrelic/nri-kube-events/pull/505)
+## v2.16.0 - 2025-10-13
 
 ### dependency
 - Upgrade k8s.io/api, apimachinery, client-go, kubectl to v0.34.1 @TmNguyen12 [#505](https://github.com/newrelic/nri-kube-events/pull/505)
+
+### 🚀 Enhancements
+- Add support for k8s v1.34.0, remove support for v1.29.5 @TmNguyen12 [#505](https://github.com/newrelic/nri-kube-events/pull/505)
+
+### ⛓️ Dependencies
+- Updated alpine to v3.22.2
 
 ## v2.15.2 - 2025-09-15
 
