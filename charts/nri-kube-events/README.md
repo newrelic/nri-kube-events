@@ -34,42 +34,42 @@ Options that can be defined globally include `affinity`, `nodeSelector`, `tolera
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| affinity | object | `{}` | Sets pod/node affinities. Can be configured also with `global.affinity` |
-| agentHTTPTimeout | string | `"30s"` | Amount of time to wait until timeout to send metrics to the metric forwarder |
-| cluster | string | `""` | Name of the Kubernetes cluster monitored. Mandatory. Can be configured also with `global.cluster` |
-| containerSecurityContext | object | `{}` | Sets security context (at container level). Can be configured also with `global.containerSecurityContext` |
-| customAttributes | object | `{}` | Adds extra attributes to the cluster and all the metrics emitted to the backend. Can be configured also with `global.customAttributes` |
-| customSecretLicenseKey | string | `""` | In case you don't want to have the license key in you values, this allows you to point to which secret key is the license key located. Can be configured also with `global.customSecretLicenseKey` |
-| customSecretName | string | `""` | In case you don't want to have the license key in you values, this allows you to point to a user created secret to get the key from there. Can be configured also with `global.customSecretName` |
-| deployment.annotations | object | `{}` | Annotations to add to the Deployment. |
-| dnsConfig | object | `{}` | Sets pod's dnsConfig. Can be configured also with `global.dnsConfig` |
-| fedramp.enabled | bool | `false` | Enables FedRAMP. Can be configured also with `global.fedramp.enabled` |
-| forwarder | object | `{"resources":{}}` | Resources for the forwarder sidecar container |
-| fullnameOverride | string | `""` | Override the full name of the release |
-| hostNetwork | bool | `false` | Sets pod's hostNetwork. Can be configured also with `global.hostNetwork` |
-| images | object | See `values.yaml` | Images used by the chart for the integration and agents |
-| images.agent | object | See `values.yaml` | Image for the New Relic Infrastructure Agent sidecar |
-| images.integration | object | See `values.yaml` | Image for the New Relic Kubernetes integration |
-| images.pullSecrets | list | `[]` | The secrets that are needed to pull images from a custom registry. |
-| labels | object | `{}` | Additional labels for chart objects |
-| licenseKey | string | `""` | This set this license key to use. Can be configured also with `global.licenseKey` |
 | nameOverride | string | `""` | Override the name of the chart |
-| nodeSelector | object | `{}` | Sets pod's node selector. Can be configured also with `global.nodeSelector` |
-| nrStaging | bool | `false` | Send the metrics to the staging backend. Requires a valid staging license key. Can be configured also with `global.nrStaging` |
-| podAnnotations | object | `{}` | Annotations to add to the pod. |
-| podLabels | object | `{}` | Additional labels for chart pods |
-| podSecurityContext | object | `{}` | Sets security context (at pod level). Can be configured also with `global.podSecurityContext` |
-| priorityClassName | string | `""` | Sets pod's priorityClassName. Can be configured also with `global.priorityClassName` |
-| proxy | string | `""` | Configures the integration to send all HTTP/HTTPS request through the proxy in that URL. The URL should have a standard format like `https://user:password@hostname:port`. Can be configured also with `global.proxy` |
+| fullnameOverride | string | `""` | Override the full name of the release |
+| cluster | string | `""` | Name of the Kubernetes cluster monitored. Mandatory. Can be configured also with `global.cluster` |
+| licenseKey | string | `""` | This set this license key to use. Can be configured also with `global.licenseKey` |
+| customSecretName | string | `""` | In case you don't want to have the license key in you values, this allows you to point to a user created secret to get the key from there. Can be configured also with `global.customSecretName` |
+| customSecretLicenseKey | string | `""` | In case you don't want to have the license key in you values, this allows you to point to which secret key is the license key located. Can be configured also with `global.customSecretLicenseKey` |
+| images | object | See `values.yaml` | Images used by the chart for the integration and agents |
+| images.integration | object | See `values.yaml` | Image for the New Relic Kubernetes integration |
+| images.agent | object | See `values.yaml` | Image for the New Relic Infrastructure Agent sidecar |
+| images.pullSecrets | list | `[]` | The secrets that are needed to pull images from a custom registry. |
+| resources | object | `{}` (no limits set) | Resources for the integration container. The integration watches Kubernetes events and resource descriptions across the entire cluster. Memory usage scales with cluster size and event frequency.  Recommended settings by cluster size: - Small clusters (<50 nodes, <1000 events/min):   requests: { cpu: 50m, memory: 64Mi }   limits: { cpu: 100m, memory: 128Mi } - Medium clusters (50-200 nodes, <5000 events/min):   requests: { cpu: 100m, memory: 128Mi }   limits: { cpu: 200m, memory: 256Mi } - Large clusters (>200 nodes, >5000 events/min):   requests: { cpu: 150m, memory: 256Mi }   limits: { cpu: 300m, memory: 512Mi }  Monitor memory usage if you experience: - High event churn (frequent pod restarts, deployments) - Large resource descriptions (many annotations/labels) - OOMKilled events in pod logs  |
+| forwarder | object | `{}` (no limits set) | Resources for the forwarder sidecar container. The forwarder receives events from the integration and sends them to New Relic. Memory usage is generally low and stable regardless of cluster size.  Recommended settings for all cluster sizes:   requests: { cpu: 50m, memory: 64Mi }   limits: { cpu: 100m, memory: 128Mi }  Note: The forwarder uses buffering, so temporary New Relic API unavailability will increase memory usage slightly until events are sent successfully.  |
 | rbac.create | bool | `true` | Specifies whether RBAC resources should be created |
-| resources | object | `{}` | Resources for the integration container |
-| scrapers | object | See `values.yaml` | Configure the various kinds of scrapers that should be run. |
 | serviceAccount | object | See `values.yaml` | Settings controlling ServiceAccount creation |
 | serviceAccount.create | bool | `true` | Specifies whether a ServiceAccount should be created |
+| podAnnotations | object | `{}` | Annotations to add to the pod. |
+| deployment.annotations | object | `{}` | Annotations to add to the Deployment. |
+| podLabels | object | `{}` | Additional labels for chart pods |
+| labels | object | `{}` | Additional labels for chart objects |
+| agentHTTPTimeout | string | `"30s"` | Amount of time to wait until timeout to send metrics to the metric forwarder |
 | sinks | object | See `values.yaml` | Configure where will the metrics be written. Mostly for debugging purposes. |
-| sinks.newRelicInfra | bool | `true` | The newRelicInfra sink sends all events to New Relic. |
 | sinks.stdout | bool | `false` | Enable the stdout sink to also see all events in the logs. |
+| sinks.newRelicInfra | bool | `true` | The newRelicInfra sink sends all events to New Relic. |
+| scrapers | object | See `values.yaml` | Configure the various kinds of scrapers that should be run. |
+| priorityClassName | string | `""` | Sets pod's priorityClassName. Can be configured also with `global.priorityClassName` |
+| hostNetwork | bool | `false` | Sets pod's hostNetwork. Can be configured also with `global.hostNetwork` |
+| dnsConfig | object | `{}` | Sets pod's dnsConfig. Can be configured also with `global.dnsConfig` |
+| podSecurityContext | object | `{}` | Sets security context (at pod level). Can be configured also with `global.podSecurityContext` |
+| containerSecurityContext | object | `{}` | Sets security context (at container level). Can be configured also with `global.containerSecurityContext` |
+| affinity | object | `{}` | Sets pod/node affinities. Can be configured also with `global.affinity` |
+| nodeSelector | object | `{}` | Sets pod's node selector. Can be configured also with `global.nodeSelector` |
 | tolerations | list | `[]` | Sets pod's tolerations to node taints. Can be configured also with `global.tolerations` |
+| customAttributes | object | `{}` | Adds extra attributes to the cluster and all the metrics emitted to the backend. Can be configured also with `global.customAttributes` |
+| proxy | string | `""` | Configures the integration to send all HTTP/HTTPS request through the proxy in that URL. The URL should have a standard format like `https://user:password@hostname:port`. Can be configured also with `global.proxy` |
+| nrStaging | bool | `false` | Send the metrics to the staging backend. Requires a valid staging license key. Can be configured also with `global.nrStaging` |
+| fedramp.enabled | bool | `false` | Enables FedRAMP. Can be configured also with `global.fedramp.enabled` |
 | verboseLog | bool | `false` | Sets the debug logs to this integration or all integrations if it is set globally. Can be configured also with `global.verboseLog` |
 
 ## Maintainers

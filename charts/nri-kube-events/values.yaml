@@ -33,7 +33,27 @@ images:
   pullSecrets: []
   # - name: regsecret
 
-# -- Resources for the integration container
+# -- Resources for the integration container.
+# The integration watches Kubernetes events and resource descriptions across the entire cluster.
+# Memory usage scales with cluster size and event frequency.
+#
+# Recommended settings by cluster size:
+# - Small clusters (<50 nodes, <1000 events/min):
+#   requests: { cpu: 50m, memory: 64Mi }
+#   limits: { cpu: 100m, memory: 128Mi }
+# - Medium clusters (50-200 nodes, <5000 events/min):
+#   requests: { cpu: 100m, memory: 128Mi }
+#   limits: { cpu: 200m, memory: 256Mi }
+# - Large clusters (>200 nodes, >5000 events/min):
+#   requests: { cpu: 150m, memory: 256Mi }
+#   limits: { cpu: 300m, memory: 512Mi }
+#
+# Monitor memory usage if you experience:
+# - High event churn (frequent pod restarts, deployments)
+# - Large resource descriptions (many annotations/labels)
+# - OOMKilled events in pod logs
+#
+# @default -- `{}` (no limits set)
 resources: {}
   # limits:
   #   cpu: 100m
@@ -42,7 +62,18 @@ resources: {}
   #   cpu: 100m
   #   memory: 128Mi
 
-# -- Resources for the forwarder sidecar container
+# -- Resources for the forwarder sidecar container.
+# The forwarder receives events from the integration and sends them to New Relic.
+# Memory usage is generally low and stable regardless of cluster size.
+#
+# Recommended settings for all cluster sizes:
+#   requests: { cpu: 50m, memory: 64Mi }
+#   limits: { cpu: 100m, memory: 128Mi }
+#
+# Note: The forwarder uses buffering, so temporary New Relic API unavailability
+# will increase memory usage slightly until events are sent successfully.
+#
+# @default -- `{}` (no limits set)
 forwarder:
   resources: {}
     # limits:
