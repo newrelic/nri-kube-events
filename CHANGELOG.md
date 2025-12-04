@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+### Added
+- Comprehensive global value inheritance test coverage (42 new tests) validating 21/27 applicable global values @dpacheconr [#516](https://github.com/newrelic/nri-kube-events/pull/516)
+- Test coverage for all agent configuration values (proxy, customAttributes, nrStaging, verboseLog) @dpacheconr [#516](https://github.com/newrelic/nri-kube-events/pull/516)
+- Resource sizing guidance for small, medium, and large Kubernetes clusters @dpacheconr [#516](https://github.com/newrelic/nri-kube-events/pull/516)
+- Documentation for global value override patterns and precedence rules @dpacheconr [#516](https://github.com/newrelic/nri-kube-events/pull/516)
+
+### Changed
+- Regenerated README.md with helm-docs for improved documentation consistency @dpacheconr [#516](https://github.com/newrelic/nri-kube-events/pull/516)
+
 ## v2.16.2 - 2025-11-24
 
 ### ⛓️ Dependencies

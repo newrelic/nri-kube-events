@@ -2,6 +2,7 @@ suite: test global value inheritance
 templates:
   - templates/deployment.yaml
   - templates/agent-configmap.yaml
+  - templates/configmap.yaml
   - templates/serviceaccount.yaml
 release:
   name: test-release
@@ -700,23 +701,38 @@ tests:
           path: data["newrelic-infra.yml"]
           pattern: "staging: true"
 
-  # NOTE: global.fedramp.enabled inheritance is currently not working in agent config
-  # This is a known limitation of the common-library's agentConfig.defaults helper
-  # The fedramp configuration is not being rendered in the agent configmap
-  # - it: should inherit global.fedramp.enabled in agent config
-  #   set:
-  #     cluster: test-cluster
-  #     licenseKey: test-key
-  #     global:
-  #       fedramp:
-  #         enabled: true
-  #     sinks:
-  #       newRelicInfra: true
-  #   asserts:
-  #     - template: templates/agent-configmap.yaml
-  #       matchRegex:
-  #         path: data["newrelic-infra.yml"]
-  #         pattern: "fedramp:\n  enabled: true"
+  - it: should inherit global.fedramp.enabled in agent config
+    set:
+      cluster: test-cluster
+      licenseKey: test-key
+      fedramp: null
+      global:
+        fedramp:
+          enabled: true
+      sinks:
+        newRelicInfra: true
+    asserts:
+      - template: templates/agent-configmap.yaml
+        matchRegex:
+          path: data["newrelic-infra.yml"]
+          pattern: "fedramp: true"
+
+  - it: should use local fedramp.enabled when set (overrides global)
+    set:
+      cluster: test-cluster
+      licenseKey: test-key
+      fedramp:
+        enabled: true
+      global:
+        fedramp:
+          enabled: false
+      sinks:
+        newRelicInfra: true
+    asserts:
+      - template: templates/agent-configmap.yaml
+        matchRegex:
+          path: data["newrelic-infra.yml"]
+          pattern: "fedramp: true"
 
   - it: should inherit global.verboseLog in agent config
     set:
