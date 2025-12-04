@@ -33,7 +33,8 @@ images:
   pullSecrets: []
   # - name: regsecret
 
-# -- Resources for the integration container
+# -- Resources for the integration container.
+# @default -- `{}` (no limits set)
 resources: {}
   # limits:
   #   cpu: 100m
@@ -42,7 +43,8 @@ resources: {}
   #   cpu: 100m
   #   memory: 128Mi
 
-# -- Resources for the forwarder sidecar container
+# -- Resources for the forwarder sidecar container.
+# @default -- `{}` (no limits set)
 forwarder:
   resources: {}
     # limits:
