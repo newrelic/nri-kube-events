@@ -2,7 +2,7 @@
 
 ![Version: 3.16.4](https://img.shields.io/badge/Version-3.16.4-informational?style=flat-square) ![AppVersion: 2.16.4](https://img.shields.io/badge/AppVersion-2.16.4-informational?style=flat-square)
 
-A Helm chart to deploy the New Relic Kube Events router
+A Helm chart to deploy the New Relic Kube Events router!
 
 **Homepage:** <https://docs.newrelic.com/docs/integrations/kubernetes-integration/kubernetes-events/install-kubernetes-events-integration>
 
