@@ -166,3 +166,75 @@ tests:
             - global: global
             - image: image
             - images: images
+
+  - it: registry defaults to docker.io when not specified
+    set:
+      cluster: test-cluster
+      licenseKey: us-whatever
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: docker.io/newrelic/nri-kube-events:2.16.4
+      - equal:
+          path: spec.template.spec.containers[1].image
+          value: docker.io/newrelic/k8s-events-forwarder:1.71.0
+
+  - it: global registry is used when local is not specified
+    set:
+      cluster: test-cluster
+      licenseKey: us-whatever
+      global:
+        images:
+          registry: global-registry.io
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: global-registry.io/newrelic/nri-kube-events:2.16.4
+      - equal:
+          path: spec.template.spec.containers[1].image
+          value: global-registry.io/newrelic/k8s-events-forwarder:1.71.0
+
+  - it: local registry takes precedence over global registry
+    set:
+      cluster: test-cluster
+      licenseKey: us-whatever
+      global:
+        images:
+          registry: global-registry.io
+      images:
+        integration:
+          registry: local-int-registry.io
+        agent:
+          registry: local-agent-registry.io
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: local-int-registry.io/newrelic/nri-kube-events:2.16.4
+      - equal:
+          path: spec.template.spec.containers[1].image
+          value: local-agent-registry.io/newrelic/k8s-events-forwarder:1.71.0
+
+  - it: old registry values take precedence over local and global
+    set:
+      cluster: test-cluster
+      licenseKey: us-whatever
+      global:
+        images:
+          registry: global-registry.io
+      images:
+        integration:
+          registry: new-int-registry.io
+        agent:
+          registry: new-agent-registry.io
+      image:
+        kubeEvents:
+          registry: old-int-registry.io
+        infraAgent:
+          registry: old-agent-registry.io
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: old-int-registry.io/newrelic/nri-kube-events:2.16.4
+      - equal:
+          path: spec.template.spec.containers[1].image
+          value: old-agent-registry.io/newrelic/k8s-events-forwarder:1.71.0

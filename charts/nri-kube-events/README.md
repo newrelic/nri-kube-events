@@ -46,7 +46,7 @@ Options that can be defined globally include `affinity`, `nodeSelector`, `tolera
 | fedramp.enabled | bool | `false` | Enables FedRAMP. Can be configured also with `global.fedramp.enabled` |
 | forwarder | object | `{"resources":{}}` | Resources for the forwarder sidecar container |
 | fullnameOverride | string | `""` | Override the full name of the release |
-| hostNetwork | bool | `false` | Sets pod's hostNetwork. Can be configured also with `global.hostNetwork` |
+| hostNetwork | bool | `false` | Sets pod's hostNetwork. Can be configured also with `global.hostNetwork` When enabled, the deployment strategy is automatically set to Recreate to avoid port conflicts during upgrades. |
 | images | object | See `values.yaml` | Images used by the chart for the integration and agents |
 | images.agent | object | See `values.yaml` | Image for the New Relic Infrastructure Agent sidecar |
 | images.integration | object | See `values.yaml` | Image for the New Relic Kubernetes integration |

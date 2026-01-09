@@ -102,3 +102,22 @@ tests:
           value:
             kubernetes.io/os: linux
             aCoolTestLabel: aCoolTestValue
+
+  - it: uses Recreate strategy when hostNetwork is enabled
+    set:
+      cluster: my-cluster
+      licenseKey: us-whatever
+      hostNetwork: true
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+
+  - it: does not set strategy when hostNetwork is disabled
+    set:
+      cluster: my-cluster
+      licenseKey: us-whatever
+      hostNetwork: false
+    asserts:
+      - isNull:
+          path: spec.strategy

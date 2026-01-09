@@ -100,6 +100,7 @@ scrapers:
 # -- Sets pod's priorityClassName. Can be configured also with `global.priorityClassName`
 priorityClassName: ""
 # -- (bool) Sets pod's hostNetwork. Can be configured also with `global.hostNetwork`
+# When enabled, the deployment strategy is automatically set to Recreate to avoid port conflicts during upgrades.
 # @default -- `false`
 hostNetwork:
 # -- Sets pod's dnsConfig. Can be configured also with `global.dnsConfig`
