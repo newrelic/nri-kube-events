@@ -7,8 +7,8 @@ sources:
   - https://github.com/newrelic/nri-kube-events/
   - https://github.com/newrelic/nri-kube-events/tree/main/charts/nri-kube-events
   - https://github.com/newrelic/infrastructure-agent/
-version: 3.16.4
-appVersion: 2.16.4
+version: 3.17.0
+appVersion: 2.17.0
 dependencies:
   - name: common-library
     version: 1.4.0
