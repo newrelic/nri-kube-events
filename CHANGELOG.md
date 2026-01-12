@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-### enhancement
+## v2.17.0 - 2026-01-12
+
+### 🚀 Enhancements
 - Accommodate common-library change for fully-qualified image paths and set upgrade strategy to Recreate when hostNetwork=true to avoid port conflicts @kondracek-nr [#526](https://github.com/newrelic/nri-kube-events/pull/526)
 
 ## v2.16.4 - 2025-12-22
