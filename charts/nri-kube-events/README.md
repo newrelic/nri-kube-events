@@ -16,6 +16,25 @@ helm repo add nri-kube-events https://newrelic.github.io/nri-kube-events
 helm upgrade --install nri-kube-events/nri-kube-events -f your-custom-values.yaml
 ```
 
+## Gke Autopilot 
+When installing this chart in a GKE Autopilot cluster, it's recommended to set resource defaults for the prometheus, and configurator containers.
+If resources are not set, GKE Autopilot will assign default resource values, and you will see the following warning in the in your console:
+
+`defaulted unspecified 'cpu' resource for containers [kube-events, forwarder]`
+
+To avoid this warning, and having GKE Autopilot set resource values for you, you can set the following values in your `values.yaml` file.
+``` yaml
+resources: 
+   requests:
+     cpu: 100m
+     memory: 128Mi
+forwarder:
+  resources: 
+     requests:
+       cpu: 100m
+       memory: 128Mi
+```
+
 ## Source Code
 
 * <https://github.com/newrelic/nri-kube-events/>
