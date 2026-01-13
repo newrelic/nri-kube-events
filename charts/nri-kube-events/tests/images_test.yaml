@@ -174,7 +174,7 @@ tests:
     asserts:
       - equal:
           path: spec.template.spec.containers[0].image
-          value: docker.io/newrelic/nri-kube-events:2.16.4
+          value: docker.io/newrelic/nri-kube-events:2.17.0
       - equal:
           path: spec.template.spec.containers[1].image
           value: docker.io/newrelic/k8s-events-forwarder:1.71.0
@@ -189,7 +189,7 @@ tests:
     asserts:
       - equal:
           path: spec.template.spec.containers[0].image
-          value: global-registry.io/newrelic/nri-kube-events:2.16.4
+          value: global-registry.io/newrelic/nri-kube-events:2.17.0
       - equal:
           path: spec.template.spec.containers[1].image
           value: global-registry.io/newrelic/k8s-events-forwarder:1.71.0
@@ -209,7 +209,7 @@ tests:
     asserts:
       - equal:
           path: spec.template.spec.containers[0].image
-          value: local-int-registry.io/newrelic/nri-kube-events:2.16.4
+          value: local-int-registry.io/newrelic/nri-kube-events:2.17.0
       - equal:
           path: spec.template.spec.containers[1].image
           value: local-agent-registry.io/newrelic/k8s-events-forwarder:1.71.0
@@ -234,7 +234,7 @@ tests:
     asserts:
       - equal:
           path: spec.template.spec.containers[0].image
-          value: old-int-registry.io/newrelic/nri-kube-events:2.16.4
+          value: old-int-registry.io/newrelic/nri-kube-events:2.17.0
       - equal:
           path: spec.template.spec.containers[1].image
           value: old-agent-registry.io/newrelic/k8s-events-forwarder:1.71.0
