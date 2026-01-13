@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## Unreleased
 
 ### enhancement
-- Readme update for GKE Autopilot warnings. @philip-r-beckwith [528](https://github.com/newrelic/nri-kube-events/pull/528)
+- Readme update for GKE Autopilot warnings @philip-r-beckwith [528](https://github.com/newrelic/nri-kube-events/pull/528)
 
 ## v2.17.0 - 2026-01-12
 
