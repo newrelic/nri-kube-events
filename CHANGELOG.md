@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-### enhancement
+## v2.18.0 - 2026-01-19
+
+### 🚀 Enhancements
 - Readme update for GKE Autopilot warnings @philip-r-beckwith [528](https://github.com/newrelic/nri-kube-events/pull/528)
+
+### ⛓️ Dependencies
+- Updated github.com/sirupsen/logrus to v1.9.4 - [Changelog 🔗](https://github.com/sirupsen/logrus/releases/tag/v1.9.4)
 
 ## v2.17.0 - 2026-01-12
 
