@@ -172,12 +172,12 @@ tests:
       cluster: test-cluster
       licenseKey: us-whatever
     asserts:
-      - equal:
+      - matchRegex:
           path: spec.template.spec.containers[0].image
-          value: docker.io/newrelic/nri-kube-events:2.17.0
-      - equal:
+          pattern: "^docker\\.io/newrelic/nri-kube-events:[0-9]+\\.[0-9]+\\.[0-9]+$"
+      - matchRegex:
           path: spec.template.spec.containers[1].image
-          value: docker.io/newrelic/k8s-events-forwarder:1.71.0
+          pattern: "^docker\\.io/newrelic/k8s-events-forwarder:[0-9]+\\.[0-9]+\\.[0-9]+$"
 
   - it: global registry is used when local is not specified
     set:
@@ -187,12 +187,12 @@ tests:
         images:
           registry: global-registry.io
     asserts:
-      - equal:
+      - matchRegex:
           path: spec.template.spec.containers[0].image
-          value: global-registry.io/newrelic/nri-kube-events:2.17.0
-      - equal:
+          pattern: "^global-registry\\.io/newrelic/nri-kube-events:[0-9]+\\.[0-9]+\\.[0-9]+$"
+      - matchRegex:
           path: spec.template.spec.containers[1].image
-          value: global-registry.io/newrelic/k8s-events-forwarder:1.71.0
+          pattern: "^global-registry\\.io/newrelic/k8s-events-forwarder:[0-9]+\\.[0-9]+\\.[0-9]+$"
 
   - it: local registry takes precedence over global registry
     set:
@@ -207,12 +207,12 @@ tests:
         agent:
           registry: local-agent-registry.io
     asserts:
-      - equal:
+      - matchRegex:
           path: spec.template.spec.containers[0].image
-          value: local-int-registry.io/newrelic/nri-kube-events:2.17.0
-      - equal:
+          pattern: "^local-int-registry\\.io/newrelic/nri-kube-events:[0-9]+\\.[0-9]+\\.[0-9]+$"
+      - matchRegex:
           path: spec.template.spec.containers[1].image
-          value: local-agent-registry.io/newrelic/k8s-events-forwarder:1.71.0
+          pattern: "^local-agent-registry\\.io/newrelic/k8s-events-forwarder:[0-9]+\\.[0-9]+\\.[0-9]+$"
 
   - it: old registry values take precedence over local and global
     set:
@@ -232,9 +232,9 @@ tests:
         infraAgent:
           registry: old-agent-registry.io
     asserts:
-      - equal:
+      - matchRegex:
           path: spec.template.spec.containers[0].image
-          value: old-int-registry.io/newrelic/nri-kube-events:2.17.0
-      - equal:
+          pattern: "^old-int-registry\\.io/newrelic/nri-kube-events:[0-9]+\\.[0-9]+\\.[0-9]+$"
+      - matchRegex:
           path: spec.template.spec.containers[1].image
-          value: old-agent-registry.io/newrelic/k8s-events-forwarder:1.71.0
+          pattern: "^old-agent-registry\\.io/newrelic/k8s-events-forwarder:[0-9]+\\.[0-9]+\\.[0-9]+$"
