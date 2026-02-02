@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+## v2.18.1 - 2026-02-02
+
+### ⛓️ Dependencies
+- Updated newrelic/k8s-events-forwarder to v1.71.3
+- Updated go to v1.25.6
+- Updated alpine to v3.23.3
+
 ## v2.18.0 - 2026-01-19
 
 ### 🚀 Enhancements
