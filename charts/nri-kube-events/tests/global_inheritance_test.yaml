@@ -198,22 +198,33 @@ tests:
             kubernetes.io/os: linux
             node.kubernetes.io/purpose: monitoring
 
+  # Tests that local nodeSelector completely REPLACES global (not key-by-key merge)
+  # Global has: environment=production, team=platform
+  # Local has: environment=staging, app=events
+  # Expected: Only local keys present (environment=staging, app=events), global-only key 'team' is absent
   - it: should use local nodeSelector when both global and local are set (override not merge)
     set:
       cluster: test-cluster
       licenseKey: test-key
       global:
         nodeSelector:
-          global-key: global-value
+          environment: production
+          team: platform
       nodeSelector:
-        local-key: local-value
+        environment: staging
+        app: events
     asserts:
       - template: templates/deployment.yaml
         equal:
           path: spec.template.spec.nodeSelector
           value:
             kubernetes.io/os: linux
-            local-key: local-value
+            environment: staging
+            app: events
+      # Verify global-only 'team' key is NOT present (proves replacement, not merge)
+      - template: templates/deployment.yaml
+        isNull:
+          path: spec.template.spec.nodeSelector.team
 
   # =============================================================================
   # Tolerations Tests
@@ -604,6 +615,162 @@ tests:
         matchRegex:
           path: spec.template.spec.containers[0].image
           pattern: ^local-registry\.io/newrelic/nri-kube-events
+
+  # =============================================================================
+  # Images.pullPolicy Tests
+  # Tests verify pull policy precedence order (highest to lowest):
+  # 1. Local setting (images.integration.pullPolicy / images.agent.pullPolicy)
+  # 2. Global setting (global.images.pullPolicy)
+  # 3. Default (IfNotPresent)
+  # =============================================================================
+  - it: should use default pullPolicy when neither global nor local set
+    set:
+      cluster: test-cluster
+      licenseKey: test-key
+      sinks:
+        newRelicInfra: true
+    asserts:
+      - template: templates/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: IfNotPresent
+      - template: templates/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[1].imagePullPolicy
+          value: IfNotPresent
+
+  - it: should inherit global.images.pullPolicy when local not set
+    set:
+      cluster: test-cluster
+      licenseKey: test-key
+      images:
+        integration:
+          pullPolicy: null
+        agent:
+          pullPolicy: null
+      global:
+        images:
+          pullPolicy: Always
+      sinks:
+        newRelicInfra: true
+    asserts:
+      - template: templates/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: Always
+      - template: templates/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[1].imagePullPolicy
+          value: Always
+
+  - it: should use local images.integration.pullPolicy when both global and local are set
+    set:
+      cluster: test-cluster
+      licenseKey: test-key
+      global:
+        images:
+          pullPolicy: Always
+      images:
+        integration:
+          pullPolicy: Never
+      sinks:
+        newRelicInfra: true
+    asserts:
+      - template: templates/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: Never
+
+  - it: should use local images.agent.pullPolicy when both global and local are set
+    set:
+      cluster: test-cluster
+      licenseKey: test-key
+      global:
+        images:
+          pullPolicy: Always
+      images:
+        agent:
+          pullPolicy: Never
+      sinks:
+        newRelicInfra: true
+    asserts:
+      - template: templates/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[1].imagePullPolicy
+          value: Never
+
+  # Backwards compatibility tests - old path takes precedence
+  - it: should use old path (image.kubeEvents.pullPolicy) over new path (images.integration.pullPolicy)
+    set:
+      cluster: test-cluster
+      licenseKey: test-key
+      image:
+        kubeEvents:
+          pullPolicy: Always
+      images:
+        integration:
+          pullPolicy: Never
+      sinks:
+        newRelicInfra: true
+    asserts:
+      - template: templates/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: Always
+
+  - it: should use old path (image.kubeEvents.pullPolicy) over global.images.pullPolicy
+    set:
+      cluster: test-cluster
+      licenseKey: test-key
+      image:
+        kubeEvents:
+          pullPolicy: Always
+      global:
+        images:
+          pullPolicy: Never
+      sinks:
+        newRelicInfra: true
+    asserts:
+      - template: templates/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: Always
+
+  - it: should use old path (image.infraAgent.pullPolicy) over new path (images.agent.pullPolicy)
+    set:
+      cluster: test-cluster
+      licenseKey: test-key
+      image:
+        infraAgent:
+          pullPolicy: Always
+      images:
+        agent:
+          pullPolicy: Never
+      sinks:
+        newRelicInfra: true
+    asserts:
+      - template: templates/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[1].imagePullPolicy
+          value: Always
+
+  - it: should use old path (image.infraAgent.pullPolicy) over global.images.pullPolicy
+    set:
+      cluster: test-cluster
+      licenseKey: test-key
+      image:
+        infraAgent:
+          pullPolicy: Always
+      global:
+        images:
+          pullPolicy: Never
+      sinks:
+        newRelicInfra: true
+    asserts:
+      - template: templates/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[1].imagePullPolicy
+          value: Always
 
   # =============================================================================
   # ServiceAccount Tests

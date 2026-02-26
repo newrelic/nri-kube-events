@@ -188,24 +188,58 @@ Uses common-library functions to ensure proper registry precedence: local -> glo
 
 {{/*
 Returns the pull policy for the integration image taking into account that we made a breaking change on the values path.
+Precedence: old path → new path (local) → global → default (IfNotPresent)
 */}}
 {{- define "nri-kube-events.compatibility.images.pullPolicy.integration" -}}
 {{- $old := include "nri-kube-events.compatibility.old.integration.pullPolicy" . -}}
-{{- $new := .Values.images.integration.pullPolicy -}}
 
-{{- $old | default $new -}}
+{{- $globalPullPolicy := "" -}}
+{{- if .Values.global -}}
+{{- if .Values.global.images -}}
+{{- $globalPullPolicy = .Values.global.images.pullPolicy | default "" -}}
+{{- end -}}
+{{- end -}}
+
+{{- $localPullPolicy := .Values.images.integration.pullPolicy | default "" -}}
+
+{{- if $old -}}
+ {{- $old -}}
+{{- else if $localPullPolicy -}}
+ {{- $localPullPolicy -}}
+{{- else if $globalPullPolicy -}}
+ {{- $globalPullPolicy -}}
+{{- else -}}
+ IfNotPresent
+{{- end -}}
 {{- end -}}
 
 
 
 {{/*
 Returns the pull policy for the agent image taking into account that we made a breaking change on the values path.
+Precedence: old path → new path (local) → global → default (IfNotPresent)
 */}}
 {{- define "nri-kube-events.compatibility.images.pullPolicy.agent" -}}
 {{- $old := include "nri-kube-events.compatibility.old.agent.pullPolicy" . -}}
-{{- $new := .Values.images.agent.pullPolicy -}}
 
-{{- $old | default $new -}}
+{{- $globalPullPolicy := "" -}}
+{{- if .Values.global -}}
+{{- if .Values.global.images -}}
+{{- $globalPullPolicy = .Values.global.images.pullPolicy | default "" -}}
+{{- end -}}
+{{- end -}}
+
+{{- $localPullPolicy := .Values.images.agent.pullPolicy | default "" -}}
+
+{{- if $old -}}
+ {{- $old -}}
+{{- else if $localPullPolicy -}}
+ {{- $localPullPolicy -}}
+{{- else if $globalPullPolicy -}}
+ {{- $globalPullPolicy -}}
+{{- else -}}
+ IfNotPresent
+{{- end -}}
 {{- end -}}
 
 
