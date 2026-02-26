@@ -7,14 +7,44 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-### Added
+### bugfix
 - Comprehensive global value inheritance test coverage (42 new tests) validating 21/27 applicable global values @dpacheconr [#516](https://github.com/newrelic/nri-kube-events/pull/516)
 - Test coverage for all agent configuration values (proxy, customAttributes, nrStaging, verboseLog) @dpacheconr [#516](https://github.com/newrelic/nri-kube-events/pull/516)
 - Resource sizing guidance for small, medium, and large Kubernetes clusters @dpacheconr [#516](https://github.com/newrelic/nri-kube-events/pull/516)
 - Documentation for global value override patterns and precedence rules @dpacheconr [#516](https://github.com/newrelic/nri-kube-events/pull/516)
-
-### Changed
 - Regenerated README.md with helm-docs for improved documentation consistency @dpacheconr [#516](https://github.com/newrelic/nri-kube-events/pull/516)
+
+## v2.18.1 - 2026-02-02
+
+### ⛓️ Dependencies
+- Updated newrelic/k8s-events-forwarder to v1.71.3
+- Updated go to v1.25.6
+- Updated alpine to v3.23.3
+
+## v2.18.0 - 2026-01-19
+
+### 🚀 Enhancements
+- Readme update for GKE Autopilot warnings @philip-r-beckwith [528](https://github.com/newrelic/nri-kube-events/pull/528)
+
+### ⛓️ Dependencies
+- Updated github.com/sirupsen/logrus to v1.9.4 - [Changelog 🔗](https://github.com/sirupsen/logrus/releases/tag/v1.9.4)
+
+## v2.17.0 - 2026-01-12
+
+### 🚀 Enhancements
+- Accommodate common-library change for fully-qualified image paths and set upgrade strategy to Recreate when hostNetwork=true to avoid port conflicts @kondracek-nr [#526](https://github.com/newrelic/nri-kube-events/pull/526)
+
+## v2.16.4 - 2025-12-22
+
+### ⛓️ Dependencies
+- Updated go to v1.25.5
+- Updated kubernetes packages to v0.34.3
+- Updated alpine to v3.23.2
+
+## v2.16.3 - 2025-12-08
+
+### ⛓️ Dependencies
+- Updated alpine to v3.23.0
 
 ## v2.16.2 - 2025-11-24
 

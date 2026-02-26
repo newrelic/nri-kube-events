@@ -27,7 +27,7 @@ images:
   agent:
     registry:
     repository: newrelic/k8s-events-forwarder
-    tag: 1.71.0
+    tag: 1.72.6
     pullPolicy: IfNotPresent
   # -- The secrets that are needed to pull images from a custom registry.
   pullSecrets: []
@@ -102,6 +102,7 @@ scrapers:
 # -- Sets pod's priorityClassName. Can be configured also with `global.priorityClassName`
 priorityClassName: ""
 # -- (bool) Sets pod's hostNetwork. Can be configured also with `global.hostNetwork`
+# When enabled, the deployment strategy is automatically set to Recreate to avoid port conflicts during upgrades.
 # @default -- `false`
 hostNetwork:
 # -- Sets pod's dnsConfig. Can be configured also with `global.dnsConfig`

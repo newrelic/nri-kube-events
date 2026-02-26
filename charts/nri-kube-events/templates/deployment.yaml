@@ -10,6 +10,11 @@ metadata:
     {{- toYaml .Values.deployment.annotations | nindent 4 }}
   {{- end }}
 spec:
+  {{- if include "newrelic.common.hostNetwork" . -}}
+  {{/* When hostNetwork is enabled, use Recreate strategy to avoid port conflicts during upgrades */}}
+  strategy:
+    type: Recreate
+  {{- end }}
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ include "newrelic.common.naming.name" . }}

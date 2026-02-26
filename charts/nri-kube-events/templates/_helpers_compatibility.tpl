@@ -122,52 +122,66 @@ like:
 
 {{/*
 Creates the image string needed to pull the integration image respecting the breaking change we made in the values file
+Uses common-library functions to ensure proper registry precedence: local -> global -> docker.io
 */}}
 {{- define "nri-kube-events.compatibility.images.integration" -}}
-{{- $globalRegistry := include "nri-kube-events.compatibility.global.registry" . -}}
+{{- /* Handle registry: old value takes precedence, otherwise use common-library (local -> global -> docker.io) */ -}}
 {{- $oldRegistry := include "nri-kube-events.compatibility.old.integration.registry" . -}}
-{{- $newRegistry := .Values.images.integration.registry -}}
-{{- $registry := $oldRegistry | default $newRegistry | default $globalRegistry -}}
-
-{{- $oldRepository := include "nri-kube-events.compatibility.old.integration.repository" . -}}
-{{- $newRepository := .Values.images.integration.repository -}}
-{{- $repository := $oldRepository | default $newRepository }}
-
-{{- $oldTag := include "nri-kube-events.compatibility.old.integration.tag" . -}}
-{{- $newTag := .Values.images.integration.tag -}}
-{{- $tag := $oldTag | default $newTag | default .Chart.AppVersion -}}
-
-{{- if $registry -}}
-    {{- printf "%s/%s:%s" $registry $repository $tag -}}
+{{- $registry := "" -}}
+{{- if $oldRegistry -}}
+    {{- $registry = $oldRegistry -}}
 {{- else -}}
-    {{- printf "%s:%s" $repository $tag -}}
+    {{- $registry = include "newrelic.common.images.registry" ( dict "imageRoot" .Values.images.integration "context" .) -}}
 {{- end -}}
+
+{{- /* Handle repository: old value takes precedence */ -}}
+{{- $oldRepository := include "nri-kube-events.compatibility.old.integration.repository" . -}}
+{{- $repository := $oldRepository | default .Values.images.integration.repository -}}
+
+{{- /* Handle tag: old value takes precedence, otherwise use common-library (value -> AppVersion) */ -}}
+{{- $oldTag := include "nri-kube-events.compatibility.old.integration.tag" . -}}
+{{- $tag := "" -}}
+{{- if $oldTag -}}
+    {{- $tag = $oldTag -}}
+{{- else -}}
+    {{- $tag = include "newrelic.common.images.tag" ( dict "imageRoot" .Values.images.integration "context" .) -}}
+{{- end -}}
+
+{{- /* Build image string - registry is always present due to docker.io fallback in common-library */ -}}
+{{- printf "%s/%s:%s" $registry $repository $tag -}}
 {{- end -}}
 
 
 
 {{/*
 Creates the image string needed to pull the agent's image respecting the breaking change we made in the values file
+Uses common-library functions to ensure proper registry precedence: local -> global -> docker.io
 */}}
 {{- define "nri-kube-events.compatibility.images.agent" -}}
-{{- $globalRegistry := include "nri-kube-events.compatibility.global.registry" . -}}
+{{- /* Handle registry: old value takes precedence, otherwise use common-library (local -> global -> docker.io) */ -}}
 {{- $oldRegistry := include "nri-kube-events.compatibility.old.agent.registry" . -}}
-{{- $newRegistry := .Values.images.agent.registry -}}
-{{- $registry := $oldRegistry | default $newRegistry | default $globalRegistry -}}
-
-{{- $oldRepository := include "nri-kube-events.compatibility.old.agent.repository" . -}}
-{{- $newRepository := .Values.images.agent.repository -}}
-{{- $repository := $oldRepository | default $newRepository }}
-
-{{- $oldTag := include "nri-kube-events.compatibility.old.agent.tag" . -}}
-{{- $newTag := .Values.images.agent.tag -}}
-{{- $tag := $oldTag | default $newTag -}}
-
-{{- if $registry -}}
-    {{- printf "%s/%s:%s" $registry $repository $tag -}}
+{{- $registry := "" -}}
+{{- if $oldRegistry -}}
+    {{- $registry = $oldRegistry -}}
 {{- else -}}
-    {{- printf "%s:%s" $repository $tag -}}
+    {{- $registry = include "newrelic.common.images.registry" ( dict "imageRoot" .Values.images.agent "context" .) -}}
 {{- end -}}
+
+{{- /* Handle repository: old value takes precedence */ -}}
+{{- $oldRepository := include "nri-kube-events.compatibility.old.agent.repository" . -}}
+{{- $repository := $oldRepository | default .Values.images.agent.repository -}}
+
+{{- /* Handle tag: old value takes precedence, otherwise use common-library (value -> AppVersion) */ -}}
+{{- $oldTag := include "nri-kube-events.compatibility.old.agent.tag" . -}}
+{{- $tag := "" -}}
+{{- if $oldTag -}}
+    {{- $tag = $oldTag -}}
+{{- else -}}
+    {{- $tag = include "newrelic.common.images.tag" ( dict "imageRoot" .Values.images.agent "context" .) -}}
+{{- end -}}
+
+{{- /* Build image string - registry is always present due to docker.io fallback in common-library */ -}}
+{{- printf "%s/%s:%s" $registry $repository $tag -}}
 {{- end -}}
 
 

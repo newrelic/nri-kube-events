@@ -19,7 +19,7 @@ jobs:
         goos: [ linux ]
         goarch: [ amd64, arm64, arm ]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - uses: helm/chart-testing-action@v2.8.0
@@ -69,7 +69,7 @@ jobs:
     env:
       DOCKER_BUILDKIT: '1'
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Set up QEMU
@@ -87,7 +87,7 @@ jobs:
             linux/amd64
           tags: e2e/nri-kube-events:test
       - name: Upload Image
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: nri-kube-events
           path: nri-kube-events.tar
@@ -97,7 +97,7 @@ jobs:
     name: Run all static analysis checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
@@ -121,14 +121,14 @@ jobs:
     runs-on: ubuntu-latest
     needs: [ build ]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
       - name: Test
         run: make test-unit
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
         with:
           fail_ci_if_error: false
         env:
@@ -148,16 +148,16 @@ jobs:
         k8sVersion: ["v1.34.0", "v1.33.0", "v1.32.0", "v1.31.0", "v1.30.0"]
         cri: [ containerd ]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
       - name: Setup Minikube
-        uses: manusa/actions-setup-minikube@b589f2d61bf96695c546929c72b38563e856059d # v2.14.0
+        uses: manusa/actions-setup-minikube@8234275e0386fe1cdaf519d28c90f4f03fad89e4 # v2.15.0
         with:
-          minikube version: v1.37.0
+          minikube version: v1.38.1
           kubernetes version: ${{ matrix.k8sVersion }}
           driver: docker
           github token: ${{ secrets.GITHUB_TOKEN }}
@@ -165,7 +165,7 @@ jobs:
       - name: Run integreation tests
         run: make test-integration
       - name: Download Image
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: nri-kube-events
       - name: Load image for chart testing
