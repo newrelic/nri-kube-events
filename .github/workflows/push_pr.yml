@@ -87,7 +87,7 @@ jobs:
             linux/amd64
           tags: e2e/nri-kube-events:test
       - name: Upload Image
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: nri-kube-events
           path: nri-kube-events.tar
@@ -165,7 +165,7 @@ jobs:
       - name: Run integreation tests
         run: make test-integration
       - name: Download Image
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: nri-kube-events
       - name: Load image for chart testing
