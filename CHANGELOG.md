@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-### enhancement
+## v2.19.0 - 2026-03-02
+
+### 🚀 Enhancements
 - Comprehensive global value inheritance test coverage (42 new tests) validating 21/27 applicable global values @dpacheconr [#516](https://github.com/newrelic/nri-kube-events/pull/516)
 - Test coverage for all agent configuration values (proxy, customAttributes, nrStaging, verboseLog) @dpacheconr [#516](https://github.com/newrelic/nri-kube-events/pull/516)
 - Resource sizing guidance for small, medium, and large Kubernetes clusters @dpacheconr [#516](https://github.com/newrelic/nri-kube-events/pull/516)
