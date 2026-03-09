@@ -31,7 +31,7 @@ jobs:
           go-version-file: 'go.mod'
 
       - name: Setup Minikube
-        uses: manusa/actions-setup-minikube@e5e04bedd6f05f888ec4af65a0fa716430b21fec # v2.16.0
+        uses: manusa/actions-setup-minikube@96202dee4ae1c2f46a62fe197273aaf22b83f42d # v2.16.1
         with:
           minikube version: v1.38.1
           kubernetes version: ${{ matrix.k8sVersion }}
