@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+## v2.19.1 - 2026-03-09
+
+### ⛓️ Dependencies
+- Updated kubernetes packages to v0.35.2
+- Updated golang version
+
 ## v2.19.0 - 2026-03-02
 
 ### 🚀 Enhancements
