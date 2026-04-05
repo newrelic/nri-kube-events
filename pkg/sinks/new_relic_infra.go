@@ -22,11 +22,19 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/sethgrid/pester"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/rest"
 	"k8s.io/kubectl/pkg/describe"
 
 	"github.com/newrelic/nri-kube-events/pkg/common"
+
+	/*
+		these imports are required for a temporary workaround to describe objects
+		that are not supported by the default describer from the describe package.
+		NOTE: this workaround will be reverted once the describe package is fixed.
+	*/
+	// nolint:depguard
+	"k8s.io/apimachinery/pkg/runtime"
+	// nolint:depguard
+	"k8s.io/client-go/rest"
 )
 
 func init() {
