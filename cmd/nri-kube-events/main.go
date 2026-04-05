@@ -191,8 +191,20 @@ func createInformers(stopChan <-chan struct{}, resync time.Duration) []cache.Sha
 	sharedInformers := informers.NewSharedInformerFactory(clientset, resync)
 
 	cronjobsInformer := sharedInformers.Batch().V1().CronJobs().Informer()
+	storageClassesInformer := sharedInformers.Storage().V1().StorageClasses().Informer()
+	secretsInformer := sharedInformers.Core().V1().Secrets().Informer()
+	limitRangesInformer := sharedInformers.Core().V1().LimitRanges().Informer()
+	horizontalPodAutoscalersV1Informer := sharedInformers.Autoscaling().V1().HorizontalPodAutoscalers().Informer()
+	horizontalPodAutoscalersV2Informer := sharedInformers.Autoscaling().V2().HorizontalPodAutoscalers().Informer()
+	podDisruptionBudgetsInformer := sharedInformers.Policy().V1().PodDisruptionBudgets().Informer()
+	endpointsInformer := sharedInformers.Core().V1().Endpoints().Informer()
+	endpointSlicesInformer := sharedInformers.Discovery().V1().EndpointSlices().Informer()
+	networkPolicyInformer := sharedInformers.Networking().V1().NetworkPolicies().Informer()
+	serviceAccountsInformer := sharedInformers.Core().V1().ServiceAccounts().Informer()
 	daemonsetsInformer := sharedInformers.Apps().V1().DaemonSets().Informer()
+	statefulsetsInformer := sharedInformers.Apps().V1().StatefulSets().Informer()
 	deploymentInformer := sharedInformers.Apps().V1().Deployments().Informer()
+	replicasetsInformer := sharedInformers.Apps().V1().ReplicaSets().Informer()
 	namespacesInformer := sharedInformers.Core().V1().Namespaces().Informer()
 	nodesInformer := sharedInformers.Core().V1().Nodes().Informer()
 	jobsInformer := sharedInformers.Batch().V1().Jobs().Informer()
@@ -205,8 +217,20 @@ func createInformers(stopChan <-chan struct{}, resync time.Duration) []cache.Sha
 
 	return []cache.SharedIndexInformer{
 		cronjobsInformer,
+		storageClassesInformer,
+		secretsInformer,
+		limitRangesInformer,
+		horizontalPodAutoscalersV1Informer,
+		horizontalPodAutoscalersV2Informer,
+		podDisruptionBudgetsInformer,
+		endpointsInformer,
+		endpointSlicesInformer,
+		networkPolicyInformer,
+		serviceAccountsInformer,
 		daemonsetsInformer,
+		statefulsetsInformer,
 		deploymentInformer,
+		replicasetsInformer,
 		namespacesInformer,
 		nodesInformer,
 		jobsInformer,

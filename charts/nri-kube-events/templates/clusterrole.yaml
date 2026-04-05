@@ -12,11 +12,14 @@ rules:
   - events
   - namespaces
   - nodes
-  - jobs
   - persistentvolumes
   - persistentvolumeclaims
   - pods
   - services
+  - secrets
+  - limitranges
+  - endpoints
+  - serviceaccounts
   verbs:
   - get
   - watch
@@ -26,6 +29,8 @@ rules:
   resources:
   - daemonsets
   - deployments
+  - statefulsets
+  - replicasets
   verbs:
   - get
   - watch
@@ -35,6 +40,46 @@ rules:
   resources:
   - cronjobs
   - jobs
+  verbs:
+  - get
+  - watch
+  - list
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
+  verbs:
+  - get
+  - watch
+  - list
+- apiGroups:
+  - autoscaling
+  resources:
+  - horizontalpodautoscalers
+  verbs:
+  - get
+  - watch
+  - list
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - get
+  - watch
+  - list
+- apiGroups:
+  - discovery.k8s.io
+  resources:
+  - endpointslices
+  verbs:
+  - get
+  - watch
+  - list
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - networkpolicies
   verbs:
   - get
   - watch
