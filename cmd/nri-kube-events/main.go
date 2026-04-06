@@ -200,6 +200,12 @@ func createInformers(stopChan <-chan struct{}, resync time.Duration) []cache.Sha
 	pvcInformer := sharedInformers.Core().V1().PersistentVolumeClaims().Informer()
 	podsInformer := sharedInformers.Core().V1().Pods().Informer()
 	servicesInformer := sharedInformers.Core().V1().Services().Informer()
+	configmapsInformer := sharedInformers.Core().V1().ConfigMaps().Informer()
+	resourceQuotasInformer := sharedInformers.Core().V1().ResourceQuotas().Informer()
+	clusterRolesInformer := sharedInformers.Rbac().V1().ClusterRoles().Informer()
+	rolesInformer := sharedInformers.Rbac().V1().Roles().Informer()
+	clusterRoleBindingsInformer := sharedInformers.Rbac().V1().ClusterRoleBindings().Informer()
+	roleBindingsInformer := sharedInformers.Rbac().V1().RoleBindings().Informer()
 
 	sharedInformers.Start(stopChan)
 
@@ -214,6 +220,12 @@ func createInformers(stopChan <-chan struct{}, resync time.Duration) []cache.Sha
 		pvcInformer,
 		podsInformer,
 		servicesInformer,
+		configmapsInformer,
+		resourceQuotasInformer,
+		clusterRolesInformer,
+		rolesInformer,
+		clusterRoleBindingsInformer,
+		roleBindingsInformer,
 	}
 }
 

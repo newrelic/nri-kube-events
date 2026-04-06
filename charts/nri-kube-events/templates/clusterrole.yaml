@@ -17,6 +17,8 @@ rules:
   - persistentvolumeclaims
   - pods
   - services
+  - configmaps
+  - resourcequotas
   verbs:
   - get
   - watch
@@ -35,6 +37,17 @@ rules:
   resources:
   - cronjobs
   - jobs
+  verbs:
+  - get
+  - watch
+  - list
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - clusterroles
+  - roles
+  - clusterrolebindings
+  - rolebindings
   verbs:
   - get
   - watch
