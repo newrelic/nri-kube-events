@@ -32,7 +32,7 @@ jobs:
           go-version-file: 'go.mod'
 
       - name: Setup Minikube
-        uses: manusa/actions-setup-minikube@96202dee4ae1c2f46a62fe197273aaf22b83f42d # v2.16.1
+        uses: manusa/actions-setup-minikube@c714373206b0bc4eb9565d795fe5acf5e41ab483 # v2.17.1
         with:
           minikube version: v1.38.1
           kubernetes version: ${{ matrix.k8sVersion }}
@@ -62,7 +62,7 @@ jobs:
           echo "exceptions=$MINOR" >> $GITHUB_OUTPUT
 
       - name: Run E2E tests
-        uses: newrelic/newrelic-integration-e2e-action@c548a33a0c2941a4db4899ded766923eb3178e0e # v1.12.0
+        uses: newrelic/newrelic-integration-e2e-action@d0c7c2b8f9af227365d71c6b7fddbc024c9e331a # v1.12.1
         env:
           EXCEPTIONS_SOURCE_FILE: ${{ steps.exceptions-version.outputs.exceptions }}-exceptions.yml
         with:
