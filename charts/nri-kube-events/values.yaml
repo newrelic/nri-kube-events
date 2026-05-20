@@ -99,6 +99,13 @@ scrapers:
   events:
     enabled: true
 
+# -- Configure the monitoring of custom resources.
+# @default -- watch all CRs
+customResourceFilters:
+  # Filter format: group/version/resource. Resource name must be plural, no caps. Regex supported.
+  # Note: The agent will monitor any CR whose name matches any filter.
+  - "*/*/*"
+
 # -- Sets pod's priorityClassName. Can be configured also with `global.priorityClassName`
 priorityClassName: ""
 # -- (bool) Sets pod's hostNetwork. Can be configured also with `global.hostNetwork`
