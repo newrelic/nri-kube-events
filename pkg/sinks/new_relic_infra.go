@@ -22,12 +22,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/sethgrid/pester"
 	"github.com/sirupsen/logrus"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubectl/pkg/describe"
 
 	"github.com/newrelic/nri-kube-events/pkg/common"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/rest"
 )
 
 func init() {
@@ -144,15 +144,23 @@ func describeObject(object runtime.Object) (output string, err error) {
 
 	if err != nil {
 		// fallback to workaround for unsupported object types: manually initialize a describer
-		config, err := rest.InClusterConfig()
+		configFlags := genericclioptions.NewConfigFlags(true)
+
+		// Get the REST Mapper to find the mapping for the Custom Resource
+		restMapper, err := configFlags.ToRESTMapper()
 		if err != nil {
-			return "", fmt.Errorf("failed to get pod service account config: %w", err)
+			return "", err
 		}
 
-		gvk := common.K8SObjGetGVK(object)
-		describer, ok := describe.DescriberFor(gvk.GroupKind(), config)
-		if !ok {
-			return "", fmt.Errorf("unable to find a describer for this object: %v", object)
+		gvk := object.GetObjectKind().GroupVersionKind()
+		mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return "", fmt.Errorf("could not find REST mapping for %s: %w", gvk.String(), err)
+		}
+
+		describer, err := describe.Describer(configFlags, mapping)
+		if err != nil {
+			return "", fmt.Errorf("failed to get describer: %w", err)
 		}
 
 		objNS, objName, err := common.GetObjNamespaceAndName(object)

@@ -6,50 +6,7 @@ metadata:
     {{- include "newrelic.common.labels" . | nindent 4 }}
   name: {{ include "newrelic.common.naming.fullname" . }}
 rules:
-- apiGroups:
-  - ""
-  resources:
-  - events
-  - namespaces
-  - nodes
-  - jobs
-  - persistentvolumes
-  - persistentvolumeclaims
-  - pods
-  - services
-  - configmaps
-  - resourcequotas
-  verbs:
-  - get
-  - watch
-  - list
-- apiGroups:
-  - apps
-  resources:
-  - daemonsets
-  - deployments
-  verbs:
-  - get
-  - watch
-  - list
-- apiGroups:
-  - batch
-  resources:
-  - cronjobs
-  - jobs
-  verbs:
-  - get
-  - watch
-  - list
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - clusterroles
-  - roles
-  - clusterrolebindings
-  - rolebindings
-  verbs:
-  - get
-  - watch
-  - list
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
 {{- end -}}
