@@ -22,7 +22,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/sethgrid/pester"
 	"github.com/sirupsen/logrus"
-	"k8s.io/kubectl/pkg/describe"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/printers"
 
 	"github.com/newrelic/nri-kube-events/pkg/common"
 )
@@ -138,7 +139,7 @@ func (ns *newRelicInfraSink) HandleObject(kubeObj common.KubeObject) error {
 	gvk := common.K8SObjGetGVK(kubeObj.Obj)
 	objKind := gvk.Kind
 
-	desc, err := describe.DefaultObjectDescriber.DescribeObject(kubeObj.Obj)
+	desc, err := getK8sObjectState(kubeObj.Obj)
 	if err != nil {
 		ns.metrics.descErr.WithLabelValues(objKind).Inc()
 		return fmt.Errorf("failed to describe object: %w", err)
@@ -229,6 +230,18 @@ func (ns *newRelicInfraSink) HandleEvent(kubeEvent common.KubeEvent) error {
 	}
 
 	return nil
+}
+
+func getK8sObjectState(obj runtime.Object) (string, error) {
+	buf := &bytes.Buffer{}
+	printer := &printers.JSONPrinter{}
+
+	err := printer.PrintObj(obj, buf)
+	if err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
 }
 
 // formatEntity returns an entity id information as tuple of (entityType, entityName).
