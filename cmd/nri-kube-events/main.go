@@ -226,12 +226,12 @@ func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.D
 	factory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynamicClient, resync, corev1.NamespaceAll, nil)
 
 	crFilterMatchers := make([]*regexp.Regexp, len(crFilters))
-	for _, filter := range crFilters {
+	for i, filter := range crFilters {
 		matcher, err := regexp.Compile(filter)
 		if err != nil {
 			logrus.Fatalf("failed to compile regex from customResourceFilters: %v", err)
 		}
-		crFilterMatchers = append(crFilterMatchers, matcher)
+		crFilterMatchers[i] = matcher
 	}
 
 	var informers []cache.SharedIndexInformer
