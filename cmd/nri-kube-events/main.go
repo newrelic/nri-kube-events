@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -225,11 +226,8 @@ func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.D
 
 	factory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynamicClient, resync, corev1.NamespaceAll, nil)
 
-	// init regex matchers for CR filters from config
 	var crFilterMatchers []*regexp.Regexp
 	for _, filter := range crFilters {
-		filter = transformRegexToAllowGlobMatching(filter)
-
 		matcher, err := regexp.Compile(filter)
 		if err != nil {
 			logrus.Fatalf("failed to compile regex from customResourceFilters: %v", err)
@@ -240,29 +238,31 @@ func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.D
 	var informers []cache.SharedIndexInformer
 	for gv, list := range resourceMap {
 		for _, resource := range list.APIResources {
-			if isWatchable(resource) {
-				gvk := gv.WithKind(resource.Kind)
-				gvr := gv.WithResource(resource.Name)
+			if !shouldWatchResource(resource) {
+				continue
+			}
 
-				shouldMonitor := false
-				if scheme.Scheme.Recognizes(gvk) {
-					// always monitor built-in resources
-					shouldMonitor = true
-				} else {
-					// monitor a CR if it matches any of the filters from config
-					gvrKey := fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Version, gvr.Resource)
-					for _, m := range crFilterMatchers {
-						if m.MatchString(gvrKey) {
-							shouldMonitor = true
-							break
-						}
+			gvk := gv.WithKind(resource.Kind)
+			gvr := gv.WithResource(resource.Name)
+
+			shouldMonitor := false
+			if scheme.Scheme.Recognizes(gvk) {
+				// always monitor built-in resources
+				shouldMonitor = true
+			} else {
+				// monitor a CR if it matches any of the filters from config
+				gvrKey := fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Version, gvr.Resource)
+				for _, m := range crFilterMatchers {
+					if m.MatchString(gvrKey) {
+						shouldMonitor = true
+						break
 					}
 				}
+			}
 
-				if shouldMonitor {
-					resourceInformer := factory.ForResource(gvr).Informer()
-					informers = append(informers, resourceInformer)
-				}
+			if shouldMonitor {
+				resourceInformer := factory.ForResource(gvr).Informer()
+				informers = append(informers, resourceInformer)
 			}
 		}
 	}
@@ -272,27 +272,10 @@ func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.D
 	return informers
 }
 
-func isWatchable(ar metav1.APIResource) bool {
-	if strings.Contains(ar.Name, "/") {
-		return false
-	}
-	for _, verb := range ar.Verbs {
-		if verb == "watch" {
-			return true
-		}
-	}
-	return false
-}
-
-func transformRegexToAllowGlobMatching(regex string) string {
-	ignoreString := "___IGNORE_TEXT_HERE___"
-	// temporarily ignore `.*` substrings
-	step1 := strings.ReplaceAll(regex, ".*", ignoreString)
-	// translate `*` to `.*`
-	step2 := strings.ReplaceAll(step1, "*", ".*")
-	// revert ignored substrings
-	step3 := strings.ReplaceAll(step2, ignoreString, ".*")
-	return step3
+func shouldWatchResource(ar metav1.APIResource) bool {
+	// the agent should watch top-level resources that are watchable
+	isTopLevelResource := !strings.Contains(ar.Name, "/")
+	return isTopLevelResource && slices.Contains(ar.Verbs, "watch")
 }
 
 // getClientset returns a kubernetes clientset.
