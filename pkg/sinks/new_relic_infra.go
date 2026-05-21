@@ -22,6 +22,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/sethgrid/pester"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/printers"
 
@@ -139,7 +141,7 @@ func (ns *newRelicInfraSink) HandleObject(kubeObj common.KubeObject) error {
 	gvk := common.K8SObjGetGVK(kubeObj.Obj)
 	objKind := gvk.Kind
 
-	desc, err := getK8sObjectState(kubeObj.Obj)
+	desc, err := describeObject(kubeObj.Obj)
 	if err != nil {
 		ns.metrics.descErr.WithLabelValues(objKind).Inc()
 		return fmt.Errorf("failed to describe object: %w", err)
@@ -232,6 +234,22 @@ func (ns *newRelicInfraSink) HandleEvent(kubeEvent common.KubeEvent) error {
 	return nil
 }
 
+func describeObject(obj runtime.Object) (string, error) {
+	if unstr, ok := obj.(*unstructured.Unstructured); ok {
+		if unstr.GetKind() == "Secret" {
+			secret := &corev1.Secret{}
+			err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstr.Object, secret)
+			if err != nil {
+				return "", err
+			}
+			redactSecretValues(secret)
+			obj = secret
+		}
+	}
+
+	return getK8sObjectState(obj)
+}
+
 func getK8sObjectState(obj runtime.Object) (string, error) {
 	buf := &bytes.Buffer{}
 	printer := &printers.JSONPrinter{}
@@ -242,6 +260,22 @@ func getK8sObjectState(obj runtime.Object) (string, error) {
 	}
 
 	return buf.String(), nil
+}
+
+func redactSecretValues(secret *corev1.Secret) {
+	redactionText := "REDACTED"
+
+	if secret.Data != nil {
+		for key := range secret.Data {
+			secret.Data[key] = []byte(redactionText)
+		}
+	}
+
+	if secret.StringData != nil {
+		for key := range secret.StringData {
+			secret.StringData[key] = redactionText
+		}
+	}
 }
 
 // formatEntity returns an entity id information as tuple of (entityType, entityName).
