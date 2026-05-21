@@ -235,18 +235,8 @@ func (ns *newRelicInfraSink) HandleEvent(kubeEvent common.KubeEvent) error {
 }
 
 func describeObject(obj runtime.Object) (string, error) {
-	if unstr, ok := obj.(*unstructured.Unstructured); ok {
-		if unstr.GetKind() == "Secret" {
-			secret := &corev1.Secret{}
-			err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstr.Object, secret)
-			if err == nil {
-				redactSecretValues(secret)
-				obj = secret
-			}
-		}
-	}
-
-	return getK8sObjectState(obj)
+	describableObject := preprocessObjectForDescription(obj)
+	return getK8sObjectState(describableObject)
 }
 
 func getK8sObjectState(obj runtime.Object) (string, error) {
@@ -261,15 +251,30 @@ func getK8sObjectState(obj runtime.Object) (string, error) {
 	return buf.String(), nil
 }
 
+func preprocessObjectForDescription(obj runtime.Object) runtime.Object {
+	// if the object is a secret, redact its sensitive data
+	if unstr, ok := obj.(*unstructured.Unstructured); ok {
+		if unstr.GetKind() == "Secret" {
+			secret := &corev1.Secret{}
+			err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstr.Object, secret)
+			if err == nil {
+				redactSecretValues(secret)
+				return secret
+			}
+		}
+	}
+
+	return obj
+}
+
+// redact sensitive data from a secret
 func redactSecretValues(secret *corev1.Secret) {
 	redactionText := "REDACTED"
-
 	if secret.Data != nil {
 		for key := range secret.Data {
 			secret.Data[key] = []byte(redactionText)
 		}
 	}
-
 	if secret.StringData != nil {
 		for key := range secret.StringData {
 			secret.StringData[key] = redactionText
