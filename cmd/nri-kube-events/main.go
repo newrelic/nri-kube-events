@@ -29,7 +29,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -226,7 +225,7 @@ func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.D
 
 	factory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynamicClient, resync, corev1.NamespaceAll, nil)
 
-	var crFilterMatchers []*regexp.Regexp
+	crFilterMatchers := make([]*regexp.Regexp, len(crFilters))
 	for _, filter := range crFilters {
 		matcher, err := regexp.Compile(filter)
 		if err != nil {
@@ -282,13 +281,13 @@ func shouldWatchResource(ar metav1.APIResource) bool {
 // It loads a kubeconfig file if the kubeconfig parameter is set
 // If it's not set, it will try to load the InClusterConfig
 func getClientset(kubeconfig string) (*kubernetes.Clientset, error) {
-	var conf *restclient.Config
+	var conf *rest.Config
 	var err error
 
 	if kubeconfig != "" {
 		conf, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 	} else {
-		conf, err = restclient.InClusterConfig()
+		conf, err = rest.InClusterConfig()
 	}
 
 	if err != nil {
