@@ -75,8 +75,8 @@ func main() {
 		router.WithWorkQueueLength(cfg.WorkQueueLength), // will ignore null values
 	}
 
+	// load custom resource filters
 	rawFilters := os.Getenv("CR_FILTERS")
-
 	crFilters := []string{}
 	if rawFilters != "" {
 		err := json.Unmarshal([]byte(rawFilters), &crFilters)
@@ -224,7 +224,11 @@ func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.D
 
 	factory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynamicClient, resync, corev1.NamespaceAll, nil)
 
-	// add logic to enable informers for built-in resources
+	// should customers be able to control which built-in resources we report descriptions for? or should they always be watched?
+
+	// if they should always be watched, how should they be identified?
+	// is there a way to tell which resources are built-in from the discovery results?
+	// if not, could use a constant list, or implement ignore filters for CRs instead
 	var crFilterMatchers []*regexp.Regexp
 	for _, f := range crFilters {
 		safeStr := strings.ReplaceAll(f, ".*", "___DOT_STAR___")
@@ -244,12 +248,18 @@ func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.D
 			if isWatchable(resource) {
 				gvr := gv.WithResource(resource.Name)
 
-				gvrKey := fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Version, gvr.Resource)
 				shouldMonitor := false
-				for _, m := range crFilterMatchers {
-					if m.MatchString(gvrKey) {
-						shouldMonitor = true
-						break
+				if isBuiltIn(gv.Group) {
+					// always monitor built-in resources
+					shouldMonitor = true
+				} else {
+					// monitor a CR if it matches one of the filters from config
+					gvrKey := fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Version, gvr.Resource)
+					for _, m := range crFilterMatchers {
+						if m.MatchString(gvrKey) {
+							shouldMonitor = true
+							break
+						}
 					}
 				}
 
@@ -264,6 +274,30 @@ func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.D
 	factory.Start(stopChan)
 
 	return informers
+}
+
+func isBuiltIn(group string) bool {
+	// core group has no name
+	if group == "" {
+		return true
+	}
+
+	// check for common built-in groups
+	builtInShortGroups := map[string]struct{}{
+		"apps":        {},
+		"batch":       {},
+		"autoscaling": {},
+		"extensions":  {},
+	}
+	if _, ok := builtInShortGroups[group]; ok {
+		return true
+	}
+
+	// other built-in groups have suffix .k8s.io
+	if strings.HasSuffix(group, ".k8s.io") {
+		return true
+	}
+	return false
 }
 
 func isWatchable(ar metav1.APIResource) bool {
