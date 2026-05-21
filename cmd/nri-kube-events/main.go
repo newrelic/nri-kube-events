@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -224,15 +225,12 @@ func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.D
 
 	factory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynamicClient, resync, corev1.NamespaceAll, nil)
 
-	// init regex evaluators for CR filters from config
+	// init regex matchers for CR filters from config
 	var crFilterMatchers []*regexp.Regexp
-	for _, f := range crFilters {
-		// allow glob matching (e.g. *)
-		safeStr := strings.ReplaceAll(f, ".*", "___DOT_STAR___")
-		safeStr = strings.ReplaceAll(safeStr, "*", ".*")
-		finalRegex := strings.ReplaceAll(safeStr, "___DOT_STAR___", ".*")
+	for _, filter := range crFilters {
+		filter = transformRegexToAllowGlobMatching(filter)
 
-		matcher, err := regexp.Compile(finalRegex)
+		matcher, err := regexp.Compile(filter)
 		if err != nil {
 			logrus.Fatalf("failed to compile regex from customResourceFilters: %v", err)
 		}
@@ -243,14 +241,15 @@ func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.D
 	for gv, list := range resourceMap {
 		for _, resource := range list.APIResources {
 			if isWatchable(resource) {
+				gvk := gv.WithKind(resource.Kind)
 				gvr := gv.WithResource(resource.Name)
 
 				shouldMonitor := false
-				if isBuiltIn(gv.Group) {
+				if scheme.Scheme.Recognizes(gvk) {
 					// always monitor built-in resources
 					shouldMonitor = true
 				} else {
-					// monitor a CR if it matches one of the filters from config
+					// monitor a CR if it matches any of the filters from config
 					gvrKey := fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Version, gvr.Resource)
 					for _, m := range crFilterMatchers {
 						if m.MatchString(gvrKey) {
@@ -273,30 +272,6 @@ func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.D
 	return informers
 }
 
-func isBuiltIn(group string) bool {
-	// core group has no name
-	if group == "" {
-		return true
-	}
-
-	// check for common built-in groups
-	builtInShortGroups := map[string]struct{}{
-		"apps":        {},
-		"batch":       {},
-		"autoscaling": {},
-		"extensions":  {},
-	}
-	if _, ok := builtInShortGroups[group]; ok {
-		return true
-	}
-
-	// other built-in groups have suffix .k8s.io
-	if strings.HasSuffix(group, ".k8s.io") {
-		return true
-	}
-	return false
-}
-
 func isWatchable(ar metav1.APIResource) bool {
 	if strings.Contains(ar.Name, "/") {
 		return false
@@ -307,6 +282,17 @@ func isWatchable(ar metav1.APIResource) bool {
 		}
 	}
 	return false
+}
+
+func transformRegexToAllowGlobMatching(regex string) string {
+	ignoreString := "___IGNORE_TEXT_HERE___"
+	// temporarily ignore `.*` substrings
+	step1 := strings.ReplaceAll(regex, ".*", ignoreString)
+	// translate `*` to `.*`
+	step2 := strings.ReplaceAll(step1, "*", ".*")
+	// revert ignored substrings
+	step3 := strings.ReplaceAll(step2, ignoreString, ".*")
+	return step3
 }
 
 // getClientset returns a kubernetes clientset.
