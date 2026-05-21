@@ -224,13 +224,10 @@ func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.D
 
 	factory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynamicClient, resync, corev1.NamespaceAll, nil)
 
-	// should customers be able to control which built-in resources we report descriptions for? or should they always be watched?
-
-	// if they should always be watched, how should they be identified?
-	// is there a way to tell which resources are built-in from the discovery results?
-	// if not, could use a constant list, or implement ignore filters for CRs instead
+	// init regex evaluators for CR filters from config
 	var crFilterMatchers []*regexp.Regexp
 	for _, f := range crFilters {
+		// allow glob matching (e.g. *)
 		safeStr := strings.ReplaceAll(f, ".*", "___DOT_STAR___")
 		safeStr = strings.ReplaceAll(safeStr, "*", ".*")
 		finalRegex := strings.ReplaceAll(safeStr, "___DOT_STAR___", ".*")
