@@ -239,11 +239,10 @@ func describeObject(obj runtime.Object) (string, error) {
 		if unstr.GetKind() == "Secret" {
 			secret := &corev1.Secret{}
 			err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstr.Object, secret)
-			if err != nil {
-				return "", err
+			if err == nil {
+				redactSecretValues(secret)
+				obj = secret
 			}
-			redactSecretValues(secret)
-			obj = secret
 		}
 	}
 
