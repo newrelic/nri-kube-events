@@ -176,9 +176,9 @@ func TestNewRelicInfraSink_HandleEvent_AddEventError(t *testing.T) {
 
 func TestDescribeObject(t *testing.T) {
 	tests := []struct {
-		name           string
 		inputObj       runtime.Object
 		validateResult func(t *testing.T, output string)
+		name           string
 		wantErr        bool
 	}{
 		{
@@ -207,6 +207,7 @@ func TestDescribeObject(t *testing.T) {
 					"metadata": map[string]interface{}{
 						"name": "my-secret",
 					},
+					// #nosec G101
 					"data": map[string]interface{}{
 						"password": "c3VwZXItc2VjcmV0LWJhc2U2NA==", // base64 for super-secret-base64
 					},
