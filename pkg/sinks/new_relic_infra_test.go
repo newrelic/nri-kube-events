@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/newrelic/nri-kube-events/pkg/common"
 )
@@ -169,5 +171,84 @@ func TestNewRelicInfraSink_HandleEvent_AddEventError(t *testing.T) {
 	wantedError := "couldn't add event"
 	if !strings.Contains(err.Error(), wantedError) {
 		t.Errorf("wanted error with message '%s' got: '%v'", wantedError, err)
+	}
+}
+
+func TestDescribeObject(t *testing.T) {
+	tests := []struct {
+		name           string
+		inputObj       runtime.Object
+		validateResult func(t *testing.T, output string)
+		wantErr        bool
+	}{
+		{
+			name: "Standard pod",
+			inputObj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata": map[string]interface{}{
+						"name": "my-pod",
+					},
+				},
+			},
+			validateResult: func(t *testing.T, output string) {
+				assert.Contains(t, output, `"name": "my-pod"`)
+				assert.Contains(t, output, `"kind": "Pod"`)
+			},
+			wantErr: false,
+		},
+		{
+			name: "Secret",
+			inputObj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Secret",
+					"metadata": map[string]interface{}{
+						"name": "my-secret",
+					},
+					"data": map[string]interface{}{
+						"password": "c3VwZXItc2VjcmV0LWJhc2U2NA==", // base64 for super-secret-base64
+					},
+					"stringData": map[string]interface{}{
+						"api-key": "raw-api-token",
+					},
+				},
+			},
+			validateResult: func(t *testing.T, output string) {
+				var result map[string]interface{}
+				if err := json.Unmarshal([]byte(output), &result); err != nil {
+					t.Fatalf("Failed to unmarshal output json: %v", err)
+				}
+
+				data, ok := result["data"].(map[string]interface{})
+				if !ok {
+					t.Fatal("Expected 'data' map to exist in output")
+				}
+
+				// "UkVEQUNURUQ=" is the base64 encoding of "REDACTED"
+				assert.Equal(t, data["password"], "UkVEQUNURUQ=")
+
+				stringData, ok := result["stringData"].(map[string]interface{})
+				if !ok {
+					t.Fatal("Expected 'stringData' map to exist in output")
+				}
+				assert.Equal(t, stringData["api-key"], "REDACTED")
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := describeObject(tt.inputObj)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("describeObject() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if err == nil && tt.validateResult != nil {
+				tt.validateResult(t, got)
+			}
+		})
 	}
 }
