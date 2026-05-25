@@ -104,7 +104,7 @@ scrapers:
 customResourceFilters:
   # Custom resource ID: group/version/resource. Use plural form of resource name. Regex is supported.
   # Note: The agent will monitor any CR whose name is a full match for any of the filters.
-  - "^.*/.*/.*$"
+  - ".*"
 
 # -- Sets pod's priorityClassName. Can be configured also with `global.priorityClassName`
 priorityClassName: ""
