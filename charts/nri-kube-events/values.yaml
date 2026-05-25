@@ -99,12 +99,12 @@ scrapers:
   events:
     enabled: true
 
-# -- Configure the monitoring of custom resources.
+# -- Define the scope of monitoring for custom resources.
 # @default -- watch all CRs
 customResourceFilters:
-  # Filter format: group/version/resource. Use plural form of resource name. Regex is supported.
+  # Custom resource ID: group/version/resource. Use plural form of resource name. Regex is supported.
   # Note: The agent will monitor any CR whose name is a full match for any of the filters.
-  - ".*/.*/.*"
+  - "^.*/.*/.*$"
 
 # -- Sets pod's priorityClassName. Can be configured also with `global.priorityClassName`
 priorityClassName: ""
