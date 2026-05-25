@@ -272,9 +272,9 @@ func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.D
 }
 
 func shouldWatchResource(ar metav1.APIResource) bool {
-	// the agent should watch top-level resources that are watchable
 	isTopLevelResource := !strings.Contains(ar.Name, "/")
-	return isTopLevelResource && slices.Contains(ar.Verbs, "watch")
+	isWatchable := slices.Contains(ar.Verbs, "watch")
+	return isTopLevelResource && isWatchable
 }
 
 // getClientset returns a kubernetes clientset.
