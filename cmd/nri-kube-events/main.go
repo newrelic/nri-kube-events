@@ -203,6 +203,15 @@ func createEventsInformer(stopChan <-chan struct{}) cache.SharedIndexInformer {
 
 // createInformers creates a SharedIndexInformer that will listen for resources we care aobut.
 func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.Duration) []cache.SharedIndexInformer {
+	crFilterMatchers := make([]*regexp.Regexp, len(crFilters))
+	for i, filter := range crFilters {
+		matcher, err := regexp.Compile(filter)
+		if err != nil {
+			logrus.Fatalf("failed to compile regex from customResourceFilters: %v", err)
+		}
+		crFilterMatchers[i] = matcher
+	}
+
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		logrus.Fatalf("failed to get pod service account config: %v", err)
@@ -224,15 +233,6 @@ func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.D
 	}
 
 	factory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynamicClient, resync, corev1.NamespaceAll, nil)
-
-	crFilterMatchers := make([]*regexp.Regexp, len(crFilters))
-	for i, filter := range crFilters {
-		matcher, err := regexp.Compile(filter)
-		if err != nil {
-			logrus.Fatalf("failed to compile regex from customResourceFilters: %v", err)
-		}
-		crFilterMatchers[i] = matcher
-	}
 
 	var informers []cache.SharedIndexInformer
 	for gv, list := range resourceMap {
