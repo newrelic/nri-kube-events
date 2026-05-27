@@ -141,7 +141,7 @@ func (ns *newRelicInfraSink) HandleObject(kubeObj common.KubeObject) error {
 	gvk := common.K8SObjGetGVK(kubeObj.Obj)
 	objKind := gvk.Kind
 
-	desc, err := describeObject(kubeObj.Obj)
+	desc, err := getSafeK8sObjectState(kubeObj.Obj)
 	if err != nil {
 		ns.metrics.descErr.WithLabelValues(objKind).Inc()
 		return fmt.Errorf("failed to describe object: %w", err)
@@ -234,8 +234,8 @@ func (ns *newRelicInfraSink) HandleEvent(kubeEvent common.KubeEvent) error {
 	return nil
 }
 
-func describeObject(obj runtime.Object) (string, error) {
-	describableObject := preprocessObjectForDescription(obj)
+func getSafeK8sObjectState(obj runtime.Object) (string, error) {
+	describableObject := redactSensitiveInfoFromObject(obj)
 	return getK8sObjectState(describableObject)
 }
 
@@ -251,7 +251,7 @@ func getK8sObjectState(obj runtime.Object) (string, error) {
 	return buf.String(), nil
 }
 
-func preprocessObjectForDescription(obj runtime.Object) runtime.Object {
+func redactSensitiveInfoFromObject(obj runtime.Object) runtime.Object {
 	// if the object is a secret, redact its sensitive data
 	if unstr, ok := obj.(*unstructured.Unstructured); ok {
 		if unstr.GetKind() == "Secret" {

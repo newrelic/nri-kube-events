@@ -242,7 +242,7 @@ func TestDescribeObject(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := describeObject(tt.inputObj)
+			got, err := getSafeK8sObjectState(tt.inputObj)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("describeObject() error = %v, wantErr %v", err, tt.wantErr)
 				return
