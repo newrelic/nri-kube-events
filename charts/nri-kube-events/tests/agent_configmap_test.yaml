@@ -35,6 +35,35 @@ tests:
               level: trace
             fedramp: true
 
+  - it: sets ca_bundle_file when forwarder.customCACert.secretName is provided
+    set:
+      cluster: test-cluster
+      licenseKey: us-whatever
+      forwarder.customCACert.secretName: my-zscaler-ca
+    asserts:
+      - equal:
+          path: data["newrelic-infra.yml"]
+          value: |
+            is_forward_only: true
+            http_server_enabled: true
+            http_server_port: 8001
+            ca_bundle_file: /etc/newrelic-infra/custom-ca/ca.crt
+
+  - it: sets ca_bundle_file with custom certKey when provided
+    set:
+      cluster: test-cluster
+      licenseKey: us-whatever
+      forwarder.customCACert.configMapName: my-zscaler-ca-cm
+      forwarder.customCACert.certKey: zscaler.pem
+    asserts:
+      - equal:
+          path: data["newrelic-infra.yml"]
+          value: |
+            is_forward_only: true
+            http_server_enabled: true
+            http_server_port: 8001
+            ca_bundle_file: /etc/newrelic-infra/custom-ca/zscaler.pem
+
   - it: does not template if the http sink is disabled
     set:
       cluster: test-cluster
