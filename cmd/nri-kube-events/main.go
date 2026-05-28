@@ -202,13 +202,13 @@ func createEventsInformer(stopChan <-chan struct{}) cache.SharedIndexInformer {
 
 // createInformers creates a SharedIndexInformer that will listen for resources we care aobut.
 func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.Duration) []cache.SharedIndexInformer {
-	builtInResourceInformers, err := initializeBuiltInResourceInformers(stopChan, resync)
+	builtInResourceInformers, err := createBuiltInResourceInformers(stopChan, resync)
 
 	if err != nil {
 		logrus.Fatalf("failed to initialize informers for built-in resources: %w", err)
 	}
 
-	customResourceInformers, err := initializeCustomResourceInformers(crFilters, stopChan, resync)
+	customResourceInformers, err := createCustomResourceInformers(crFilters, stopChan, resync)
 
 	if err != nil {
 		logrus.Errorf("failed to initialize informers for custom resources: %w", err)
@@ -217,7 +217,7 @@ func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.D
 	return append(builtInResourceInformers, customResourceInformers...)
 }
 
-func initializeBuiltInResourceInformers(stopChan <-chan struct{}, resync time.Duration) ([]cache.SharedIndexInformer, error) {
+func createBuiltInResourceInformers(stopChan <-chan struct{}, resync time.Duration) ([]cache.SharedIndexInformer, error) {
 	clientset, err := getClientset(*kubeConfig)
 
 	if err != nil {
@@ -290,7 +290,7 @@ func initializeBuiltInResourceInformers(stopChan <-chan struct{}, resync time.Du
 	}, nil
 }
 
-func initializeCustomResourceInformers(crFilters []string, stopChan <-chan struct{}, resync time.Duration) ([]cache.SharedIndexInformer, error) {
+func createCustomResourceInformers(crFilters []string, stopChan <-chan struct{}, resync time.Duration) ([]cache.SharedIndexInformer, error) {
 	informers := []cache.SharedIndexInformer{}
 	var crFilterMatchers []*regexp.Regexp
 	for _, filter := range crFilters {
