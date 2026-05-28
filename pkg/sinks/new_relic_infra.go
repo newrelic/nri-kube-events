@@ -235,8 +235,13 @@ func (ns *newRelicInfraSink) HandleEvent(kubeEvent common.KubeEvent) error {
 }
 
 func safelySerializeK8sObjectToJSON(obj runtime.Object) (string, error) {
-	describableObject := redactSensitiveInfoFromObject(obj)
-	return serializeK8sObjectToJSON(describableObject)
+	safeObject, err := redactSensitiveInfoFromObject(obj)
+
+	if err != nil {
+		return "", err
+	}
+
+	return serializeK8sObjectToJSON(safeObject)
 }
 
 func serializeK8sObjectToJSON(obj runtime.Object) (string, error) {
@@ -251,7 +256,7 @@ func serializeK8sObjectToJSON(obj runtime.Object) (string, error) {
 	return buf.String(), nil
 }
 
-func redactSensitiveInfoFromObject(obj runtime.Object) runtime.Object {
+func redactSensitiveInfoFromObject(obj runtime.Object) (runtime.Object, error) {
 	// if the object is a secret, redact its sensitive data
 	if unstr, ok := obj.(*unstructured.Unstructured); ok {
 		if unstr.GetKind() == "Secret" {
@@ -259,12 +264,14 @@ func redactSensitiveInfoFromObject(obj runtime.Object) runtime.Object {
 			err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstr.Object, secret)
 			if err == nil {
 				redactSecretValues(secret)
-				return secret
+				return secret, nil
+			} else {
+				return nil, fmt.Errorf("failed to redact sensitive info from kubernetes object: %w", err)
 			}
 		}
 	}
 
-	return obj
+	return obj, nil
 }
 
 // redact sensitive data from a secret
