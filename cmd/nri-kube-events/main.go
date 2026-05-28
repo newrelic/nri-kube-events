@@ -203,13 +203,14 @@ func createEventsInformer(stopChan <-chan struct{}) cache.SharedIndexInformer {
 
 // createInformers creates a SharedIndexInformer that will listen for resources we care aobut.
 func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.Duration) []cache.SharedIndexInformer {
-	crFilterMatchers := make([]*regexp.Regexp, len(crFilters))
-	for i, filter := range crFilters {
+	var crFilterMatchers []*regexp.Regexp
+	for _, filter := range crFilters {
 		matcher, err := regexp.Compile(filter)
-		if err != nil {
-			logrus.Fatalf("failed to compile regex from customResourceFilters: %v", err)
+		if err == nil {
+			crFilterMatchers = append(crFilterMatchers, matcher)
+		} else {
+			logrus.Warnf("failed to compile regex from customResourceFilters: %v", err)
 		}
-		crFilterMatchers[i] = matcher
 	}
 
 	config, err := rest.InClusterConfig()
