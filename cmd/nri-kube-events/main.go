@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
@@ -201,49 +202,138 @@ func createEventsInformer(stopChan <-chan struct{}) cache.SharedIndexInformer {
 
 // createInformers creates a SharedIndexInformer that will listen for resources we care aobut.
 func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.Duration) []cache.SharedIndexInformer {
+	builtInResourceInformers, err := initializeBuiltInResourceInformers(stopChan, resync)
+
+	if err != nil {
+		logrus.Fatalf("failed to initialize informers for built-in resources: %w", err)
+	}
+
+	customResourceInformers, err := initializeCustomResourceInformers(crFilters, stopChan, resync)
+
+	if err != nil {
+		logrus.Errorf("failed to initialize informers for custom resources: %w", err)
+	}
+
+	return append(builtInResourceInformers, customResourceInformers...)
+}
+
+func initializeBuiltInResourceInformers(stopChan <-chan struct{}, resync time.Duration) ([]cache.SharedIndexInformer, error) {
+	clientset, err := getClientset(*kubeConfig)
+
+	if err != nil {
+		return nil, fmt.Errorf("could not create kubernetes client: %w", err)
+	}
+
+	sharedInformerFactory := informers.NewSharedInformerFactory(clientset, resync)
+
+	// built-in resources that are watched unconditionally
+	podInformer := sharedInformerFactory.Core().V1().Pods().Informer()
+	nodeInformer := sharedInformerFactory.Core().V1().Nodes().Informer()
+	deploymentInformer := sharedInformerFactory.Apps().V1().Deployments().Informer()
+	daemonsetInformer := sharedInformerFactory.Apps().V1().DaemonSets().Informer()
+	statefulSetInformer := sharedInformerFactory.Apps().V1().StatefulSets().Informer()
+	replicaSetInformer := sharedInformerFactory.Apps().V1().ReplicaSets().Informer()
+	configMapInformer := sharedInformerFactory.Core().V1().ConfigMaps().Informer()
+	secretInformer := sharedInformerFactory.Core().V1().Secrets().Informer()
+	serviceInformer := sharedInformerFactory.Core().V1().Services().Informer()
+	namespaceInformer := sharedInformerFactory.Core().V1().Namespaces().Informer()
+	jobInformer := sharedInformerFactory.Batch().V1().Jobs().Informer()
+	cronjobInformer := sharedInformerFactory.Batch().V1().CronJobs().Informer()
+	storageClassInformer := sharedInformerFactory.Storage().V1().StorageClasses().Informer()
+	pvInformer := sharedInformerFactory.Core().V1().PersistentVolumes().Informer()
+	pvcInformer := sharedInformerFactory.Core().V1().PersistentVolumeClaims().Informer()
+	resourceQuotaInformer := sharedInformerFactory.Core().V1().ResourceQuotas().Informer()
+	limitRangeInformer := sharedInformerFactory.Core().V1().LimitRanges().Informer()
+	hpaV1Informer := sharedInformerFactory.Autoscaling().V1().HorizontalPodAutoscalers().Informer()
+	hpaV2Informer := sharedInformerFactory.Autoscaling().V2().HorizontalPodAutoscalers().Informer()
+	pdbInformer := sharedInformerFactory.Policy().V1().PodDisruptionBudgets().Informer()
+	endpointInformer := sharedInformerFactory.Core().V1().Endpoints().Informer()
+	networkPolicyInformer := sharedInformerFactory.Networking().V1().NetworkPolicies().Informer()
+	endpointSliceInformer := sharedInformerFactory.Discovery().V1().EndpointSlices().Informer()
+	serviceAccountInformer := sharedInformerFactory.Core().V1().ServiceAccounts().Informer()
+	clusterRoleInformer := sharedInformerFactory.Rbac().V1().ClusterRoles().Informer()
+	roleInformer := sharedInformerFactory.Rbac().V1().Roles().Informer()
+	clusterRoleBindingInformer := sharedInformerFactory.Rbac().V1().ClusterRoleBindings().Informer()
+	roleBindingInformer := sharedInformerFactory.Rbac().V1().RoleBindings().Informer()
+
+	sharedInformerFactory.Start(stopChan)
+
+	return []cache.SharedIndexInformer{
+		cronjobInformer,
+		daemonsetInformer,
+		deploymentInformer,
+		namespaceInformer,
+		nodeInformer,
+		jobInformer,
+		pvInformer,
+		pvcInformer,
+		podInformer,
+		serviceInformer,
+		replicaSetInformer,
+		statefulSetInformer,
+		storageClassInformer,
+		configMapInformer,
+		secretInformer,
+		resourceQuotaInformer,
+		limitRangeInformer,
+		hpaV1Informer,
+		hpaV2Informer,
+		pdbInformer,
+		endpointInformer,
+		networkPolicyInformer,
+		endpointSliceInformer,
+		serviceAccountInformer,
+		clusterRoleInformer,
+		roleInformer,
+		clusterRoleBindingInformer,
+		roleBindingInformer,
+	}, nil
+}
+
+func initializeCustomResourceInformers(crFilters []string, stopChan <-chan struct{}, resync time.Duration) ([]cache.SharedIndexInformer, error) {
+	informers := []cache.SharedIndexInformer{}
 	var crFilterMatchers []*regexp.Regexp
 	for _, filter := range crFilters {
 		matcher, err := regexp.Compile(filter)
 		if err == nil {
 			crFilterMatchers = append(crFilterMatchers, matcher)
 		} else {
-			logrus.Warnf("failed to compile regex from customResourceFilters: %v", err)
+			logrus.Warnf("failed to compile the following regex from customResourceFilters: %v", err)
 		}
 	}
 
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		logrus.Fatalf("failed to get pod service account config: %v", err)
+		return nil, fmt.Errorf("failed to get pod service account config: %w", err)
 	}
 
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {
-		logrus.Fatalf("could not create discovery client: %v", err)
+		return nil, fmt.Errorf("could not create discovery client: %w", err)
 	}
 
 	_, resourceMap, _, err := discoveryClient.GroupsAndMaybeResources()
 	if err != nil {
-		logrus.Fatalf("could not discover groups and/or resources: %v", err)
+		return nil, fmt.Errorf("could not discover groups and/or resources: %w", err)
 	}
 
 	dynamicClient, err := dynamic.NewForConfig(config)
 	if err != nil {
-		logrus.Fatalf("could not create dynamic client: %v", err)
+		return nil, fmt.Errorf("could not create dynamic client: %w", err)
 	}
 
-	factory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynamicClient, resync, corev1.NamespaceAll, nil)
+	dynamicInformerFactory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynamicClient, resync, corev1.NamespaceAll, nil)
 
-	var informers []cache.SharedIndexInformer
 	for gv, list := range resourceMap {
 		for _, resource := range list.APIResources {
 			shouldWatch := false
+			gvk := gv.WithKind(resource.Kind)
 			gvr := gv.WithResource(resource.Name)
 
-			if isCommonBuiltInResource(resource) {
-				// always monitor common built-in resources
-				shouldWatch = true
+			if scheme.Scheme.Recognizes(gvk) {
+				// ignore built-in resources
+				shouldWatch = false
 			} else {
-				// monitor a CR if it matches any of the filters from config
 				gvrKey := fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Version, gvr.Resource)
 				for _, m := range crFilterMatchers {
 					if m.MatchString(gvrKey) {
@@ -255,53 +345,18 @@ func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.D
 
 			if shouldWatch {
 				if !isWatchableResource(resource) {
-					logrus.Warnf("Failed to watch resource %s because the service account cluster role lacks permission", gvr)
+					logrus.Warnf("Failed to watch custom resource %s because the service account cluster role lacks permission", gvr)
 					continue
 				}
-				resourceInformer := factory.ForResource(gvr).Informer()
+				resourceInformer := dynamicInformerFactory.ForResource(gvr).Informer()
 				informers = append(informers, resourceInformer)
 			}
 		}
 	}
 
-	factory.Start(stopChan)
+	dynamicInformerFactory.Start(stopChan)
 
-	return informers
-}
-
-func isCommonBuiltInResource(resource metav1.APIResource) bool {
-	commonBuiltInResources := map[metav1.GroupResource]struct{}{
-		{Group: "", Resource: "configmaps"}:                                   {},
-		{Group: "", Resource: "endpoints"}:                                    {},
-		{Group: "", Resource: "limitranges"}:                                  {},
-		{Group: "", Resource: "namespaces"}:                                   {},
-		{Group: "", Resource: "nodes"}:                                        {},
-		{Group: "", Resource: "persistentvolumes"}:                            {},
-		{Group: "", Resource: "persistentvolumeclaims"}:                       {},
-		{Group: "", Resource: "pods"}:                                         {},
-		{Group: "", Resource: "resourcequotas"}:                               {},
-		{Group: "", Resource: "secrets"}:                                      {},
-		{Group: "", Resource: "serviceaccounts"}:                              {},
-		{Group: "", Resource: "services"}:                                     {},
-		{Group: "apps", Resource: "daemonsets"}:                               {},
-		{Group: "apps", Resource: "deployments"}:                              {},
-		{Group: "apps", Resource: "replicasets"}:                              {},
-		{Group: "apps", Resource: "statefulsets"}:                             {},
-		{Group: "autoscaling", Resource: "horizontalpodautoscalers"}:          {},
-		{Group: "batch", Resource: "cronjobs"}:                                {},
-		{Group: "batch", Resource: "jobs"}:                                    {},
-		{Group: "policy", Resource: "poddisruptionbudgets"}:                   {},
-		{Group: "networking.k8s.io", Resource: "endpointslices"}:              {},
-		{Group: "networking.k8s.io", Resource: "networkpolicies"}:             {},
-		{Group: "rbac.authorization.k8s.io", Resource: "clusterroles"}:        {},
-		{Group: "rbac.authorization.k8s.io", Resource: "clusterrolebindings"}: {},
-		{Group: "rbac.authorization.k8s.io", Resource: "roles"}:               {},
-		{Group: "rbac.authorization.k8s.io", Resource: "rolebindings"}:        {},
-		{Group: "storage.k8s.io", Resource: "storageclasses"}:                 {},
-	}
-	gr := metav1.GroupResource{Group: resource.Group, Resource: resource.Name}
-	_, ok := commonBuiltInResources[gr]
-	return ok
+	return informers, nil
 }
 
 func isWatchableResource(ar metav1.APIResource) bool {

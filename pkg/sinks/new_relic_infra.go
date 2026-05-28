@@ -135,13 +135,13 @@ type newRelicInfraSink struct {
 }
 
 // HandleObject sends the descriptions for the object to the New Relic Agent
-func (ns *newRelicInfraSink) HandleObject(kubeObj common.KubeObject) error {
+func (ns *newRelicInfraSink) HandleObject(obj runtime.Object) error {
 	defer ns.sdkIntegration.Clear()
 
-	gvk := common.K8SObjGetGVK(kubeObj.Obj)
+	gvk := common.K8SObjGetGVK(obj)
 	objKind := gvk.Kind
 
-	desc, err := getSafeK8sObjectState(kubeObj.Obj)
+	desc, err := safelySerializeK8sObjectToJSON(obj)
 	if err != nil {
 		ns.metrics.descErr.WithLabelValues(objKind).Inc()
 		return fmt.Errorf("failed to describe object: %w", err)
@@ -153,7 +153,7 @@ func (ns *newRelicInfraSink) HandleObject(kubeObj common.KubeObject) error {
 		return nil
 	}
 
-	objNS, objName, err := common.GetObjNamespaceAndName(kubeObj.Obj)
+	objNS, objName, err := common.GetObjNamespaceAndName(obj)
 	if err != nil {
 		return fmt.Errorf("failed to get object namespace/name: %w", err)
 	}
@@ -234,12 +234,12 @@ func (ns *newRelicInfraSink) HandleEvent(kubeEvent common.KubeEvent) error {
 	return nil
 }
 
-func getSafeK8sObjectState(obj runtime.Object) (string, error) {
+func safelySerializeK8sObjectToJSON(obj runtime.Object) (string, error) {
 	describableObject := redactSensitiveInfoFromObject(obj)
-	return getK8sObjectState(describableObject)
+	return serializeK8sObjectToJSON(describableObject)
 }
 
-func getK8sObjectState(obj runtime.Object) (string, error) {
+func serializeK8sObjectToJSON(obj runtime.Object) (string, error) {
 	buf := &bytes.Buffer{}
 	printer := &printers.JSONPrinter{}
 
