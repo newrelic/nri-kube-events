@@ -13,7 +13,6 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -27,7 +26,6 @@ import (
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
@@ -238,29 +236,28 @@ func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.D
 	var informers []cache.SharedIndexInformer
 	for gv, list := range resourceMap {
 		for _, resource := range list.APIResources {
-			if !shouldWatchResource(resource) {
-				continue
-			}
-
-			gvk := gv.WithKind(resource.Kind)
+			shouldWatch := false
 			gvr := gv.WithResource(resource.Name)
 
-			shouldMonitor := false
-			if scheme.Scheme.Recognizes(gvk) {
-				// always monitor built-in resources
-				shouldMonitor = true
+			if isCommonBuiltInResource(resource) {
+				// always monitor common built-in resources
+				shouldWatch = true
 			} else {
 				// monitor a CR if it matches any of the filters from config
 				gvrKey := fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Version, gvr.Resource)
 				for _, m := range crFilterMatchers {
 					if m.MatchString(gvrKey) {
-						shouldMonitor = true
+						shouldWatch = true
 						break
 					}
 				}
 			}
 
-			if shouldMonitor {
+			if shouldWatch {
+				if !isWatchableResource(resource) {
+					logrus.Warnf("Failed to watch resource %s because the service account cluster role lacks permission", gvr)
+					continue
+				}
 				resourceInformer := factory.ForResource(gvr).Informer()
 				informers = append(informers, resourceInformer)
 			}
@@ -272,10 +269,43 @@ func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.D
 	return informers
 }
 
-func shouldWatchResource(ar metav1.APIResource) bool {
-	isTopLevelResource := !strings.Contains(ar.Name, "/")
-	isWatchable := slices.Contains(ar.Verbs, "watch")
-	return isTopLevelResource && isWatchable
+func isCommonBuiltInResource(resource metav1.APIResource) bool {
+	commonBuiltInResources := map[metav1.GroupResource]struct{}{
+		{Group: "", Resource: "configmaps"}:                                   {},
+		{Group: "", Resource: "endpoints"}:                                    {},
+		{Group: "", Resource: "limitranges"}:                                  {},
+		{Group: "", Resource: "namespaces"}:                                   {},
+		{Group: "", Resource: "nodes"}:                                        {},
+		{Group: "", Resource: "persistentvolumes"}:                            {},
+		{Group: "", Resource: "persistentvolumeclaims"}:                       {},
+		{Group: "", Resource: "pods"}:                                         {},
+		{Group: "", Resource: "resourcequotas"}:                               {},
+		{Group: "", Resource: "secrets"}:                                      {},
+		{Group: "", Resource: "serviceaccounts"}:                              {},
+		{Group: "", Resource: "services"}:                                     {},
+		{Group: "apps", Resource: "daemonsets"}:                               {},
+		{Group: "apps", Resource: "deployments"}:                              {},
+		{Group: "apps", Resource: "replicasets"}:                              {},
+		{Group: "apps", Resource: "statefulsets"}:                             {},
+		{Group: "autoscaling", Resource: "horizontalpodautoscalers"}:          {},
+		{Group: "batch", Resource: "cronjobs"}:                                {},
+		{Group: "batch", Resource: "jobs"}:                                    {},
+		{Group: "policy", Resource: "poddisruptionbudgets"}:                   {},
+		{Group: "networking.k8s.io", Resource: "endpointslices"}:              {},
+		{Group: "networking.k8s.io", Resource: "networkpolicies"}:             {},
+		{Group: "rbac.authorization.k8s.io", Resource: "clusterroles"}:        {},
+		{Group: "rbac.authorization.k8s.io", Resource: "clusterrolebindings"}: {},
+		{Group: "rbac.authorization.k8s.io", Resource: "roles"}:               {},
+		{Group: "rbac.authorization.k8s.io", Resource: "rolebindings"}:        {},
+		{Group: "storage.k8s.io", Resource: "storageclasses"}:                 {},
+	}
+	gr := metav1.GroupResource{Group: resource.Group, Resource: resource.Name}
+	_, ok := commonBuiltInResources[gr]
+	return ok
+}
+
+func isWatchableResource(ar metav1.APIResource) bool {
+	return slices.Contains(ar.Verbs, "watch")
 }
 
 // getClientset returns a kubernetes clientset.
