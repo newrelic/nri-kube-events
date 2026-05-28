@@ -205,13 +205,13 @@ func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.D
 	builtInResourceInformers, err := createBuiltInResourceInformers(stopChan, resync)
 
 	if err != nil {
-		logrus.Fatalf("failed to initialize informers for built-in resources: %w", err)
+		logrus.Fatalf("failed to initialize informers for built-in resources: %s", err)
 	}
 
 	customResourceInformers, err := createCustomResourceInformers(crFilters, stopChan, resync)
 
 	if err != nil {
-		logrus.Errorf("failed to initialize informers for custom resources: %w", err)
+		logrus.Errorf("failed to initialize informers for custom resources: %s", err)
 	}
 
 	return append(builtInResourceInformers, customResourceInformers...)
