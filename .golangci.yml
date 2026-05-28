@@ -49,6 +49,7 @@ linters:
             - k8s.io/apimachinery/pkg/apis/meta/v1/unstructured
             - k8s.io/apimachinery/pkg/runtime
             - k8s.io/cli-runtime/pkg/printers
+            - k8s.io/client-go/kubernetes/scheme
     dupl:
       threshold: 100
     gocyclo:
