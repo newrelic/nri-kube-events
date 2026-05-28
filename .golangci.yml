@@ -31,6 +31,22 @@ linters:
     - unused
     - whitespace
   settings:
+    depguard:
+      rules:
+        main:
+          files:
+            - "$all"
+          allow:
+            - k8s.io/api/core/v1
+            - k8s.io/apimachinery/pkg/apis/meta/v1
+            - k8s.io/client-go/discovery
+            - k8s.io/client-go/dynamic
+            - k8s.io/client-go/dynamic/dynamicinformer
+            - k8s.io/client-go/kubernetes/scheme
+            - k8s.io/client-go/rest
+            - k8s.io/apimachinery/pkg/apis/meta/v1/unstructured
+            - k8s.io/apimachinery/pkg/runtime
+            - k8s.io/cli-runtime/pkg/printers
     dupl:
       threshold: 100
     gocyclo:
