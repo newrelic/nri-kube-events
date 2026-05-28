@@ -82,7 +82,7 @@ func main() {
 	if rawFilters != "" {
 		err := json.Unmarshal([]byte(rawFilters), &crFilters)
 		if err != nil {
-			fmt.Printf("Failed to monitor custom resources. Error parsing customResourceFilters: %v.\n", err)
+			logrus.Fatalf("Failed to monitor custom resources. Error parsing customResourceFilters: %v.\n", err)
 		}
 	}
 
