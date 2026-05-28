@@ -262,12 +262,13 @@ func redactSensitiveInfoFromObject(obj runtime.Object) (runtime.Object, error) {
 		if unstr.GetKind() == "Secret" {
 			secret := &corev1.Secret{}
 			err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstr.Object, secret)
-			if err == nil {
-				redactSecretValues(secret)
-				return secret, nil
-			} else {
+
+			if err != nil {
 				return nil, fmt.Errorf("failed to redact sensitive info from kubernetes object: %w", err)
 			}
+
+			redactSecretValues(secret)
+			return secret, nil
 		}
 	}
 
