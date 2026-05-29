@@ -214,6 +214,7 @@ func TestDescribeObject(t *testing.T) {
 					"metadata": map[string]interface{}{
 						"name": "my-secret",
 					},
+					// #nosec G101
 					"data": map[string]interface{}{
 						"password": "c3VwZXItc2VjcmV0LWJhc2U2NA==",
 					},
