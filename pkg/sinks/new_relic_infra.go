@@ -23,7 +23,6 @@ import (
 	"github.com/sethgrid/pester"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/printers"
 
@@ -235,12 +234,7 @@ func (ns *newRelicInfraSink) HandleEvent(kubeEvent common.KubeEvent) error {
 }
 
 func safelySerializeK8sObjectToJSON(obj runtime.Object) (string, error) {
-	safeObject, err := redactSensitiveInfoFromObject(obj)
-
-	if err != nil {
-		return "", err
-	}
-
+	safeObject := redactSensitiveInfoFromObject(obj)
 	return serializeK8sObjectToJSON(safeObject)
 }
 
@@ -256,23 +250,14 @@ func serializeK8sObjectToJSON(obj runtime.Object) (string, error) {
 	return buf.String(), nil
 }
 
-func redactSensitiveInfoFromObject(obj runtime.Object) (runtime.Object, error) {
+func redactSensitiveInfoFromObject(obj runtime.Object) runtime.Object {
 	// if the object is a secret, redact its sensitive data
-	if unstr, ok := obj.(*unstructured.Unstructured); ok {
-		if unstr.GetKind() == "Secret" {
-			secret := &corev1.Secret{}
-			err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstr.Object, secret)
-
-			if err != nil {
-				return nil, fmt.Errorf("failed to redact sensitive info from kubernetes object: %w", err)
-			}
-
-			redactSecretValues(secret)
-			return secret, nil
-		}
+	if secret, ok := obj.(*corev1.Secret); ok {
+		redactSecretValues(secret)
+		return secret
 	}
 
-	return obj, nil
+	return obj
 }
 
 // redact sensitive data from a secret
