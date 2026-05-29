@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+### enhancement
+- Add temporary workaround for describing certain object kinds @jamescripter [#545](https://github.com/newrelic/nri-kube-events/pull/545)
+
 ## v2.19.3 - 2026-04-20
 
 ### ⛓️ Dependencies

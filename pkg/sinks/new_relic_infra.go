@@ -22,9 +22,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/sethgrid/pester"
 	"github.com/sirupsen/logrus"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubectl/pkg/describe"
 
 	"github.com/newrelic/nri-kube-events/pkg/common"
+
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func init() {
@@ -131,6 +134,49 @@ type newRelicInfraSink struct {
 	metrics        newRelicInfraSinkMetrics
 }
 
+/*
+this is a temporary workaround until all default k8s object kinds are supported by
+DefaultObjectDescriber in the describe package. afterward, this commit can be reverted.
+*/
+func describeObject(object runtime.Object) (output string, err error) {
+	// first try the default describer
+	description, err := describe.DefaultObjectDescriber.DescribeObject(object)
+
+	if err != nil {
+		// fallback to workaround for unsupported object types: manually initialize a describer
+		configFlags := genericclioptions.NewConfigFlags(true)
+
+		// Get the REST Mapper to find the mapping for the Custom Resource
+		restMapper, err := configFlags.ToRESTMapper()
+		if err != nil {
+			return "", err
+		}
+
+		gvk := object.GetObjectKind().GroupVersionKind()
+		mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return "", fmt.Errorf("could not find REST mapping for %s: %w", gvk.String(), err)
+		}
+
+		describer, err := describe.Describer(configFlags, mapping)
+		if err != nil {
+			return "", fmt.Errorf("failed to get describer: %w", err)
+		}
+
+		objNS, objName, err := common.GetObjNamespaceAndName(object)
+		if err != nil {
+			return "", fmt.Errorf("failed to get object namespace/name: %w", err)
+		}
+
+		description, err = describer.Describe(objNS, objName, describe.DescriberSettings{})
+		if err != nil {
+			return "", fmt.Errorf("failed to describe object: %w", err)
+		}
+	}
+
+	return description, nil
+}
+
 // HandleObject sends the descriptions for the object to the New Relic Agent
 func (ns *newRelicInfraSink) HandleObject(kubeObj common.KubeObject) error {
 	defer ns.sdkIntegration.Clear()
@@ -138,7 +184,7 @@ func (ns *newRelicInfraSink) HandleObject(kubeObj common.KubeObject) error {
 	gvk := common.K8SObjGetGVK(kubeObj.Obj)
 	objKind := gvk.Kind
 
-	desc, err := describe.DefaultObjectDescriber.DescribeObject(kubeObj.Obj)
+	desc, err := describeObject(kubeObj.Obj)
 	if err != nil {
 		ns.metrics.descErr.WithLabelValues(objKind).Inc()
 		return fmt.Errorf("failed to describe object: %w", err)

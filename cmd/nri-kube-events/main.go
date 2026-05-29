@@ -4,20 +4,29 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	"regexp"
 	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
@@ -66,6 +75,16 @@ func main() {
 		router.WithWorkQueueLength(cfg.WorkQueueLength), // will ignore null values
 	}
 
+	rawFilters := os.Getenv("CR_FILTERS")
+
+	crFilters := []string{}
+	if rawFilters != "" {
+		err := json.Unmarshal([]byte(rawFilters), &crFilters)
+		if err != nil {
+			fmt.Printf("Failed to monitor custom resources. Error parsing customResourceFilters: %v.\n", err)
+		}
+	}
+
 	if cfg.CaptureEvents == nil || *cfg.CaptureEvents {
 		eventsInformer := createEventsInformer(stopChan)
 		activeEventHandlers := make(map[string]events.EventHandler)
@@ -87,7 +106,7 @@ func main() {
 		if cfg.DescribeRefresh != nil {
 			resync = *cfg.DescribeRefresh
 		}
-		resourceInformers := createInformers(stopChan, resync)
+		resourceInformers := createInformers(crFilters, stopChan, resync)
 		activeObjectHandlers := make(map[string]descriptions.ObjectHandler)
 
 		for name, sink := range activeSinks {
@@ -181,40 +200,81 @@ func createEventsInformer(stopChan <-chan struct{}) cache.SharedIndexInformer {
 	return eventsInformer
 }
 
-// createInformers creates a SharedIndexInformer that will listen for resources we care aobut.
-func createInformers(stopChan <-chan struct{}, resync time.Duration) []cache.SharedIndexInformer {
-	clientset, err := getClientset(*kubeConfig)
+func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.Duration) []cache.SharedIndexInformer {
+	config, err := rest.InClusterConfig()
 	if err != nil {
-		logrus.Fatalf("could not create kubernetes client: %v", err)
+		logrus.Fatalf("failed to get pod service account config: %v", err)
 	}
 
-	sharedInformers := informers.NewSharedInformerFactory(clientset, resync)
-
-	cronjobsInformer := sharedInformers.Batch().V1().CronJobs().Informer()
-	daemonsetsInformer := sharedInformers.Apps().V1().DaemonSets().Informer()
-	deploymentInformer := sharedInformers.Apps().V1().Deployments().Informer()
-	namespacesInformer := sharedInformers.Core().V1().Namespaces().Informer()
-	nodesInformer := sharedInformers.Core().V1().Nodes().Informer()
-	jobsInformer := sharedInformers.Batch().V1().Jobs().Informer()
-	pvInformer := sharedInformers.Core().V1().PersistentVolumes().Informer()
-	pvcInformer := sharedInformers.Core().V1().PersistentVolumeClaims().Informer()
-	podsInformer := sharedInformers.Core().V1().Pods().Informer()
-	servicesInformer := sharedInformers.Core().V1().Services().Informer()
-
-	sharedInformers.Start(stopChan)
-
-	return []cache.SharedIndexInformer{
-		cronjobsInformer,
-		daemonsetsInformer,
-		deploymentInformer,
-		namespacesInformer,
-		nodesInformer,
-		jobsInformer,
-		pvInformer,
-		pvcInformer,
-		podsInformer,
-		servicesInformer,
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
+	if err != nil {
+		logrus.Fatalf("could not create discovery client: %v", err)
 	}
+
+	_, resourceMap, _, err := discoveryClient.GroupsAndMaybeResources()
+	if err != nil {
+		logrus.Fatalf("could not discover groups and/or resources: %v", err)
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		logrus.Fatalf("could not create dynamic client: %v", err)
+	}
+
+	factory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynamicClient, resync, corev1.NamespaceAll, nil)
+
+	// add logic to enable informers for built-in resources
+	var crFilterMatchers []*regexp.Regexp
+	for _, f := range crFilters {
+		safeStr := strings.ReplaceAll(f, ".*", "___DOT_STAR___")
+		safeStr = strings.ReplaceAll(safeStr, "*", ".*")
+		finalRegex := strings.ReplaceAll(safeStr, "___DOT_STAR___", ".*")
+
+		matcher, err := regexp.Compile(finalRegex)
+		if err != nil {
+			logrus.Fatalf("failed to compile regex from customResourceFilters: %v", err)
+		}
+		crFilterMatchers = append(crFilterMatchers, matcher)
+	}
+
+	var informers []cache.SharedIndexInformer
+	for gv, list := range resourceMap {
+		for _, resource := range list.APIResources {
+			if isWatchable(resource) {
+				gvr := gv.WithResource(resource.Name)
+
+				gvrKey := fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Version, gvr.Resource)
+				shouldMonitor := false
+				for _, m := range crFilterMatchers {
+					if m.MatchString(gvrKey) {
+						shouldMonitor = true
+						break
+					}
+				}
+
+				if shouldMonitor {
+					resourceInformer := factory.ForResource(gvr).Informer()
+					informers = append(informers, resourceInformer)
+				}
+			}
+		}
+	}
+
+	factory.Start(stopChan)
+
+	return informers
+}
+
+func isWatchable(ar metav1.APIResource) bool {
+	if strings.Contains(ar.Name, "/") {
+		return false
+	}
+	for _, verb := range ar.Verbs {
+		if verb == "watch" {
+			return true
+		}
+	}
+	return false
 }
 
 // getClientset returns a kubernetes clientset.

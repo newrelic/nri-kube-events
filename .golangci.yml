@@ -31,6 +31,12 @@ linters:
     - unused
     - whitespace
   settings:
+    depguard:
+      rules:
+        main:
+          allow:
+            - k8s.io/apimachinery/pkg/runtime
+            - k8s.io/client-go/rest
     dupl:
       threshold: 100
     gocyclo:
