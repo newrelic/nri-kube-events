@@ -27,7 +27,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -302,7 +302,7 @@ func createCustomResourceInformers(crFilters []string, stopChan <-chan struct{},
 		}
 	}
 
-	config, err := rest.InClusterConfig()
+	config, err := restclient.InClusterConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pod service account config: %w", err)
 	}
@@ -367,13 +367,13 @@ func isWatchableResource(ar metav1.APIResource) bool {
 // It loads a kubeconfig file if the kubeconfig parameter is set
 // If it's not set, it will try to load the InClusterConfig
 func getClientset(kubeconfig string) (*kubernetes.Clientset, error) {
-	var conf *rest.Config
+	var conf *restclient.Config
 	var err error
 
 	if kubeconfig != "" {
 		conf, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 	} else {
-		conf, err = rest.InClusterConfig()
+		conf, err = restclient.InClusterConfig()
 	}
 
 	if err != nil {
