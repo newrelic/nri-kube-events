@@ -192,9 +192,16 @@ func TestDescribeObject(t *testing.T) {
 					},
 				},
 			},
-			validateResult: func(t *testing.T, output string) {
-				assert.Contains(t, output, `"name": "my-pod"`)
-				assert.Contains(t, output, `"kind": "Pod"`)
+			validateResult: func(t *testing.T, actual string) {
+				expected := `{
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "metadata": {
+        "name": "my-pod"
+    }
+}
+`
+				assert.Equal(t, expected, actual)
 			},
 			wantErr: false,
 		},
@@ -207,34 +214,31 @@ func TestDescribeObject(t *testing.T) {
 					"metadata": map[string]interface{}{
 						"name": "my-secret",
 					},
-					// #nosec G101
 					"data": map[string]interface{}{
-						"password": "c3VwZXItc2VjcmV0LWJhc2U2NA==", // base64 for super-secret-base64
+						"password": "c3VwZXItc2VjcmV0LWJhc2U2NA==",
 					},
 					"stringData": map[string]interface{}{
 						"api-key": "raw-api-token",
 					},
 				},
 			},
-			validateResult: func(t *testing.T, output string) {
-				var result map[string]interface{}
-				if err := json.Unmarshal([]byte(output), &result); err != nil {
-					t.Fatalf("Failed to unmarshal output json: %v", err)
-				}
-
-				data, ok := result["data"].(map[string]interface{})
-				if !ok {
-					t.Fatal("Expected 'data' map to exist in output")
-				}
-
-				// "UkVEQUNURUQ=" is the base64 encoding of "REDACTED"
-				assert.Equal(t, data["password"], "UkVEQUNURUQ=")
-
-				stringData, ok := result["stringData"].(map[string]interface{})
-				if !ok {
-					t.Fatal("Expected 'stringData' map to exist in output")
-				}
-				assert.Equal(t, stringData["api-key"], "REDACTED")
+			validateResult: func(t *testing.T, actual string) {
+				// sensitive data should be replaced with `REDACTED` or its base64 encoding
+				expected := `{
+    "kind": "Secret",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "my-secret"
+    },
+    "data": {
+        "password": "UkVEQUNURUQ="
+    },
+    "stringData": {
+        "api-key": "REDACTED"
+    }
+}
+`
+				assert.Equal(t, expected, actual)
 			},
 			wantErr: false,
 		},
