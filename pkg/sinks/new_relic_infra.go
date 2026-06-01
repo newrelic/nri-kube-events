@@ -234,15 +234,18 @@ func (ns *newRelicInfraSink) HandleEvent(kubeEvent common.KubeEvent) error {
 }
 
 func safelySerializeK8sObjectToJSON(obj runtime.Object) (string, error) {
-	safeObject := redactSensitiveInfoFromObject(obj)
+	safeObject := redactSensitiveInfoFromK8sObject(obj)
 	return serializeK8sObjectToJSON(safeObject)
 }
 
 func serializeK8sObjectToJSON(obj runtime.Object) (string, error) {
+	// json printer requires the k8s object to have type meta
+	objWithTypeMeta := populateK8sObjectTypeMetaIfNeeded(obj)
+
 	buf := &bytes.Buffer{}
 	printer := &printers.JSONPrinter{}
 
-	err := printer.PrintObj(obj, buf)
+	err := printer.PrintObj(objWithTypeMeta, buf)
 	if err != nil {
 		return "", err
 	}
@@ -250,7 +253,7 @@ func serializeK8sObjectToJSON(obj runtime.Object) (string, error) {
 	return buf.String(), nil
 }
 
-func redactSensitiveInfoFromObject(obj runtime.Object) runtime.Object {
+func redactSensitiveInfoFromK8sObject(obj runtime.Object) runtime.Object {
 	// if the object is a secret, redact its sensitive data
 	if secret, ok := obj.(*corev1.Secret); ok {
 		redactSecretValues(secret)
@@ -273,6 +276,15 @@ func redactSecretValues(secret *corev1.Secret) {
 			secret.StringData[key] = redactionText
 		}
 	}
+}
+
+func populateK8sObjectTypeMetaIfNeeded(obj runtime.Object) runtime.Object {
+	if obj.GetObjectKind().GroupVersionKind().Empty() {
+		obj = obj.DeepCopyObject()
+		gvk := common.K8SObjGetGVK(obj)
+		obj.GetObjectKind().SetGroupVersionKind(gvk)
+	}
+	return obj
 }
 
 // formatEntity returns an entity id information as tuple of (entityType, entityName).
