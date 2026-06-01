@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -333,6 +334,9 @@ func createCustomResourceInformers(crFilters []string, stopChan <-chan struct{},
 			if scheme.Scheme.Recognizes(gvk) {
 				// ignore built-in resources
 				shouldWatch = false
+			} else if !isTopLevelResource(resource) {
+				// ignore subresources
+				shouldWatch = false
 			} else {
 				gvrKey := fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Version, gvr.Resource)
 				for _, m := range crFilterMatchers {
@@ -361,6 +365,10 @@ func createCustomResourceInformers(crFilters []string, stopChan <-chan struct{},
 
 func isWatchableResource(ar metav1.APIResource) bool {
 	return slices.Contains(ar.Verbs, "watch")
+}
+
+func isTopLevelResource(ar metav1.APIResource) bool {
+	return !strings.Contains(ar.Name, "/")
 }
 
 // getClientset returns a kubernetes clientset.
