@@ -339,6 +339,7 @@ func createCustomResourceInformers(crFilters []string, stopChan <-chan struct{},
 				// ignore subresources
 				shouldWatch = false
 			default:
+				// watch a custom resource if it matches any of the filters from config
 				gvrKey := fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Version, gvr.Resource)
 				for _, m := range crFilterMatchers {
 					if m.MatchString(gvrKey) {
