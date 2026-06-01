@@ -331,13 +331,14 @@ func createCustomResourceInformers(crFilters []string, stopChan <-chan struct{},
 			gvk := gv.WithKind(resource.Kind)
 			gvr := gv.WithResource(resource.Name)
 
-			if scheme.Scheme.Recognizes(gvk) {
+			switch {
+			case scheme.Scheme.Recognizes(gvk):
 				// ignore built-in resources
 				shouldWatch = false
-			} else if !isTopLevelResource(resource) {
+			case !isTopLevelResource(resource):
 				// ignore subresources
 				shouldWatch = false
-			} else {
+			default:
 				gvrKey := fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Version, gvr.Resource)
 				for _, m := range crFilterMatchers {
 					if m.MatchString(gvrKey) {
