@@ -173,11 +173,11 @@ func TestNewRelicInfraSink_HandleEvent_AddEventError(t *testing.T) {
 	}
 }
 
-func TestDescribeObject_SharedInformer(t *testing.T) {
+func TestSerialize(t *testing.T) {
 	tests := []struct {
-		name           string
 		inputObj       runtime.Object
 		validateResult func(t *testing.T, output string)
+		name           string
 		wantErr        bool
 	}{
 		{
