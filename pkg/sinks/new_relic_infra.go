@@ -140,7 +140,7 @@ func (ns *newRelicInfraSink) HandleObject(obj runtime.Object) error {
 	gvk := common.K8SObjGetGVK(obj)
 	objKind := gvk.Kind
 
-	desc, err := safelySerializeK8sObjectToJSON(obj)
+	desc, err := serializeK8sObjectToUserFacingJSON(obj)
 	if err != nil {
 		ns.metrics.descErr.WithLabelValues(objKind).Inc()
 		return fmt.Errorf("failed to describe object: %w", err)
@@ -233,13 +233,13 @@ func (ns *newRelicInfraSink) HandleEvent(kubeEvent common.KubeEvent) error {
 	return nil
 }
 
-func safelySerializeK8sObjectToJSON(obj runtime.Object) (string, error) {
+func serializeK8sObjectToUserFacingJSON(obj runtime.Object) (string, error) {
 	safeObject := redactSensitiveInfoFromK8sObject(obj)
 	return serializeK8sObjectToJSON(safeObject)
 }
 
 func serializeK8sObjectToJSON(obj runtime.Object) (string, error) {
-	// json printer requires the k8s object to have type meta
+	// k8s json printer requires the object to have type meta
 	objWithTypeMeta := populateK8sObjectTypeMetaIfNeeded(obj)
 
 	buf := &bytes.Buffer{}

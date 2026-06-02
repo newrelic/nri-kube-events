@@ -248,7 +248,7 @@ func TestSerialize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := safelySerializeK8sObjectToJSON(tt.inputObj)
+			got, err := serializeK8sObjectToUserFacingJSON(tt.inputObj)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("safelySerializeK8sObjectToJSON() error = %v, wantErr %v", err, tt.wantErr)
 				return
