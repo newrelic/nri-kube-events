@@ -21,17 +21,20 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 
+	"github.com/newrelic/nri-kube-events/pkg/common"
 	"github.com/newrelic/nri-kube-events/pkg/descriptions"
 	"github.com/newrelic/nri-kube-events/pkg/events"
 	"github.com/newrelic/nri-kube-events/pkg/router"
@@ -227,7 +230,7 @@ func createBuiltInResourceInformers(stopChan <-chan struct{}, resync time.Durati
 
 	sharedInformerFactory := informers.NewSharedInformerFactory(clientset, resync)
 
-	// built-in resources that are watched unconditionally
+	// watch the following built-in resources unconditionally
 	deploymentInformer := sharedInformerFactory.Apps().V1().Deployments().Informer()
 	daemonsetInformer := sharedInformerFactory.Apps().V1().DaemonSets().Informer()
 	statefulSetInformer := sharedInformerFactory.Apps().V1().StatefulSets().Informer()
@@ -257,9 +260,7 @@ func createBuiltInResourceInformers(stopChan <-chan struct{}, resync time.Durati
 	roleBindingInformer := sharedInformerFactory.Rbac().V1().RoleBindings().Informer()
 	storageClassInformer := sharedInformerFactory.Storage().V1().StorageClasses().Informer()
 
-	sharedInformerFactory.Start(stopChan)
-
-	return []cache.SharedIndexInformer{
+	informers := []cache.SharedIndexInformer{
 		cronjobInformer,
 		daemonsetInformer,
 		deploymentInformer,
@@ -288,7 +289,23 @@ func createBuiltInResourceInformers(stopChan <-chan struct{}, resync time.Durati
 		roleInformer,
 		clusterRoleBindingInformer,
 		roleBindingInformer,
-	}, nil
+	}
+
+	// watch CRDs if possible
+	apiextensionsClientset, err := getAPIExtensionsClientset()
+	if err == nil {
+		crdInformerFactory := apiextensionsinformers.NewSharedInformerFactory(apiextensionsClientset, resync)
+		crdInformer := crdInformerFactory.Apiextensions().V1().CustomResourceDefinitions().Informer()
+		informers = append(informers, crdInformer)
+
+		crdInformerFactory.Start(stopChan)
+	} else {
+		logrus.Warnf("failed to initialize apiextensions clientset. skipping creation of CRD informer: %v", err)
+	}
+
+	sharedInformerFactory.Start(stopChan)
+
+	return informers, nil
 }
 
 func createCustomResourceInformers(crFilters []string, stopChan <-chan struct{}, resync time.Duration) ([]cache.SharedIndexInformer, error) {
@@ -327,25 +344,30 @@ func createCustomResourceInformers(crFilters []string, stopChan <-chan struct{},
 
 	for gv, list := range resourceMap {
 		for _, resource := range list.APIResources {
-			shouldWatch := false
-			gvk := gv.WithKind(resource.Kind)
-			gvr := gv.WithResource(resource.Name)
+			// check whether the resource is built-in
+			isBuiltInResource := false
+			possibleGroupNames := []string{resource.Group, gv.Group}
+			for _, possibleGroupName := range possibleGroupNames {
+				possibleGVK := schema.GroupVersionKind{Group: possibleGroupName, Version: gv.Version, Kind: resource.Kind}
+				if common.IsBuiltInResource(possibleGVK) {
+					isBuiltInResource = true
+					break
+				}
+			}
 
-			switch {
-			case scheme.Scheme.Recognizes(gvk):
+			if isBuiltInResource {
 				// ignore built-in resources
-				shouldWatch = false
-			case !isTopLevelResource(resource):
-				// ignore subresources
-				shouldWatch = false
-			default:
-				// watch a custom resource if it matches any of the filters from config
-				gvrKey := fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Version, gvr.Resource)
-				for _, m := range crFilterMatchers {
-					if m.MatchString(gvrKey) {
-						shouldWatch = true
-						break
-					}
+				continue
+			}
+
+			// watch a custom resource if it matches any of the filters from config
+			shouldWatch := false
+			gvr := gv.WithResource(resource.Name)
+			gvrKey := fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Version, gvr.Resource)
+			for _, m := range crFilterMatchers {
+				if m.MatchString(gvrKey) {
+					shouldWatch = true
+					break
 				}
 			}
 
@@ -391,6 +413,23 @@ func getClientset(kubeconfig string) (*kubernetes.Clientset, error) {
 	}
 
 	return kubernetes.NewForConfig(conf)
+}
+
+func getAPIExtensionsClientset() (*apiextensionsclientset.Clientset, error) {
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	configOverrides := &clientcmd.ConfigOverrides{}
+	configLoader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
+	config, err := configLoader.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	apiextensionsClientset, err := apiextensionsclientset.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	return apiextensionsClientset, nil
 }
 
 func setLogLevel(logLevel string, fallback logrus.Level) {
