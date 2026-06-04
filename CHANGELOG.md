@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### enhancement
 - Report descriptions for all objects by default @jamescripter [#557](https://github.com/newrelic/nri-kube-events/pull/557)
 
+### security
+- Update package management @dbudziwojski [#555](https://github.com/newrelic/nri-kube-events/pull/555)
+
 ## v2.19.3 - 2026-04-20
 
 ### ⛓️ Dependencies
