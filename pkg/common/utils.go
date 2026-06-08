@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"unicode/utf8"
 
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -25,12 +24,12 @@ const NRDBLimit = 4095
 func init() {
 	err := apiregistrationv1.AddToScheme(scheme.Scheme)
 	if err != nil {
-		logrus.Warnf("failed to enable identification of built-in resources in apiregistration group: %v", err)
+		log.Warnf("failed to enable identification of built-in resources in apiregistration group: %v", err)
 	}
 
 	err = apiextensionsv1.AddToScheme(scheme.Scheme)
 	if err != nil {
-		logrus.Warnf("failed to enable identification of built-in resources in apiextensions group: %v", err)
+		log.Warnf("failed to enable identification of built-in resources in apiextensions group: %v", err)
 	}
 }
 
