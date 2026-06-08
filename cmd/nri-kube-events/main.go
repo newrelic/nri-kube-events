@@ -13,7 +13,6 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -308,6 +307,7 @@ func createBuiltInResourceInformers(stopChan <-chan struct{}, resync time.Durati
 	return informers, nil
 }
 
+//nolint:gocognit
 func createCustomResourceInformers(crFilters []string, stopChan <-chan struct{}, resync time.Duration) ([]cache.SharedIndexInformer, error) {
 	informers := []cache.SharedIndexInformer{}
 	var crFilterMatchers []*regexp.Regexp
@@ -389,10 +389,6 @@ func createCustomResourceInformers(crFilters []string, stopChan <-chan struct{},
 
 func isWatchableResource(ar metav1.APIResource) bool {
 	return slices.Contains(ar.Verbs, "watch")
-}
-
-func isTopLevelResource(ar metav1.APIResource) bool {
-	return !strings.Contains(ar.Name, "/")
 }
 
 // getClientset returns a kubernetes clientset.
