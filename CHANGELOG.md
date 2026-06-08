@@ -10,8 +10,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### enhancement
 - Report descriptions for all objects by default @jamescripter [#557](https://github.com/newrelic/nri-kube-events/pull/557)
 
-### security
+## v2.20.0 - 2026-06-08
+
+### 🛡️ Security notices
 - Update package management @dbudziwojski [#555](https://github.com/newrelic/nri-kube-events/pull/555)
+
+### ⛓️ Dependencies
+- Updated golang version to v1.26.4
 
 ## v2.19.3 - 2026-04-20
 
