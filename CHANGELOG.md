@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+### dependency
+- Updating Common library to 2.3.1 @philip-r-beckwith (#561)[https://github.com/newrelic/nri-kube-events/pull/561]
+
 ## v2.20.0 - 2026-06-08
 
 ### 🛡️ Security notices
