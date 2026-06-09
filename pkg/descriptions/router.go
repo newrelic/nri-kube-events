@@ -12,7 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/newrelic/nri-kube-events/pkg/common"
 	"github.com/newrelic/nri-kube-events/pkg/router"
 )
 
@@ -38,7 +37,7 @@ var (
 )
 
 type ObjectHandler interface {
-	HandleObject(kubeEvent common.KubeObject) error
+	HandleObject(kubeEvent runtime.Object) error
 }
 
 // Router listens for events coming from a SharedIndexInformer,
@@ -48,7 +47,7 @@ type Router struct {
 	handlers map[string]ObjectHandler
 
 	// all updates & adds will be appended to this queue
-	workQueue chan common.KubeObject
+	workQueue chan runtime.Object
 }
 
 type observedObjectHandler struct {
@@ -56,11 +55,11 @@ type observedObjectHandler struct {
 	prometheus.Observer
 }
 
-func (o *observedObjectHandler) HandleObject(kubeObject common.KubeObject) error {
+func (o *observedObjectHandler) HandleObject(obj runtime.Object) error {
 	t := time.Now()
 	defer func() { o.Observer.Observe(time.Since(t).Seconds()) }()
 
-	return o.ObjectHandler.HandleObject(kubeObject)
+	return o.ObjectHandler.HandleObject(obj)
 }
 
 // NewRouter returns a new Router which listens to the given SharedIndexInformer,
@@ -71,22 +70,15 @@ func NewRouter(informers []cache.SharedIndexInformer, handlers map[string]Object
 		logrus.Fatalf("Error with Router configuration: %v", err)
 	}
 
-	workQueue := make(chan common.KubeObject, config.WorkQueueLength())
+	workQueue := make(chan runtime.Object, config.WorkQueueLength())
 
 	for _, informer := range informers {
 		_, err = informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				workQueue <- common.KubeObject{
-					Obj:  obj.(runtime.Object),
-					Verb: "ADDED",
-				}
+				workQueue <- obj.(runtime.Object)
 			},
-			UpdateFunc: func(oldObj, newObj interface{}) {
-				workQueue <- common.KubeObject{
-					Obj:    newObj.(runtime.Object),
-					OldObj: oldObj.(runtime.Object),
-					Verb:   "UPDATE",
-				}
+			UpdateFunc: func(_, newObj interface{}) {
+				workQueue <- newObj.(runtime.Object)
 			},
 		})
 
@@ -138,17 +130,17 @@ func (r *Router) Run(stopChan <-chan struct{}) {
 		select {
 		case <-stopChan:
 			return
-		case event := <-r.workQueue:
-			r.publishObjectDescription(event)
+		case obj := <-r.workQueue:
+			r.publishObjectDescription(obj)
 		}
 	}
 }
 
-func (r *Router) publishObjectDescription(kubeObject common.KubeObject) {
+func (r *Router) publishObjectDescription(obj runtime.Object) {
 	for name, handler := range r.handlers {
 		descsReceivedTotal.WithLabelValues(name).Inc()
 
-		if err := handler.HandleObject(kubeObject); err != nil {
+		if err := handler.HandleObject(obj); err != nil {
 			logrus.Warningf("Sink %s HandleEvent error: %v", name, err)
 			descsFailuresTotal.WithLabelValues(name).Inc()
 		}

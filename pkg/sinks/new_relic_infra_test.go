@@ -12,26 +12,27 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/newrelic/nri-kube-events/pkg/common"
 )
 
 func TestFormatEntityID(t *testing.T) {
-	podObject := v1.ObjectReference{
+	podObject := corev1.ObjectReference{
 		Kind:      "Pod",
 		Namespace: "test_namespace",
 		Name:      "TestPod",
 	}
 
-	nodeObject := v1.ObjectReference{
+	nodeObject := corev1.ObjectReference{
 		Kind: "Node",
 		Name: "Worker1c",
 	}
 
 	tt := []struct {
-		involvedObject                                      v1.ObjectReference
+		involvedObject                                      corev1.ObjectReference
 		expectedEntityType, expectedEntityName, clusterName string
 	}{
 		{
@@ -58,7 +59,7 @@ func TestFormatEntityID(t *testing.T) {
 		entityType, entityName := formatEntityID(
 			testCase.clusterName,
 			common.KubeEvent{
-				Event: &v1.Event{
+				Event: &corev1.Event{
 					InvolvedObject: testCase.involvedObject,
 				},
 			},
@@ -112,7 +113,7 @@ func TestNewRelicSinkIntegration_HandleEvent_Success(t *testing.T) {
 	sink, _ := createNewRelicInfraSink(config, "0.0.0")
 	err = sink.HandleEvent(common.KubeEvent{
 		Verb: "ADDED",
-		Event: &v1.Event{
+		Event: &corev1.Event{
 			Message: "The event message",
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test",
@@ -123,7 +124,7 @@ func TestNewRelicSinkIntegration_HandleEvent_Success(t *testing.T) {
 				Finalizers: []string{"1", "2"},
 			},
 			Count: 10,
-			InvolvedObject: v1.ObjectReference{
+			InvolvedObject: corev1.ObjectReference{
 				Kind:      "Pod",
 				Namespace: "test_namespace",
 				Name:      "TestPod",
@@ -145,7 +146,7 @@ func TestNewRelicInfraSink_HandleEvent_AddEventError(t *testing.T) {
 	sink, _ := createNewRelicInfraSink(config, "0.0.0")
 	err := sink.HandleEvent(common.KubeEvent{
 		Verb: "ADDED",
-		Event: &v1.Event{
+		Event: &corev1.Event{
 			Message: "",
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test",
@@ -156,7 +157,7 @@ func TestNewRelicInfraSink_HandleEvent_AddEventError(t *testing.T) {
 				Finalizers: []string{"1", "2"},
 			},
 			Count: 10,
-			InvolvedObject: v1.ObjectReference{
+			InvolvedObject: corev1.ObjectReference{
 				Kind:      "Pod",
 				Namespace: "test_namespace",
 				Name:      "TestPod",
@@ -169,5 +170,92 @@ func TestNewRelicInfraSink_HandleEvent_AddEventError(t *testing.T) {
 	wantedError := "couldn't add event"
 	if !strings.Contains(err.Error(), wantedError) {
 		t.Errorf("wanted error with message '%s' got: '%v'", wantedError, err)
+	}
+}
+
+func TestSerialize(t *testing.T) {
+	tests := []struct {
+		inputObj       runtime.Object
+		validateResult func(t *testing.T, output string)
+		name           string
+		wantErr        bool
+	}{
+		{
+			name: "Standard pod",
+			inputObj: &corev1.Pod{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "Pod",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-pod",
+				},
+			},
+			validateResult: func(t *testing.T, actual string) {
+				expected := `{
+    "kind": "Pod",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "my-pod"
+    },
+    "spec": {
+        "containers": null
+    },
+    "status": {}
+}
+`
+				assert.JSONEq(t, expected, actual)
+			},
+			wantErr: false,
+		},
+		{
+			name: "Secret",
+			inputObj: &corev1.Secret{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "Secret",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-secret",
+				},
+				Data: map[string][]byte{
+					"password": []byte("super-secret-base64"),
+				},
+				StringData: map[string]string{
+					"api-key": "raw-api-token",
+				},
+			},
+			validateResult: func(t *testing.T, actual string) {
+				expected := `{
+    "kind": "Secret",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "my-secret"
+    },
+    "data": {
+        "password": "UkVEQUNURUQ="
+    },
+    "stringData": {
+        "api-key": "REDACTED"
+    }
+}
+`
+				assert.JSONEq(t, expected, actual)
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := serializeK8sObjectToUserFacingJSON(tt.inputObj)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("safelySerializeK8sObjectToJSON() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if err == nil && tt.validateResult != nil {
+				tt.validateResult(t, got)
+			}
+		})
 	}
 }

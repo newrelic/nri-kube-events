@@ -22,7 +22,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/sethgrid/pester"
 	"github.com/sirupsen/logrus"
-	"k8s.io/kubectl/pkg/describe"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/printers"
 
 	"github.com/newrelic/nri-kube-events/pkg/common"
 )
@@ -132,13 +134,13 @@ type newRelicInfraSink struct {
 }
 
 // HandleObject sends the descriptions for the object to the New Relic Agent
-func (ns *newRelicInfraSink) HandleObject(kubeObj common.KubeObject) error {
+func (ns *newRelicInfraSink) HandleObject(obj runtime.Object) error {
 	defer ns.sdkIntegration.Clear()
 
-	gvk := common.K8SObjGetGVK(kubeObj.Obj)
+	gvk := common.K8SObjGetGVK(obj)
 	objKind := gvk.Kind
 
-	desc, err := describe.DefaultObjectDescriber.DescribeObject(kubeObj.Obj)
+	desc, err := serializeK8sObjectToUserFacingJSON(obj)
 	if err != nil {
 		ns.metrics.descErr.WithLabelValues(objKind).Inc()
 		return fmt.Errorf("failed to describe object: %w", err)
@@ -150,7 +152,7 @@ func (ns *newRelicInfraSink) HandleObject(kubeObj common.KubeObject) error {
 		return nil
 	}
 
-	objNS, objName, err := common.GetObjNamespaceAndName(kubeObj.Obj)
+	objNS, objName, err := common.GetObjNamespaceAndName(obj)
 	if err != nil {
 		return fmt.Errorf("failed to get object namespace/name: %w", err)
 	}
@@ -229,6 +231,60 @@ func (ns *newRelicInfraSink) HandleEvent(kubeEvent common.KubeEvent) error {
 	}
 
 	return nil
+}
+
+func serializeK8sObjectToUserFacingJSON(obj runtime.Object) (string, error) {
+	safeObject := redactSensitiveInfoFromK8sObject(obj)
+	return serializeK8sObjectToJSON(safeObject)
+}
+
+func serializeK8sObjectToJSON(obj runtime.Object) (string, error) {
+	// k8s json printer requires the object to have type meta
+	objWithTypeMeta := populateK8sObjectTypeMetaIfNeeded(obj)
+
+	buf := &bytes.Buffer{}
+	printer := &printers.JSONPrinter{}
+
+	err := printer.PrintObj(objWithTypeMeta, buf)
+	if err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
+}
+
+func redactSensitiveInfoFromK8sObject(obj runtime.Object) runtime.Object {
+	// if the object is a secret, redact its sensitive data
+	if secret, ok := obj.(*corev1.Secret); ok {
+		redactSecretValues(secret)
+		return secret
+	}
+
+	return obj
+}
+
+// redact sensitive data from a secret
+func redactSecretValues(secret *corev1.Secret) {
+	redactionText := "REDACTED"
+	if secret.Data != nil {
+		for key := range secret.Data {
+			secret.Data[key] = []byte(redactionText)
+		}
+	}
+	if secret.StringData != nil {
+		for key := range secret.StringData {
+			secret.StringData[key] = redactionText
+		}
+	}
+}
+
+func populateK8sObjectTypeMetaIfNeeded(obj runtime.Object) runtime.Object {
+	if obj.GetObjectKind().GroupVersionKind().Empty() {
+		obj = obj.DeepCopyObject()
+		gvk := common.K8SObjGetGVK(obj)
+		obj.GetObjectKind().SetGroupVersionKind(gvk)
+	}
+	return obj
 }
 
 // formatEntity returns an entity id information as tuple of (entityType, entityName).

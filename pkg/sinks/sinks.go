@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/newrelic/nri-kube-events/pkg/common"
 )
@@ -16,7 +17,7 @@ import (
 // destination (stdout, NewRelic platform, etc.).
 type Sink interface {
 	HandleEvent(kubeEvent common.KubeEvent) error
-	HandleObject(kubeObject common.KubeObject) error
+	HandleObject(obj runtime.Object) error
 }
 
 // SinkConfig defines the name and config map of an `Sink`

@@ -4,24 +4,36 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	"regexp"
 	"runtime"
+	"slices"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 
+	"github.com/newrelic/nri-kube-events/pkg/common"
 	"github.com/newrelic/nri-kube-events/pkg/descriptions"
 	"github.com/newrelic/nri-kube-events/pkg/events"
 	"github.com/newrelic/nri-kube-events/pkg/router"
@@ -66,6 +78,16 @@ func main() {
 		router.WithWorkQueueLength(cfg.WorkQueueLength), // will ignore null values
 	}
 
+	// load custom resource filters
+	rawFilters := os.Getenv("CR_FILTERS")
+	crFilters := []string{}
+	if rawFilters != "" {
+		err := json.Unmarshal([]byte(rawFilters), &crFilters)
+		if err != nil {
+			logrus.Errorf("Failed to monitor custom resources. Error parsing customResourceFilters: %v.\n", err)
+		}
+	}
+
 	if cfg.CaptureEvents == nil || *cfg.CaptureEvents {
 		eventsInformer := createEventsInformer(stopChan)
 		activeEventHandlers := make(map[string]events.EventHandler)
@@ -87,7 +109,7 @@ func main() {
 		if cfg.DescribeRefresh != nil {
 			resync = *cfg.DescribeRefresh
 		}
-		resourceInformers := createInformers(stopChan, resync)
+		resourceInformers := createInformers(crFilters, stopChan, resync)
 		activeObjectHandlers := make(map[string]descriptions.ObjectHandler)
 
 		for name, sink := range activeSinks {
@@ -182,39 +204,191 @@ func createEventsInformer(stopChan <-chan struct{}) cache.SharedIndexInformer {
 }
 
 // createInformers creates a SharedIndexInformer that will listen for resources we care aobut.
-func createInformers(stopChan <-chan struct{}, resync time.Duration) []cache.SharedIndexInformer {
-	clientset, err := getClientset(*kubeConfig)
+func createInformers(crFilters []string, stopChan <-chan struct{}, resync time.Duration) []cache.SharedIndexInformer {
+	builtInResourceInformers, err := createBuiltInResourceInformers(stopChan, resync)
+
 	if err != nil {
-		logrus.Fatalf("could not create kubernetes client: %v", err)
+		logrus.Fatalf("failed to initialize informers for built-in resources: %s", err)
 	}
 
-	sharedInformers := informers.NewSharedInformerFactory(clientset, resync)
+	customResourceInformers, err := createCustomResourceInformers(crFilters, stopChan, resync)
 
-	cronjobsInformer := sharedInformers.Batch().V1().CronJobs().Informer()
-	daemonsetsInformer := sharedInformers.Apps().V1().DaemonSets().Informer()
-	deploymentInformer := sharedInformers.Apps().V1().Deployments().Informer()
-	namespacesInformer := sharedInformers.Core().V1().Namespaces().Informer()
-	nodesInformer := sharedInformers.Core().V1().Nodes().Informer()
-	jobsInformer := sharedInformers.Batch().V1().Jobs().Informer()
-	pvInformer := sharedInformers.Core().V1().PersistentVolumes().Informer()
-	pvcInformer := sharedInformers.Core().V1().PersistentVolumeClaims().Informer()
-	podsInformer := sharedInformers.Core().V1().Pods().Informer()
-	servicesInformer := sharedInformers.Core().V1().Services().Informer()
+	if err != nil {
+		logrus.Errorf("failed to initialize informers for custom resources: %s", err)
+	}
 
-	sharedInformers.Start(stopChan)
+	return append(builtInResourceInformers, customResourceInformers...)
+}
 
-	return []cache.SharedIndexInformer{
-		cronjobsInformer,
-		daemonsetsInformer,
+func createBuiltInResourceInformers(stopChan <-chan struct{}, resync time.Duration) ([]cache.SharedIndexInformer, error) {
+	clientset, err := getClientset(*kubeConfig)
+
+	if err != nil {
+		return nil, fmt.Errorf("could not create kubernetes client: %w", err)
+	}
+
+	sharedInformerFactory := informers.NewSharedInformerFactory(clientset, resync)
+
+	// watch the following built-in resources unconditionally
+	deploymentInformer := sharedInformerFactory.Apps().V1().Deployments().Informer()
+	daemonsetInformer := sharedInformerFactory.Apps().V1().DaemonSets().Informer()
+	statefulSetInformer := sharedInformerFactory.Apps().V1().StatefulSets().Informer()
+	replicaSetInformer := sharedInformerFactory.Apps().V1().ReplicaSets().Informer()
+	hpaV1Informer := sharedInformerFactory.Autoscaling().V1().HorizontalPodAutoscalers().Informer()
+	hpaV2Informer := sharedInformerFactory.Autoscaling().V2().HorizontalPodAutoscalers().Informer()
+	cronjobInformer := sharedInformerFactory.Batch().V1().CronJobs().Informer()
+	jobInformer := sharedInformerFactory.Batch().V1().Jobs().Informer()
+	podInformer := sharedInformerFactory.Core().V1().Pods().Informer()
+	nodeInformer := sharedInformerFactory.Core().V1().Nodes().Informer()
+	configMapInformer := sharedInformerFactory.Core().V1().ConfigMaps().Informer()
+	secretInformer := sharedInformerFactory.Core().V1().Secrets().Informer()
+	serviceInformer := sharedInformerFactory.Core().V1().Services().Informer()
+	namespaceInformer := sharedInformerFactory.Core().V1().Namespaces().Informer()
+	pvInformer := sharedInformerFactory.Core().V1().PersistentVolumes().Informer()
+	pvcInformer := sharedInformerFactory.Core().V1().PersistentVolumeClaims().Informer()
+	resourceQuotaInformer := sharedInformerFactory.Core().V1().ResourceQuotas().Informer()
+	limitRangeInformer := sharedInformerFactory.Core().V1().LimitRanges().Informer()
+	endpointInformer := sharedInformerFactory.Core().V1().Endpoints().Informer()
+	serviceAccountInformer := sharedInformerFactory.Core().V1().ServiceAccounts().Informer()
+	endpointSliceInformer := sharedInformerFactory.Discovery().V1().EndpointSlices().Informer()
+	networkPolicyInformer := sharedInformerFactory.Networking().V1().NetworkPolicies().Informer()
+	pdbInformer := sharedInformerFactory.Policy().V1().PodDisruptionBudgets().Informer()
+	clusterRoleInformer := sharedInformerFactory.Rbac().V1().ClusterRoles().Informer()
+	roleInformer := sharedInformerFactory.Rbac().V1().Roles().Informer()
+	clusterRoleBindingInformer := sharedInformerFactory.Rbac().V1().ClusterRoleBindings().Informer()
+	roleBindingInformer := sharedInformerFactory.Rbac().V1().RoleBindings().Informer()
+	storageClassInformer := sharedInformerFactory.Storage().V1().StorageClasses().Informer()
+
+	informers := []cache.SharedIndexInformer{
+		cronjobInformer,
+		daemonsetInformer,
 		deploymentInformer,
-		namespacesInformer,
-		nodesInformer,
-		jobsInformer,
+		namespaceInformer,
+		nodeInformer,
+		jobInformer,
 		pvInformer,
 		pvcInformer,
-		podsInformer,
-		servicesInformer,
+		podInformer,
+		serviceInformer,
+		replicaSetInformer,
+		statefulSetInformer,
+		storageClassInformer,
+		configMapInformer,
+		secretInformer,
+		resourceQuotaInformer,
+		limitRangeInformer,
+		hpaV1Informer,
+		hpaV2Informer,
+		pdbInformer,
+		endpointInformer,
+		networkPolicyInformer,
+		endpointSliceInformer,
+		serviceAccountInformer,
+		clusterRoleInformer,
+		roleInformer,
+		clusterRoleBindingInformer,
+		roleBindingInformer,
 	}
+
+	// watch CRDs if possible
+	apiextensionsClientset, err := getAPIExtensionsClientset()
+	if err == nil {
+		crdInformerFactory := apiextensionsinformers.NewSharedInformerFactory(apiextensionsClientset, resync)
+		crdInformer := crdInformerFactory.Apiextensions().V1().CustomResourceDefinitions().Informer()
+		informers = append(informers, crdInformer)
+
+		crdInformerFactory.Start(stopChan)
+	} else {
+		logrus.Warnf("failed to initialize apiextensions clientset. skipping creation of CRD informer: %v", err)
+	}
+
+	sharedInformerFactory.Start(stopChan)
+
+	return informers, nil
+}
+
+//nolint:gocognit
+func createCustomResourceInformers(crFilters []string, stopChan <-chan struct{}, resync time.Duration) ([]cache.SharedIndexInformer, error) {
+	informers := []cache.SharedIndexInformer{}
+	var crFilterMatchers []*regexp.Regexp
+	for _, filter := range crFilters {
+		matcher, err := regexp.Compile(filter)
+		if err == nil {
+			crFilterMatchers = append(crFilterMatchers, matcher)
+		} else {
+			logrus.Warnf("failed to compile the following regex from customResourceFilters: %v", err)
+		}
+	}
+
+	config, err := restclient.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get pod service account config: %w", err)
+	}
+
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("could not create discovery client: %w", err)
+	}
+
+	_, resourceMap, _, err := discoveryClient.GroupsAndMaybeResources()
+	if err != nil {
+		return nil, fmt.Errorf("could not discover groups and/or resources: %w", err)
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("could not create dynamic client: %w", err)
+	}
+
+	dynamicInformerFactory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynamicClient, resync, corev1.NamespaceAll, nil)
+
+	for gv, list := range resourceMap {
+		for _, resource := range list.APIResources {
+			// check whether the resource is built-in
+			isBuiltInResource := false
+			possibleGroupNames := []string{resource.Group, gv.Group}
+			for _, possibleGroupName := range possibleGroupNames {
+				possibleGVK := schema.GroupVersionKind{Group: possibleGroupName, Version: gv.Version, Kind: resource.Kind}
+				if common.IsBuiltInResource(possibleGVK) {
+					isBuiltInResource = true
+					break
+				}
+			}
+
+			if isBuiltInResource {
+				// ignore built-in resources
+				continue
+			}
+
+			// watch a custom resource if it matches any of the filters from config
+			shouldWatch := false
+			gvr := gv.WithResource(resource.Name)
+			gvrKey := fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Version, gvr.Resource)
+			for _, m := range crFilterMatchers {
+				if m.MatchString(gvrKey) {
+					shouldWatch = true
+					break
+				}
+			}
+
+			if shouldWatch {
+				if !isWatchableResource(resource) {
+					logrus.Warnf("Failed to watch custom resource %s because the service account cluster role lacks permission", gvr)
+					continue
+				}
+				resourceInformer := dynamicInformerFactory.ForResource(gvr).Informer()
+				informers = append(informers, resourceInformer)
+			}
+		}
+	}
+
+	dynamicInformerFactory.Start(stopChan)
+
+	return informers, nil
+}
+
+func isWatchableResource(ar metav1.APIResource) bool {
+	return slices.Contains(ar.Verbs, "watch")
 }
 
 // getClientset returns a kubernetes clientset.
@@ -235,6 +409,23 @@ func getClientset(kubeconfig string) (*kubernetes.Clientset, error) {
 	}
 
 	return kubernetes.NewForConfig(conf)
+}
+
+func getAPIExtensionsClientset() (*apiextensionsclientset.Clientset, error) {
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	configOverrides := &clientcmd.ConfigOverrides{}
+	configLoader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
+	config, err := configLoader.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	apiextensionsClientset, err := apiextensionsclientset.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	return apiextensionsClientset, nil
 }
 
 func setLogLevel(logLevel string, fallback logrus.Level) {

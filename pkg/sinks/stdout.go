@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/newrelic/nri-kube-events/pkg/common"
 )
@@ -33,7 +34,7 @@ func (stdoutSink) HandleEvent(event common.KubeEvent) error {
 	return nil
 }
 
-func (stdoutSink) HandleObject(object common.KubeObject) error {
+func (stdoutSink) HandleObject(object runtime.Object) error {
 	b, err := json.Marshal(object)
 
 	if err != nil {
