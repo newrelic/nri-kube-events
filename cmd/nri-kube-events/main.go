@@ -346,6 +346,7 @@ func createCustomResourceInformers(crFilters []string, stopChan <-chan struct{},
 		for _, resource := range list.APIResources {
 			// check whether the resource is built-in
 			isBuiltInResource := false
+			// apparently we need to try both of these group names (they can be different in the case of subresources)
 			possibleGroupNames := []string{resource.Group, gv.Group}
 			for _, possibleGroupName := range possibleGroupNames {
 				possibleGVK := schema.GroupVersionKind{Group: possibleGroupName, Version: gv.Version, Kind: resource.Kind}
