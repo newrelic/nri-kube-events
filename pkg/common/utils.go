@@ -14,7 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
@@ -22,12 +21,7 @@ const SplitMaxCols = 16
 const NRDBLimit = 4095
 
 func init() {
-	err := apiregistrationv1.AddToScheme(scheme.Scheme)
-	if err != nil {
-		log.Warnf("failed to enable identification of built-in resources in apiregistration group: %v", err)
-	}
-
-	err = apiextensionsv1.AddToScheme(scheme.Scheme)
+	err := apiextensionsv1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		log.Warnf("failed to enable identification of built-in resources in apiextensions group: %v", err)
 	}

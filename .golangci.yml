@@ -56,7 +56,6 @@ linters:
             - k8s.io/client-go/rest
             - k8s.io/cli-runtime/pkg/printers
             - k8s.io/client-go/kubernetes/scheme
-            - k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
     dupl:
       threshold: 100
     gocyclo:
