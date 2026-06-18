@@ -145,6 +145,11 @@ func (s *stubResourceEventHandlerRegistration) HasSynced() bool {
 	return true
 }
 
+func (s *stubResourceEventHandlerRegistration) HasSyncedChecker() cache.DoneChecker {
+	s.Called()
+	return nil // Since this is a mocked handler and we don't use this, return nil
+}
+
 func (m *MockSharedIndexInformer) AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error) {
 	m.Called(handler)
 	return &stubResourceEventHandlerRegistration{}, nil

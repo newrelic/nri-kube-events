@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### enhancement
 - Report descriptions for all objects by default @jamescripter [#557](https://github.com/newrelic/nri-kube-events/pull/557)
 
+## v2.20.1 - 2026-06-11
+
+### dependency
+- Updating Common library to 2.3.1 @philip-r-beckwith (#561)[[https://github.com/newrelic/nri-kube-events/pull/561](https://github.com/newrelic/nri-kube-events/pull/561)\]
+
+### ⛓️ Dependencies
+- Updated alpine to v3.24.0
+
 ## v2.20.0 - 2026-06-08
 
 ### 🛡️ Security notices
