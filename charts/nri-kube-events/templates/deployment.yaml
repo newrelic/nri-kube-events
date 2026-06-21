@@ -84,6 +84,13 @@ spec:
             - name: config
               mountPath: /etc/newrelic-infra.yml
               subPath: newrelic-infra.yml
+            {{- with ((.Values.forwarder).customCACert) }}
+            {{- if or .secretName .configMapName }}
+            - name: custom-ca-cert
+              mountPath: /etc/newrelic-infra/custom-ca
+              readOnly: true
+            {{- end }}
+            {{- end }}
           {{- if ((.Values.forwarder).resources) }}
           resources:
             {{- toYaml .Values.forwarder.resources | nindent 12 }}
@@ -108,6 +115,23 @@ spec:
           emptyDir: {}
         - name: tmpfs-tmp
           emptyDir: {}
+        {{- with ((.Values.forwarder).customCACert) }}
+        {{- if .secretName }}
+        - name: custom-ca-cert
+          secret:
+            secretName: {{ .secretName }}
+            items:
+              - key: {{ .certKey | default "ca.crt" }}
+                path: {{ .certKey | default "ca.crt" }}
+        {{- else if .configMapName }}
+        - name: custom-ca-cert
+          configMap:
+            name: {{ .configMapName }}
+            items:
+              - key: {{ .certKey | default "ca.crt" }}
+                path: {{ .certKey | default "ca.crt" }}
+        {{- end }}
+        {{- end }}
       {{- with include "newrelic.common.priorityClassName" . }}
       priorityClassName: {{ . }}
       {{- end }}

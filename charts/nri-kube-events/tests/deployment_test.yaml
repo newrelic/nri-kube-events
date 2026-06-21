@@ -121,3 +121,59 @@ tests:
     asserts:
       - isNull:
           path: spec.strategy
+
+  - it: mounts custom CA cert from Secret when forwarder.customCACert.secretName is set
+    set:
+      cluster: my-cluster
+      licenseKey: us-whatever
+      forwarder.customCACert.secretName: my-zscaler-ca
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: custom-ca-cert
+            secret:
+              secretName: my-zscaler-ca
+              items:
+                - key: ca.crt
+                  path: ca.crt
+      - contains:
+          path: spec.template.spec.containers[1].volumeMounts
+          content:
+            name: custom-ca-cert
+            mountPath: /etc/newrelic-infra/custom-ca
+            readOnly: true
+
+  - it: mounts custom CA cert from ConfigMap when forwarder.customCACert.configMapName is set
+    set:
+      cluster: my-cluster
+      licenseKey: us-whatever
+      forwarder.customCACert.configMapName: my-zscaler-ca-cm
+      forwarder.customCACert.certKey: zscaler.pem
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: custom-ca-cert
+            configMap:
+              name: my-zscaler-ca-cm
+              items:
+                - key: zscaler.pem
+                  path: zscaler.pem
+      - contains:
+          path: spec.template.spec.containers[1].volumeMounts
+          content:
+            name: custom-ca-cert
+            mountPath: /etc/newrelic-infra/custom-ca
+            readOnly: true
+
+  - it: does not add custom-ca-cert volume when customCACert is not configured
+    set:
+      cluster: my-cluster
+      licenseKey: us-whatever
+    asserts:
+      - notContains:
+          path: spec.template.spec.volumes
+          any: true
+          content:
+            name: custom-ca-cert
