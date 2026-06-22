@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+## v2.20.2 - 2026-06-22
+
+### ⛓️ Dependencies
+- Updated alpine to v3.24.1
+- Updated kubernetes monorepo to v0.36.2
+
 ## v2.20.1 - 2026-06-11
 
 ### dependency
