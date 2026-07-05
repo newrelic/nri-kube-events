@@ -181,6 +181,8 @@ func Test_Sink_receives_common_Pod_creation_events(t *testing.T) {
 		_ = e.Encode(pre1dot32CreateEvent)
 		t.Log("Or")
 		_ = e.Encode(post1dot32CreateEvent)
+		t.Log("Have:")
+		_ = e.Encode(agentMock.Events())
 		t.Fatalf("Event was not captured")
 	}
 
