@@ -175,7 +175,24 @@ func Test_Sink_receives_common_Pod_creation_events(t *testing.T) {
 		},
 	}
 
-	if !agentMock.Has(&pre1dot32CreateEvent) && !agentMock.Has(&post1dot32CreateEvent) {
+	post1dot35CreateEvent := sdkEvent.Event{
+		Summary:  "Container created",
+		Category: "kubernetes",
+		Attributes: map[string]interface{}{
+			"event.metadata.name":             testpod.Name + ".",
+			"event.metadata.namespace":        ns.Name,
+			"event.reason":                    "Created",
+			"clusterName":                     "",
+			"event.involvedObject.apiVersion": "",
+			"event.involvedObject.kind":       "Pod",
+			"event.involvedObject.name":       testpod.Name,
+			"event.message":                   "Container created",
+			"event.type":                      "Normal",
+			"verb":                            "ADDED",
+		},
+	}
+
+	if !agentMock.Has(&pre1dot32CreateEvent) && !agentMock.Has(&post1dot32CreateEvent) && !agentMock.Has(&post1dot35CreateEvent) {
 		e := json.NewEncoder(os.Stderr)
 		t.Log("Expected:")
 		_ = e.Encode(pre1dot32CreateEvent)
@@ -226,6 +243,8 @@ func Test_Sink_receives_common_Pod_creation_events(t *testing.T) {
 		_ = e.Encode(pre1dot35StartEvent)
 		t.Log("Or")
 		_ = e.Encode(post1dot35StartEvent)
+		t.Log("Have:")
+		_ = e.Encode(agentMock.Events())
 		t.Fatalf("Event was not captured")
 	}
 
