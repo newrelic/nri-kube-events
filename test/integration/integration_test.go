@@ -123,29 +123,8 @@ func Test_Sink_receives_common_Pod_creation_events(t *testing.T) {
 				"verb":                            "ADDED",
 			},
 		},
-
-		// container started event has different summary/message depending on k8s version
-
-		// k8s 1.35 version
 		{
-			Summary:  "Container started",
-			Category: "kubernetes",
-			Attributes: map[string]interface{}{
-				"event.metadata.name":             testpod.Name + ".",
-				"event.metadata.namespace":        ns.Name,
-				"event.reason":                    "Started",
-				"clusterName":                     "",
-				"event.involvedObject.apiVersion": "",
-				"event.involvedObject.kind":       "Pod",
-				"event.involvedObject.name":       testpod.Name,
-				"event.message":                   "Container started",
-				"event.type":                      "Normal",
-				"verb":                            "ADDED",
-			},
-		},
-		// k8s <1.35 version
-		{
-			Summary:  "Container started",
+			Summary:  "Started container " + testpod.Spec.Containers[0].Name,
 			Category: "kubernetes",
 			Attributes: map[string]interface{}{
 				"event.metadata.name":             testpod.Name + ".",
@@ -218,6 +197,49 @@ func Test_Sink_receives_common_Pod_creation_events(t *testing.T) {
 		_ = e.Encode(pre1dot32CreateEvent)
 		t.Log("Or")
 		_ = e.Encode(post1dot32CreateEvent)
+		t.Fatalf("Event was not captured")
+	}
+
+	pre1dot35StartEvent := sdkEvent.Event{
+		Summary:  "Started container " + testpod.Spec.Containers[0].Name,
+		Category: "kubernetes",
+		Attributes: map[string]interface{}{
+			"event.metadata.name":             testpod.Name + ".",
+			"event.metadata.namespace":        ns.Name,
+			"event.reason":                    "Started",
+			"clusterName":                     "",
+			"event.involvedObject.apiVersion": "",
+			"event.involvedObject.kind":       "Pod",
+			"event.involvedObject.name":       testpod.Name,
+			"event.message":                   "Container started",
+			"event.type":                      "Normal",
+			"verb":                            "ADDED",
+		},
+	}
+
+	post1dot35StartEvent := sdkEvent.Event{
+		Summary:  "Container started",
+		Category: "kubernetes",
+		Attributes: map[string]interface{}{
+			"event.metadata.name":             testpod.Name + ".",
+			"event.metadata.namespace":        ns.Name,
+			"event.reason":                    "Started",
+			"clusterName":                     "",
+			"event.involvedObject.apiVersion": "",
+			"event.involvedObject.kind":       "Pod",
+			"event.involvedObject.name":       testpod.Name,
+			"event.message":                   "Container started",
+			"event.type":                      "Normal",
+			"verb":                            "ADDED",
+		},
+	}
+
+	if !agentMock.Has(&pre1dot35StartEvent) && !agentMock.Has(&post1dot35StartEvent) {
+		e := json.NewEncoder(os.Stderr)
+		t.Log("Expected:")
+		_ = e.Encode(pre1dot35StartEvent)
+		t.Log("Or")
+		_ = e.Encode(post1dot35StartEvent)
 		t.Fatalf("Event was not captured")
 	}
 
