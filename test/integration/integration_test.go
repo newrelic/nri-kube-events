@@ -123,6 +123,27 @@ func Test_Sink_receives_common_Pod_creation_events(t *testing.T) {
 				"verb":                            "ADDED",
 			},
 		},
+
+		// container started event has different summary/message depending on k8s version
+
+		// k8s 1.35 version
+		{
+			Summary:  "Container started",
+			Category: "kubernetes",
+			Attributes: map[string]interface{}{
+				"event.metadata.name":             testpod.Name + ".",
+				"event.metadata.namespace":        ns.Name,
+				"event.reason":                    "Started",
+				"clusterName":                     "",
+				"event.involvedObject.apiVersion": "",
+				"event.involvedObject.kind":       "Pod",
+				"event.involvedObject.name":       testpod.Name,
+				"event.message":                   "Container started",
+				"event.type":                      "Normal",
+				"verb":                            "ADDED",
+			},
+		},
+		// k8s <1.35 version
 		{
 			Summary:  "Container started",
 			Category: "kubernetes",
