@@ -214,7 +214,7 @@ func Test_Sink_receives_common_Pod_creation_events(t *testing.T) {
 			"event.involvedObject.apiVersion": "v1",
 			"event.involvedObject.kind":       "Pod",
 			"event.involvedObject.name":       testpod.Name,
-			"event.message":                   "Container started",
+			"event.message":                   "Started container nginx" + testpod.Spec.Containers[0].Name,
 			"event.type":                      "Normal",
 			"verb":                            "ADDED",
 		},
