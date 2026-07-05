@@ -124,7 +124,7 @@ func Test_Sink_receives_common_Pod_creation_events(t *testing.T) {
 			},
 		},
 		{
-			Summary:  "Started container " + testpod.Spec.Containers[0].Name,
+			Summary:  "Container started",
 			Category: "kubernetes",
 			Attributes: map[string]interface{}{
 				"event.metadata.name":             testpod.Name + ".",
