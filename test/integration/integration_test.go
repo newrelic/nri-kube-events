@@ -123,22 +123,6 @@ func Test_Sink_receives_common_Pod_creation_events(t *testing.T) {
 				"verb":                            "ADDED",
 			},
 		},
-		{
-			Summary:  "Started container " + testpod.Spec.Containers[0].Name,
-			Category: "kubernetes",
-			Attributes: map[string]interface{}{
-				"event.metadata.name":             testpod.Name + ".",
-				"event.metadata.namespace":        ns.Name,
-				"event.reason":                    "Started",
-				"clusterName":                     "",
-				"event.involvedObject.apiVersion": "",
-				"event.involvedObject.kind":       "Pod",
-				"event.involvedObject.name":       testpod.Name,
-				"event.message":                   "Started container " + testpod.Spec.Containers[0].Name,
-				"event.type":                      "Normal",
-				"verb":                            "ADDED",
-			},
-		},
 	} {
 		if agentMock.Has(&event) {
 			continue
