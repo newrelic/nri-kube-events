@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	log "github.com/sirupsen/logrus"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -18,6 +19,13 @@ import (
 
 const SplitMaxCols = 16
 const NRDBLimit = 4095
+
+func init() {
+	err := apiextensionsv1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		log.Warnf("failed to enable identification of built-in resources in apiextensions group: %v", err)
+	}
+}
 
 // LimitSplit splits the input string into multiple strings at the specified limit
 // taking care not to split mid-rune.
@@ -41,6 +49,10 @@ func LimitSplit(input string, limit int) []string {
 		splits = append(splits, input)
 	}
 	return splits
+}
+
+func IsBuiltInResource(gvk schema.GroupVersionKind) bool {
+	return scheme.Scheme.Recognizes(gvk)
 }
 
 // K8SObjGetGVK gets the GVK for the given object.

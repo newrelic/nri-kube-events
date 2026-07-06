@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+### enhancement
+- Report descriptions for all objects by default @jamescripter [#557](https://github.com/newrelic/nri-kube-events/pull/557)
+
 ## v2.20.2 - 2026-06-29
 
 ### dependency

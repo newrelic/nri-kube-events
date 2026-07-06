@@ -48,6 +48,9 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           {{- end }}
           args: ["-config", "/app/config/config.yaml", "-loglevel", "debug"]
+          env:
+            - name: CR_FILTERS
+              value: {{ toJson .Values.customResourceFilters | quote }}
           volumeMounts:
             - name: config-volume
               mountPath: /app/config
