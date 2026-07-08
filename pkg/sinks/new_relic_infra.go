@@ -213,8 +213,13 @@ func (ns *newRelicInfraSink) HandleEvent(kubeEvent common.KubeEvent) error {
 
 	ns.decorateAttrs(flattenedEvent)
 
+	message := strings.TrimSpace(kubeEvent.Event.Message)
+	if len(kubeEvent.Event.InvolvedObject.FieldPath) > 0 {
+		message = fmt.Sprintf("%s: %s", kubeEvent.Event.InvolvedObject.FieldPath, message)
+	}
+
 	event := sdkEvent.NewWithAttributes(
-		kubeEvent.Event.Message,
+		message,
 		newRelicCategory,
 		flattenedEvent,
 	)
