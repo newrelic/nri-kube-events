@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## Unreleased
 
 ### enhancement
-- Support Kubernetes 1.35 @jamescripter [#569](https://github.com/newrelic/nri-kube-events/pull/569)
+- Add support for Kubernetes 1.35, remove support for 1.30 @jamescripter [#569](https://github.com/newrelic/nri-kube-events/pull/569)
 
 ## v2.20.2 - 2026-06-29
 
