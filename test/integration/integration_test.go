@@ -123,22 +123,6 @@ func Test_Sink_receives_common_Pod_creation_events(t *testing.T) {
 				"verb":                            "ADDED",
 			},
 		},
-		{
-			Summary:  "Started container " + testpod.Spec.Containers[0].Name,
-			Category: "kubernetes",
-			Attributes: map[string]interface{}{
-				"event.metadata.name":             testpod.Name + ".",
-				"event.metadata.namespace":        ns.Name,
-				"event.reason":                    "Started",
-				"clusterName":                     "",
-				"event.involvedObject.apiVersion": "",
-				"event.involvedObject.kind":       "Pod",
-				"event.involvedObject.name":       testpod.Name,
-				"event.message":                   "Started container " + testpod.Spec.Containers[0].Name,
-				"event.type":                      "Normal",
-				"verb":                            "ADDED",
-			},
-		},
 	} {
 		if agentMock.Has(&event) {
 			continue
@@ -154,9 +138,9 @@ func Test_Sink_receives_common_Pod_creation_events(t *testing.T) {
 
 	// TODO(kpattaswamy): Once the latest 5 versions of Kubernetes contain the same container creation
 	// events, we should move this logic back up.
-	// For context, as of version 1.32 in Kubernetes, the event summary and event message contain a colon after
-	// the word "container". Since these tests aim to provide coverage across the latest 5 versions of
-	// Kubernetes, we check to see if either an older or newer container creation evevnt exist in the agent.
+	// For context, the event summary and message formats have been updated in versions 1.32 and 1.35
+	// of Kubernetes. Since these tests aim to provide coverage across the latest 5 versions, we check
+	// to see if the agent has observed any version of certain events.
 	pre1dot32CreateEvent := sdkEvent.Event{
 		Summary:  "Created container " + testpod.Spec.Containers[0].Name,
 		Category: "kubernetes",
@@ -174,7 +158,7 @@ func Test_Sink_receives_common_Pod_creation_events(t *testing.T) {
 		},
 	}
 
-	post1dot32CreateEvent := sdkEvent.Event{
+	post1dot32Pre1dot35CreateEvent := sdkEvent.Event{
 		Summary:  "Created container: " + testpod.Spec.Containers[0].Name,
 		Category: "kubernetes",
 		Attributes: map[string]interface{}{
@@ -191,12 +175,78 @@ func Test_Sink_receives_common_Pod_creation_events(t *testing.T) {
 		},
 	}
 
-	if !agentMock.Has(&pre1dot32CreateEvent) && !agentMock.Has(&post1dot32CreateEvent) {
+	post1dot35CreateEvent := sdkEvent.Event{
+		Summary:  "Container created",
+		Category: "kubernetes",
+		Attributes: map[string]interface{}{
+			"event.metadata.name":             testpod.Name + ".",
+			"event.metadata.namespace":        ns.Name,
+			"event.reason":                    "Created",
+			"clusterName":                     "",
+			"event.involvedObject.apiVersion": "",
+			"event.involvedObject.kind":       "Pod",
+			"event.involvedObject.name":       testpod.Name,
+			"event.message":                   "Container created",
+			"event.type":                      "Normal",
+			"verb":                            "ADDED",
+		},
+	}
+
+	if !agentMock.Has(&pre1dot32CreateEvent) && !agentMock.Has(&post1dot32Pre1dot35CreateEvent) && !agentMock.Has(&post1dot35CreateEvent) {
 		e := json.NewEncoder(os.Stderr)
 		t.Log("Expected:")
 		_ = e.Encode(pre1dot32CreateEvent)
 		t.Log("Or")
-		_ = e.Encode(post1dot32CreateEvent)
+		_ = e.Encode(post1dot32Pre1dot35CreateEvent)
+		t.Log("Or")
+		_ = e.Encode(post1dot35CreateEvent)
+		t.Log("Have:")
+		_ = e.Encode(agentMock.Events())
+		t.Fatalf("Event was not captured")
+	}
+
+	pre1dot35StartEvent := sdkEvent.Event{
+		Summary:  "Started container " + testpod.Spec.Containers[0].Name,
+		Category: "kubernetes",
+		Attributes: map[string]interface{}{
+			"event.metadata.name":             testpod.Name + ".",
+			"event.metadata.namespace":        ns.Name,
+			"event.reason":                    "Started",
+			"clusterName":                     "integrationTest",
+			"event.involvedObject.apiVersion": "v1",
+			"event.involvedObject.kind":       "Pod",
+			"event.involvedObject.name":       testpod.Name,
+			"event.message":                   "Started container " + testpod.Spec.Containers[0].Name,
+			"event.type":                      "Normal",
+			"verb":                            "ADDED",
+		},
+	}
+
+	post1dot35StartEvent := sdkEvent.Event{
+		Summary:  "Container started",
+		Category: "kubernetes",
+		Attributes: map[string]interface{}{
+			"event.metadata.name":             testpod.Name + ".",
+			"event.metadata.namespace":        ns.Name,
+			"event.reason":                    "Started",
+			"clusterName":                     "",
+			"event.involvedObject.apiVersion": "",
+			"event.involvedObject.kind":       "Pod",
+			"event.involvedObject.name":       testpod.Name,
+			"event.message":                   "Container started",
+			"event.type":                      "Normal",
+			"verb":                            "ADDED",
+		},
+	}
+
+	if !agentMock.Has(&pre1dot35StartEvent) && !agentMock.Has(&post1dot35StartEvent) {
+		e := json.NewEncoder(os.Stderr)
+		t.Log("Expected:")
+		_ = e.Encode(pre1dot35StartEvent)
+		t.Log("Or")
+		_ = e.Encode(post1dot35StartEvent)
+		t.Log("Have:")
+		_ = e.Encode(agentMock.Events())
 		t.Fatalf("Event was not captured")
 	}
 
