@@ -20,10 +20,12 @@ spec:
       app.kubernetes.io/name: {{ include "newrelic.common.naming.name" . }}
   template:
     metadata:
-      {{- if .Values.podAnnotations }}
       annotations:
-        {{- toYaml .Values.podAnnotations | nindent 8}}
-      {{- end }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/agent-config: {{ include (print $.Template.BasePath "/agent-configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       labels:
         {{- include "newrelic.common.labels.podLabels" . | nindent 8 }}
     spec:

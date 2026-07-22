@@ -1,6 +1,8 @@
 suite: test deployment security context
 templates:
   - templates/deployment.yaml
+  - templates/configmap.yaml
+  - templates/agent-configmap.yaml
 release:
   name: my-release
   namespace: my-namespace
@@ -9,6 +11,7 @@ tests:
     set:
       cluster: my-cluster
       licenseKey: us-whatever
+    template: templates/deployment.yaml
     asserts:
       - equal:
           path: spec.template.spec.securityContext
@@ -21,6 +24,7 @@ tests:
       licenseKey: us-whatever
       podSecurityContext:
         foobar: true
+    template: templates/deployment.yaml
     asserts:
       - equal:
           path: spec.template.spec.securityContext.foobar
@@ -33,6 +37,7 @@ tests:
       podSecurityContext:
         runAsUser: 1000
         runAsNonRoot: false
+    template: templates/deployment.yaml
     asserts:
       - equal:
           path: spec.template.spec.securityContext
@@ -44,6 +49,7 @@ tests:
       cluster: test-cluster
       licenseKey: us-whatever
       runAsUser: 1001
+    template: templates/deployment.yaml
     asserts:
       - equal:
           path: spec.template.spec.securityContext.runAsUser
@@ -52,6 +58,7 @@ tests:
     set:
       cluster: my-cluster
       licenseKey: us-whatever
+    template: templates/deployment.yaml
     asserts:
       - equal:
           path: spec.template.spec.containers[0].securityContext
@@ -71,6 +78,7 @@ tests:
       licenseKey: us-whatever
       containerSecurityContext:
         foobar: true
+    template: templates/deployment.yaml
     asserts:
       - equal:
           path: spec.template.spec.containers[0].securityContext.foobar
