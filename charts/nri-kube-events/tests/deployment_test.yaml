@@ -1,6 +1,8 @@
 suite: test deployment images
 templates:
   - templates/deployment.yaml
+  - templates/configmap.yaml
+  - templates/agent-configmap.yaml
 release:
   name: my-release
   namespace: my-namespace
@@ -12,6 +14,7 @@ tests:
       images:
         pullSecrets:
           - name: regsecret
+    template: templates/deployment.yaml
     asserts:
       - equal:
           path: spec.template.spec.imagePullSecrets
@@ -29,6 +32,7 @@ tests:
         agent:
           repository: newrelic/k8s-events-forwarder
           tag: "latest"
+    template: templates/deployment.yaml
     asserts:
       - matchRegex:
           path: spec.template.spec.containers[0].image
@@ -42,6 +46,7 @@ tests:
     set:
       cluster: test-cluster
       licenseKey: us-whatever
+    template: templates/deployment.yaml
     asserts:
       - contains:
           path: spec.template.spec.containers
@@ -64,6 +69,7 @@ tests:
       licenseKey: us-whatever
       sinks:
         newRelicInfra: false
+    template: templates/deployment.yaml
     asserts:
       - notContains:
           path: spec.template.spec.containers
@@ -84,6 +90,7 @@ tests:
     set:
       cluster: my-cluster
       licenseKey: us-whatever
+    template: templates/deployment.yaml
     asserts:
       - equal:
           path: spec.template.spec.nodeSelector
@@ -96,6 +103,7 @@ tests:
       licenseKey: us-whatever
       nodeSelector:
         aCoolTestLabel: aCoolTestValue
+    template: templates/deployment.yaml
     asserts:
       - equal:
           path: spec.template.spec.nodeSelector
@@ -108,6 +116,7 @@ tests:
       cluster: my-cluster
       licenseKey: us-whatever
       hostNetwork: true
+    template: templates/deployment.yaml
     asserts:
       - equal:
           path: spec.strategy.type
@@ -118,6 +127,7 @@ tests:
       cluster: my-cluster
       licenseKey: us-whatever
       hostNetwork: false
+    template: templates/deployment.yaml
     asserts:
       - isNull:
           path: spec.strategy
