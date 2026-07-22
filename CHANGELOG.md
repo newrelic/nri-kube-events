@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### bugfix
 - Automatically rollout new pods on ConfigMap changes. @dbudziwojski [#579](https://github.com/newrelic/nri-kube-events/pull/579)
 
+## v2.21.1 - 2026-07-20
+
+### ⛓️ Dependencies
+- Updated go module directive to v1.26.5
+
 ## v2.21.0 - 2026-07-13
 
 ### 🚀 Enhancements
