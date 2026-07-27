@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-### bugfix
+## v2.21.2 - 2026-07-27
+
+### 🐞 Bug fixes
 - Automatically rollout new pods on ConfigMap changes. @dbudziwojski [#579](https://github.com/newrelic/nri-kube-events/pull/579)
+
+### ⛓️ Dependencies
+- Updated github.com/prometheus/client_golang to v1.24.0 - [Changelog 🔗](https://github.com/prometheus/client_golang/releases/tag/v1.24.0)
 
 ## v2.21.1 - 2026-07-20
 
