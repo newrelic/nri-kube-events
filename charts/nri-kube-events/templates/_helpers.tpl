@@ -41,5 +41,9 @@ readOnlyRootFilesystem: true
 is_forward_only: true
 http_server_enabled: true
 http_server_port: 8001
+{{- $caCert := ((.Values.forwarder).customCACert) | default dict }}
+{{- if or $caCert.secretName $caCert.configMapName }}
+ca_bundle_file: /etc/newrelic-infra/custom-ca/{{ $caCert.certKey | default "ca.crt" }}
+{{- end }}
 {{ include "newrelic.common.agentConfig.defaults" . }}
 {{- end -}}
