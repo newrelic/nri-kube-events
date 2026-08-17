@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+## v2.21.3 - 2026-08-17
+
+### ⛓️ Dependencies
+- Updated github.com/sirupsen/logrus to v1.10.0 - [Changelog 🔗](https://github.com/sirupsen/logrus/releases/tag/v1.10.0)
+- Updated github.com/prometheus/client_golang to v1.24.1 - [Changelog 🔗](https://github.com/prometheus/client_golang/releases/tag/v1.24.1)
+
 ## v2.21.2 - 2026-07-27
 
 ### 🐞 Bug fixes
