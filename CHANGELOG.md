@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+## v2.21.5 - 2026-08-31
+
+### ⛓️ Dependencies
+- Updated github.com/sirupsen/logrus to v1.10.2 - [Changelog 🔗](https://github.com/sirupsen/logrus/releases/tag/v1.10.2)
+
 ## v2.21.4 - 2026-08-24
 
 ### ⛓️ Dependencies
