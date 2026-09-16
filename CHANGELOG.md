@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+### enhancement
+- Add support for Kubernetes 1.36, remove support for 1.31 [#601](https://github.com/newrelic/nri-kube-events/pull/601)
+
 ## v2.21.6 - 2026-09-07
 
 ### ⛓️ Dependencies
