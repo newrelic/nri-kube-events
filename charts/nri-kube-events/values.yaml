@@ -53,6 +53,20 @@ forwarder:
     # requests:
     #   cpu: 100m
     #   memory: 128Mi
+  # -- Reference to a Kubernetes Secret or ConfigMap containing a custom CA certificate.
+  # Required when traffic passes through an SSL-inspecting proxy (e.g. ZScaler) that
+  # replaces TLS certificates with ones signed by a corporate CA unknown to the agent.
+  # The certificate is mounted into the forwarder container and set as `ca_bundle_file`
+  # in the newrelic-infra agent configuration.
+  # @default -- See `values.yaml`
+  customCACert:
+    # -- Name of an existing Secret whose data contains the CA certificate.
+    secretName: ""
+    # -- Name of an existing ConfigMap whose data contains the CA certificate.
+    # Ignored if secretName is set.
+    configMapName: ""
+    # -- Key within the Secret or ConfigMap that holds the PEM-encoded CA certificate.
+    certKey: "ca.crt"
 
 rbac:
   # -- Specifies whether RBAC resources should be created
