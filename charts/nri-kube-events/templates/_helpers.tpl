@@ -20,6 +20,7 @@
 {{- define "nriKubernetes.securityContext.podDefaults" -}}
 runAsUser: 1000
 runAsNonRoot: true
+fsGroup: 1000
 {{- end -}}
 
 

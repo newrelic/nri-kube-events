@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+### 🚀 Enhancements
+- Set a default `fsGroup: 1000` on the pod security context so the integration and forwarder containers' emptyDir and configMap volumes are group-owned by the same GID as the default `runAsUser`. @philip-r-beckwith [#608](https://github.com/newrelic/nri-kube-events/pull/608)
+
 ## v2.22.0 - 2026-09-21
 
 ### 🚀 Enhancements
