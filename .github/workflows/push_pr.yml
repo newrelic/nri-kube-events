@@ -173,7 +173,7 @@ jobs:
           kubectl create ns ct
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.14'
+          python-version: '3.15'
       - uses: helm/chart-testing-action@v2.9.0
       - name: Test install charts
         run: ct install --namespace ct --config .github/ct.yaml --debug
