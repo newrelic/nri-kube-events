@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+## v2.22.2 - 2026-10-12
+
+### ⛓️ Dependencies
+- Updated github.com/prometheus/client_golang to v1.25.0 - [Changelog 🔗](https://github.com/prometheus/client_golang/releases/tag/v1.25.0)
+
 ## v2.22.1 - 2026-10-05
 
 ### ⛓️ Dependencies
