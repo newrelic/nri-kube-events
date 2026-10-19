@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+### bugfix
+- Update golang.org/x/net to v0.61.0 @dbudziwojski [#618](https://github.com/newrelic/nri-kube-events/pull/618)
+
 ## v2.22.2 - 2026-10-12
 
 ### ⛓️ Dependencies
