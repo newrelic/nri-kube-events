@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: helm/chart-testing-action@v2.8.0
+      - uses: helm/chart-testing-action@v2.9.0
 
       - name: Lint charts
         run: ct --config .github/ct.yaml lint --debug
@@ -126,7 +126,7 @@ jobs:
       - name: Test
         run: make test-unit
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@0b35c9ecc4f0529d0eb674914510c22f85b196b4 # v7.1.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           fail_ci_if_error: false
         env:
@@ -153,7 +153,7 @@ jobs:
         with:
           go-version-file: 'go.mod'
       - name: Setup Minikube
-        uses: manusa/actions-setup-minikube@b65276017fdec6f1e6498129fb740e34e260dc55 # v2.18.0
+        uses: manusa/actions-setup-minikube@001b9f30165b2a875b835ec5183ced75b94bc269 # v2.19.0
         with:
           minikube version: v1.39.0
           kubernetes version: ${{ matrix.k8sVersion }}
@@ -173,8 +173,8 @@ jobs:
           kubectl create ns ct
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.14'
-      - uses: helm/chart-testing-action@v2.8.0
+          python-version: '3.15'
+      - uses: helm/chart-testing-action@v2.9.0
       - name: Test install charts
         run: ct install --namespace ct --config .github/ct.yaml --debug
       - name: Test upgrade charts

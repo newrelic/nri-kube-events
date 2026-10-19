@@ -7,8 +7,24 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-### enhancement
+## v2.22.2 - 2026-10-12
+
+### ⛓️ Dependencies
+- Updated github.com/prometheus/client_golang to v1.25.0 - [Changelog 🔗](https://github.com/prometheus/client_golang/releases/tag/v1.25.0)
+
+## v2.22.1 - 2026-10-05
+
+### ⛓️ Dependencies
+- Updated kubernetes monorepo to v0.37.1
+- Updated golang version
+
+## v2.22.0 - 2026-09-21
+
+### 🚀 Enhancements
 - Add support for Kubernetes 1.36, remove support for 1.31 [#601](https://github.com/newrelic/nri-kube-events/pull/601)
+
+### ⛓️ Dependencies
+- Updated alpine to v3.24.2
 
 ## v2.21.6 - 2026-09-07
 
