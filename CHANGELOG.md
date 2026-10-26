@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-### bugfix
+## v2.22.3 - 2026-10-26
+
+### 🐞 Bug fixes
 - Update golang.org/x/net to v0.61.0 @dbudziwojski [#618](https://github.com/newrelic/nri-kube-events/pull/618)
+
+### ⛓️ Dependencies
+- Updated go module directive to v1.27.2
+- Updated alpine to v3.24.3
 
 ## v2.22.2 - 2026-10-12
 
