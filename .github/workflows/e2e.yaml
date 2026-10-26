@@ -20,7 +20,7 @@ jobs:
       matrix:
         # Latest patch version can be found in https://kubernetes.io/releases/patch-releases/
         # Some versions might not be available yet in https://storage.googleapis.com/kubernetes-release/release/v1.X.Y/bin/linux/amd64/kubelet
-        k8sVersion: ["v1.36.0", "v1.35.0", "v1.34.0", "v1.33.0", "v1.32.0"]
+        k8sVersion: ["v1.36.0", "v1.35.0", "v1.34.0"]
         cri: [ containerd ]
     steps:
       - name: Checkout repository
@@ -32,7 +32,7 @@ jobs:
           go-version-file: 'go.mod'
 
       - name: Setup Minikube
-        uses: manusa/actions-setup-minikube@b65276017fdec6f1e6498129fb740e34e260dc55 # v2.18.0
+        uses: manusa/actions-setup-minikube@001b9f30165b2a875b835ec5183ced75b94bc269 # v2.19.0
         with:
           minikube version: v1.39.0
           kubernetes version: ${{ matrix.k8sVersion }}

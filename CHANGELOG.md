@@ -7,8 +7,28 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-### 🚀 Enhancements
+### enhancements
 - Set a default `fsGroup: 1000` on the pod security context so the integration and forwarder containers' emptyDir and configMap volumes are group-owned by the same GID as the default `runAsUser`. @philip-r-beckwith [#608](https://github.com/newrelic/nri-kube-events/pull/608)
+
+## v2.22.3 - 2026-10-26
+
+### 🐞 Bug fixes
+- Update golang.org/x/net to v0.61.0 @dbudziwojski [#618](https://github.com/newrelic/nri-kube-events/pull/618)
+
+### ⛓️ Dependencies
+- Updated go module directive to v1.27.2
+- Updated alpine to v3.24.3
+
+## v2.22.2 - 2026-10-12
+
+### ⛓️ Dependencies
+- Updated github.com/prometheus/client_golang to v1.25.0 - [Changelog 🔗](https://github.com/prometheus/client_golang/releases/tag/v1.25.0)
+
+## v2.22.1 - 2026-10-05
+
+### ⛓️ Dependencies
+- Updated kubernetes monorepo to v0.37.1
+- Updated golang version
 
 ## v2.22.0 - 2026-09-21
 
