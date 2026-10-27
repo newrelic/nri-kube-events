@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-### security
+## v2.23.0 - 2026-10-27
+
+### 🛡️ Security notices
 - Bump forwarder to 1.80.7 @TmNguyen12 [#622](https://github.com/newrelic/nri-kube-events/pull/622)
+
+### ⛓️ Dependencies
+- Updated go module directive to v1.27.3
 
 ## v2.22.3 - 2026-10-26
 
