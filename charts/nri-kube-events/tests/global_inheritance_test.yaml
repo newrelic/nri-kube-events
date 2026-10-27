@@ -491,6 +491,10 @@ tests:
         equal:
           path: spec.template.spec.securityContext.runAsNonRoot
           value: true
+      - template: templates/deployment.yaml
+        equal:
+          path: spec.template.spec.securityContext.fsGroup
+          value: 1000
 
   # =============================================================================
   # ContainerSecurityContext Tests

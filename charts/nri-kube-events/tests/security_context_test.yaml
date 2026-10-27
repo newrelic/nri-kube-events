@@ -18,6 +18,7 @@ tests:
           value:
             runAsUser: 1000
             runAsNonRoot: true
+            fsGroup: 1000
   - it: pod securityContext set common-library values
     set:
       cluster: test-cluster
