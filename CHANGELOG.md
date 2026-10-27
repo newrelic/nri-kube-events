@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+### security
+- Bump forwarder to 1.80.7 @TmNguyen12 [#622](https://github.com/newrelic/nri-kube-events/pull/622)
+
 ## v2.22.3 - 2026-10-26
 
 ### 🐞 Bug fixes
