@@ -27,7 +27,7 @@ images:
   agent:
     registry:
     repository: newrelic/k8s-events-forwarder
-    tag: 1.80.7
+    tag: 1.81.0
     pullPolicy: IfNotPresent
   # -- The secrets that are needed to pull images from a custom registry.
   pullSecrets: []
