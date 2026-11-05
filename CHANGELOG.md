@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+### security
+- Bump golang.org/x/net to v0.62.0 @shashank-reddy-nr [#626](https://github.com/newrelic/nri-kube-events/pull/626)
+
 ## v2.23.0 - 2026-10-27
 
 ### 🛡️ Security notices
