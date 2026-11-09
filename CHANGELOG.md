@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-### security
+## v2.24.0 - 2026-11-09
+
+### 🛡️ Security notices
 - Bump golang.org/x/net to v0.62.0 @shashank-reddy-nr [#626](https://github.com/newrelic/nri-kube-events/pull/626)
+
+### ⛓️ Dependencies
+- Updated kubernetes monorepo to v0.37.2
+- Updated alpine to v3.24.4
 
 ## v2.23.0 - 2026-10-27
 
