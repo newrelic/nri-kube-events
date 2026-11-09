@@ -1,6 +1,6 @@
 # nri-kube-events
 
-![Version: 3.23.0](https://img.shields.io/badge/Version-3.23.0-informational?style=flat-square) ![AppVersion: 2.23.0](https://img.shields.io/badge/AppVersion-2.23.0-informational?style=flat-square)
+![Version: 3.24.0](https://img.shields.io/badge/Version-3.24.0-informational?style=flat-square) ![AppVersion: 2.24.0](https://img.shields.io/badge/AppVersion-2.24.0-informational?style=flat-square)
 
 A Helm chart to deploy the New Relic Kube Events router
 
