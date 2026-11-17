@@ -133,8 +133,10 @@ objectState:
   enabled: false
   # -- Resend an unchanged object after this long. `"0"` turns the resend off.
   resendAfter: "24h"
-  # -- Upper bound on object records sent per second.
-  maxRecordsPerSecond: 100
+  # -- Upper bound on object records sent per second. On a 5,700-object test cluster the
+  # forwarder dropped no events at any rate from 100 to 3200, and the startup burst took about
+  # 4 s at both 1600 and 3200.
+  maxRecordsPerSecond: 3200
 
 # -- Sets pod's priorityClassName. Can be configured also with `global.priorityClassName`
 priorityClassName: ""

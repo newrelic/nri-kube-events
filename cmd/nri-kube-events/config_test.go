@@ -84,7 +84,7 @@ func TestObjectStateDefaults(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, cfg.ObjectState.Enabled)
 	assert.Equal(t, 24*time.Hour, cfg.ObjectState.resendAfter())
-	assert.Equal(t, 100.0, cfg.ObjectState.maxRecordsPerSecond())
+	assert.Equal(t, 3200.0, cfg.ObjectState.maxRecordsPerSecond())
 }
 
 func TestObjectStateParse(t *testing.T) {

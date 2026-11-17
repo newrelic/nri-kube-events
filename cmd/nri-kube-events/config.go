@@ -19,7 +19,7 @@ const (
 	DefaultDescribeRefresh = 24 * time.Hour
 
 	defaultObjectStateResendAfter         = 24 * time.Hour
-	defaultObjectStateMaxRecordsPerSecond = 100
+	defaultObjectStateMaxRecordsPerSecond = 3200
 )
 
 type config struct {
@@ -47,7 +47,7 @@ type ObjectStateConfig struct {
 	AgentEndpoint string `yaml:"agentEndpoint"`
 	// Proxy is the proxy URL for the command API poll. Empty means no proxy.
 	Proxy string `yaml:"proxy"`
-	// MaxRecordsPerSecond 0 means 100.
+	// MaxRecordsPerSecond 0 means 3200.
 	MaxRecordsPerSecond float64 `yaml:"maxRecordsPerSecond"`
 	Enabled             bool    `yaml:"enabled"`
 	NRStaging           bool    `yaml:"nrStaging"`

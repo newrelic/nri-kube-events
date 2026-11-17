@@ -31,7 +31,7 @@ tests:
             objectState:
               enabled: true
               resendAfter: "24h"
-              maxRecordsPerSecond: 100
+              maxRecordsPerSecond: 3200
               clusterName: a-cluster
               namespace: my-namespace
               agentEndpoint: http://localhost:8001/v1/data
@@ -55,7 +55,7 @@ tests:
             (?m)^objectState:
               enabled: true
               resendAfter: "0"
-              maxRecordsPerSecond: 100
+              maxRecordsPerSecond: 3200
               clusterName: a-cluster
               namespace: my-namespace
               agentEndpoint: http://localhost:8001/v1/data
