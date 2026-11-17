@@ -64,8 +64,10 @@ func TestRegisterMetricsOnlyWhenCalled(t *testing.T) {
 
 	setObjectsMetric(map[string]int{"Pod": 1})
 	metricForwarderRejections.WithLabelValues("500").Add(0)
+	metricCarrierFailures.WithLabelValues(StageRun).Add(0)
 	assert.ElementsMatch(t, []string{
 		"nri_kube_events_objects_bytes_sent_total",
+		"nri_kube_events_objects_carrier_failures_total",
 		"nri_kube_events_objects_forwarder_rejections_total",
 		"nri_kube_events_objects_hash_store_bytes_written_total",
 		"nri_kube_events_objects_hash_store_entries",

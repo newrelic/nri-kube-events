@@ -96,10 +96,6 @@ func main() {
 		}()
 	}
 
-	if cfg.ObjectState.Enabled {
-		startObjectState(cfg.ObjectState, stopChan, wg)
-	}
-
 	if cfg.CaptureDescribe == nil || *cfg.CaptureDescribe {
 		resync := DefaultDescribeRefresh
 		if cfg.DescribeRefresh != nil {
@@ -127,6 +123,15 @@ func main() {
 		servePrometheus(*promAddr, stopChan)
 	}()
 
+	// The carrier starts after the Kubernetes Events and describe paths, and never blocks
+	// or stops them.
+	startObjectStateIfEnabled(cfg.ObjectState, stopChan, wg)
+
+	// After the stop signal, main waits for every path to return; upstream exited with
+	// status 1 as soon as the Prometheus server shut down. The wait lets the carrier flush
+	// its hash store. It applies with the carrier off too: shutdown then waits for the
+	// events and describe routers, so a sink call blocked in its retries delays the exit
+	// until the pod's termination grace period ends.
 	wg.Wait()
 	logrus.Infoln("Shutdown complete")
 }
@@ -165,28 +170,123 @@ func serveError(addr string, err error) error {
 	return fmt.Errorf("could not serve Prometheus on %s: %w", addr, err)
 }
 
-// startObjectState validates oc, loads the HMAC key and the hash store, and starts the
-// object-state carrier, which runs until stopChan closes. It also starts the command API
-// poller and runs the watcher only while the account flag is on. Any startup failure is
-// fatal.
+// objectStateRetry is the wait after a failed start or run of the object-state carrier. It
+// doubles after each failure up to max, and starts over after a run that lasted longer than
+// max.
+var objectStateRetry = retryPolicy{initial: 5 * time.Second, max: 5 * time.Minute}
+
+// objectStateRegisterer is where the objects metrics register. Tests replace it.
+var objectStateRegisterer prometheus.Registerer = prometheus.DefaultRegisterer
+
+type retryPolicy struct {
+	initial, max time.Duration
+}
+
+// startObjectStateIfEnabled starts the object-state carrier when oc enables it. With the
+// carrier off it starts nothing and registers no metric.
+func startObjectStateIfEnabled(oc ObjectStateConfig, stopChan <-chan struct{}, wg *sync.WaitGroup) {
+	if oc.Enabled {
+		startObjectState(oc, stopChan, wg)
+	}
+}
+
+// startObjectState starts the object-state carrier in its own goroutine and returns at once.
+// The carrier runs until stopChan closes. No failure of the carrier stops the process, so
+// Kubernetes Events and describe collection keep running: an invalid oc is logged and the
+// carrier does not start, and a failed startup or a run that ends early is logged, counted
+// in nri_kube_events_objects_carrier_failures_total, and retried with backoff. The carrier
+// polls the command API and runs the watcher only while the account flag is on.
 func startObjectState(oc ObjectStateConfig, stopChan <-chan struct{}, wg *sync.WaitGroup) {
-	if oc.ClusterName == "" {
-		logrus.Fatal("objectState.enabled is true but objectState.clusterName is empty")
+	if err := objects.RegisterMetrics(objectStateRegisterer); err != nil {
+		logrus.WithError(err).Error("objects: could not register metrics")
 	}
-	if oc.AgentEndpoint == "" {
-		logrus.Fatal("objectState.enabled is true but objectState.agentEndpoint is empty")
+	if err := oc.validate(); err != nil {
+		objects.CountCarrierFailure(objects.StageConfig)
+		logrus.WithError(err).Error("objects: not starting the object-state carrier; Kubernetes Events collection continues")
+		return
 	}
-	if oc.Namespace == "" {
-		logrus.Fatal("objectState.enabled is true but objectState.namespace is empty")
+	if err := accountflag.RegisterMetrics(objectStateRegisterer); err != nil {
+		logrus.WithError(err).Error("objects: could not register account flag metrics")
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		<-stopChan
+		cancel()
+	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		var c *objectCarrier
+		retryObjectState(ctx, objectStateRetry, func(ctx context.Context) (string, error) {
+			if c == nil {
+				started, err := newObjectCarrier(ctx, oc)
+				if err != nil {
+					return objects.StageStartup, err
+				}
+				c = started
+				logrus.Infof("objects: starting the object-state carrier for cluster %s, hash store in namespace %s", oc.ClusterName, oc.Namespace)
+			}
+			return objects.StageRun, c.run(ctx)
+		})
+	}()
+}
+
+// retryObjectState calls attempt until ctx is canceled. attempt returns only on failure, or
+// after ctx is canceled, and names the stage it failed at. Each failure while ctx is live is
+// logged and counted, and the next attempt waits per p. An error returned after the cancel
+// is the shutdown flush's, and is only logged.
+func retryObjectState(ctx context.Context, p retryPolicy, attempt func(context.Context) (string, error)) {
+	delay := p.initial
+	for {
+		began := time.Now()
+		stage, err := attempt(ctx)
+		if ctx.Err() != nil {
+			if err != nil {
+				logrus.WithError(err).Error("objects: object-state carrier stopped")
+			}
+			return
+		}
+		if err == nil {
+			err = errors.New("returned before the stop signal")
+		}
+		if time.Since(began) > p.max {
+			delay = p.initial
+		}
+		objects.CountCarrierFailure(stage)
+		logrus.WithError(err).WithField("stage", stage).Errorf("objects: object-state carrier failed, retrying in %s; Kubernetes Events collection continues", delay)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(delay):
+		}
+		delay = min(2*delay, p.max)
+	}
+}
+
+// objectCarrier is a started object-state carrier: its clients, HMAC key, loaded hash store,
+// sink and its command API poller.
+type objectCarrier struct {
+	dynamicClient   dynamic.Interface
+	discoveryClient discovery.DiscoveryInterface
+	store           *objects.Store
+	sink            *objects.InfraSink
+	poller          *accountflag.Poller
+	hmacKey         []byte
+	watcherConfig   objects.Config
+}
+
+// newObjectCarrier builds the carrier's clients, loads the HMAC key and the hash store
+// within objectStateStartupTimeout, and builds the sink and the poller. oc is valid.
+func newObjectCarrier(ctx context.Context, oc ObjectStateConfig) (*objectCarrier, error) {
 	licenseKey := os.Getenv(licenseKeyEnv)
 	if licenseKey == "" {
-		logrus.Fatalf("objectState.enabled is true but the %s env var is empty", licenseKeyEnv)
+		return nil, fmt.Errorf("objectState.enabled is true but the %s env var is empty", licenseKeyEnv)
 	}
 
 	conf, err := getRestConfig(*kubeConfig)
 	if err != nil {
-		logrus.Fatalf("objects: %v", err)
+		return nil, err
 	}
 	// The carrier lists every kind at startup, which at the default QPS of 5 takes about
 	// 45 s on a cluster with 233 kinds. The higher limits apply to this copy only. The copy
@@ -197,89 +297,78 @@ func startObjectState(oc ObjectStateConfig, stopChan <-chan struct{}, wg *sync.W
 
 	clientset, err := kubernetes.NewForConfig(conf)
 	if err != nil {
-		logrus.Fatalf("objects: could not create kubernetes client: %v", err)
+		return nil, fmt.Errorf("could not create kubernetes client: %w", err)
 	}
-	dynamicClient, err := dynamic.NewForConfig(conf)
-	if err != nil {
-		logrus.Fatalf("objects: could not create dynamic client: %v", err)
+	c := &objectCarrier{}
+	if c.dynamicClient, err = dynamic.NewForConfig(conf); err != nil {
+		return nil, fmt.Errorf("could not create dynamic client: %w", err)
 	}
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(conf)
-	if err != nil {
-		logrus.Fatalf("objects: could not create discovery client: %v", err)
+	if c.discoveryClient, err = discovery.NewDiscoveryClientForConfig(conf); err != nil {
+		return nil, fmt.Errorf("could not create discovery client: %w", err)
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		<-stopChan
-		cancel()
-	}()
 
 	startCtx, startCancel := context.WithTimeout(ctx, objectStateStartupTimeout)
 	defer startCancel()
-	hmacKey, err := objects.LoadOrCreateHMACKey(startCtx, clientset, oc.Namespace)
-	if err != nil {
-		logrus.Fatalf("objects: could not load or create the HMAC key secret in namespace %s: %v", oc.Namespace, err)
+	if c.hmacKey, err = objects.LoadOrCreateHMACKey(startCtx, clientset, oc.Namespace); err != nil {
+		return nil, fmt.Errorf("could not load or create the HMAC key secret in namespace %s: %w", oc.Namespace, err)
 	}
-	// This is the only load of the hash store: Run does not load it again, so a transient
-	// apiserver error after startup cannot stop the carrier.
-	store := objects.NewStore(clientset, oc.Namespace)
-	if err = store.Load(startCtx); err != nil {
-		logrus.Fatalf("objects: could not load the hash store in namespace %s: %v", oc.Namespace, err)
-	}
-
-	if err = objects.RegisterMetrics(prometheus.DefaultRegisterer); err != nil {
-		logrus.Fatalf("objects: could not register metrics: %v", err)
-	}
-	if err = accountflag.RegisterMetrics(prometheus.DefaultRegisterer); err != nil {
-		logrus.Fatalf("objects: could not register account flag metrics: %v", err)
+	// This is the only load of the hash store: Run does not load it again, and a run that
+	// is restarted reuses this store.
+	c.store = objects.NewStore(clientset, oc.Namespace)
+	if err = c.store.Load(startCtx); err != nil {
+		return nil, fmt.Errorf("could not load the hash store in namespace %s: %w", oc.Namespace, err)
 	}
 
-	sink, err := objects.NewInfraSink(objects.InfraSinkConfig{
+	c.sink, err = objects.NewInfraSink(objects.InfraSinkConfig{
 		Endpoint:            oc.AgentEndpoint,
 		ClusterName:         oc.ClusterName,
 		IntegrationVersion:  integrationVersion,
 		MaxRecordsPerSecond: oc.maxRecordsPerSecond(),
 	})
 	if err != nil {
-		logrus.Fatalf("objects: %v", err)
+		return nil, err
 	}
 
 	// With no HTTPClient the poller builds its own client, with a request timeout, through
 	// Proxy.
-	poller, err := accountflag.NewPoller(accountflag.Config{
+	c.poller, err = accountflag.NewPoller(accountflag.Config{
 		URL:        accountflag.CommandAPIURL(licenseKey, oc.NRStaging, oc.Fedramp),
 		LicenseKey: licenseKey,
 		UserAgent:  "nri-kube-events/" + integrationVersion,
 		Proxy:      oc.Proxy,
 	})
 	if err != nil {
-		logrus.Fatalf("objects: %v", err)
+		return nil, err
 	}
+	poller := c.poller
 	flagState := func() string { return poller.State().String() }
-
-	watcherConfig := objects.Config{
+	c.watcherConfig = objects.Config{
 		ClusterName:       oc.ClusterName,
 		Namespace:         oc.Namespace,
 		ResendAfter:       oc.resendAfter(),
 		MaxResendsPerScan: maxResendsPerScan(oc.maxRecordsPerSecond()),
 		AccountFlag:       flagState,
 	}
-	// A Watcher runs once, so every run builds a new one over the same store.
-	run := func(ctx context.Context) error {
-		return objects.NewWatcher(watcherConfig, dynamicClient, discoveryClient, store, sink, hmacKey).Run(ctx)
-	}
+	return c, nil
+}
 
-	logrus.Infof("objects: starting the object-state carrier for cluster %s, hash store in namespace %s", oc.ClusterName, oc.Namespace)
-	wg.Add(1)
+// run runs the carrier until ctx is canceled, and returns early only if the watcher does.
+// It runs the watcher only while the account flag is on.
+func (c *objectCarrier) run(ctx context.Context) error {
+	// A Watcher runs once, so every run builds a new one over the same store.
+	runWatcher := func(ctx context.Context) error {
+		return objects.NewWatcher(c.watcherConfig, c.dynamicClient, c.discoveryClient, c.store, c.sink, c.hmacKey).Run(ctx)
+	}
+	pollCtx, stopPoll := context.WithCancel(ctx)
+	polled := make(chan struct{})
 	go func() {
-		defer wg.Done()
-		poller.Run(ctx)
+		defer close(polled)
+		c.poller.Run(pollCtx)
 	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		watcherExited(ctx, objects.RunGated(ctx, poller, run))
-	}()
+	err := objects.RunGated(ctx, c.poller, runWatcher)
+	stopPoll()
+	<-polled
+	return err
 }
 
 // maxResendsPerScan caps one resend scan at the records the sink posts in one resend
@@ -288,20 +377,6 @@ func startObjectState(oc ObjectStateConfig, stopChan <-chan struct{}, wg *sync.W
 func maxResendsPerScan(maxRecordsPerSecond float64) int {
 	perSecond := min(maxRecordsPerSecond, objectStateQPS/2)
 	return int(perSecond * objects.DefaultResendInterval.Seconds())
-}
-
-// watcherExited handles the return of the carrier's run. The run returns only after ctx
-// is canceled, so a return while ctx is live means the carrier stopped while the events
-// path keeps running. The process then exits, so the pod restarts. A return after the stop
-// signal is the normal shutdown, and its flush error is only logged.
-func watcherExited(ctx context.Context, err error) {
-	if ctx.Err() == nil {
-		logrus.Fatalf("objects: watcher stopped before the stop signal: %v", err)
-		return
-	}
-	if err != nil {
-		logrus.Errorf("objects: watcher stopped: %v", err)
-	}
 }
 
 // listenForStopSignal returns a channel that will be closed

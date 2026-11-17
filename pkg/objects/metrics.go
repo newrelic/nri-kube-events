@@ -44,6 +44,10 @@ var (
 		Name: metricsPrefix + "forwarder_rejections_total",
 		Help: "POST attempts to the infrastructure agent forwarder that did not get HTTP 204, by status code, or transport for a transport error.",
 	}, []string{"code"})
+	metricCarrierFailures = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: metricsPrefix + "carrier_failures_total",
+		Help: "Failures that stopped the object-state carrier, by stage: config (not started), startup (retried with backoff) and run (restarted with backoff). Kubernetes Events collection keeps running.",
+	}, []string{"stage"})
 	metricResends = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: metricsPrefix + "resends_total",
 		Help: "Unchanged objects re-sent because their last send was older than resendAfter.",
@@ -73,6 +77,7 @@ func objectsCollectors() []prometheus.Collector {
 		metricHashStoreLastFlush,
 		metricHashStoreBytesWritten,
 		metricForwarderRejections,
+		metricCarrierFailures,
 		metricResends,
 	}
 }
@@ -90,4 +95,16 @@ func setObjectsMetric(counts map[string]int) {
 	for kind, n := range counts {
 		metricObjects.WithLabelValues(kind).Set(float64(n))
 	}
+}
+
+// Stages of CountCarrierFailure.
+const (
+	StageConfig  = "config"
+	StageStartup = "startup"
+	StageRun     = "run"
+)
+
+// CountCarrierFailure counts a failure that stopped the carrier at stage.
+func CountCarrierFailure(stage string) {
+	metricCarrierFailures.WithLabelValues(stage).Inc()
 }
