@@ -50,7 +50,17 @@ var (
 // registrations that failed, joined.
 func RegisterMetrics(r prometheus.Registerer) error {
 	var errs []error
-	for _, c := range []prometheus.Collector{
+	for _, c := range objectsCollectors() {
+		if err := r.Register(c); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// objectsCollectors lists every objects metric.
+func objectsCollectors() []prometheus.Collector {
+	return []prometheus.Collector{
 		metricRecordsSent,
 		metricBytesSent,
 		metricSendFailures,
@@ -59,12 +69,7 @@ func RegisterMetrics(r prometheus.Registerer) error {
 		metricHashStoreLastFlush,
 		metricForwarderRejections,
 		metricResends,
-	} {
-		if err := r.Register(c); err != nil {
-			errs = append(errs, err)
-		}
 	}
-	return errors.Join(errs...)
 }
 
 // objectsMetricMu serializes setObjectsMetric, so a reset and its sets are never interleaved

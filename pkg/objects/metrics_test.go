@@ -40,7 +40,15 @@ func gatheredObjectsFamilies(t *testing.T, g prometheus.Gatherer) []string {
 }
 
 func TestRegisterMetricsOnlyWhenCalled(t *testing.T) {
-	assert.Empty(t, gatheredObjectsFamilies(t, prometheus.NewRegistry()))
+	// Nothing in the package registers globally: the default registry gathers no objects
+	// family, and each objects collector can still be registered there. A vector with no
+	// children gathers nothing, so the Register check is what catches a registered vector.
+	assert.Empty(t, gatheredObjectsFamilies(t, prometheus.DefaultGatherer))
+	for _, c := range objectsCollectors() {
+		err := prometheus.DefaultRegisterer.Register(c)
+		require.NoError(t, err, "an objects metric is registered globally without RegisterMetrics")
+		prometheus.DefaultRegisterer.Unregister(c)
+	}
 
 	r := prometheus.NewRegistry()
 	require.NoError(t, RegisterMetrics(r))

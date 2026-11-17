@@ -78,10 +78,10 @@ func (f *fakeForwarder) only(t *testing.T) fakeRequest {
 	return reqs[0]
 }
 
-// newTestSink is a sink for cluster c1 with fast test values.
-func newTestSink(t *testing.T, endpoint string) *InfraSink {
+// newTestSink is a sink for cluster with fast test values.
+func newTestSink(t *testing.T, endpoint, cluster string) *InfraSink {
 	t.Helper()
-	return newTestSinkWith(t, InfraSinkConfig{Endpoint: endpoint})
+	return newTestSinkWith(t, InfraSinkConfig{Endpoint: endpoint, ClusterName: cluster})
 }
 
 // newTestSinkWith fills the fields cfg leaves zero with fast test values.
@@ -151,7 +151,7 @@ func decode(t *testing.T, body []byte) sentPayload {
 
 func TestSendRequestShape(t *testing.T) {
 	fwd := newFakeForwarder(t, http.StatusNoContent)
-	s := newTestSink(t, fwd.URL)
+	s := newTestSink(t, fwd.URL, "c1")
 	require.NoError(t, s.Send(context.Background(), []Record{rec("a"), rec("b")}))
 	req := fwd.only(t)
 	assert.Equal(t, http.MethodPost, req.Method)
@@ -175,7 +175,7 @@ func TestSendRequestShape(t *testing.T) {
 
 func TestSendDoesNotMutateRecords(t *testing.T) {
 	fwd := newFakeForwarder(t, http.StatusNoContent)
-	s := newTestSink(t, fwd.URL)
+	s := newTestSink(t, fwd.URL, "c1")
 	recs := []Record{rec("a"), rec("b")}
 	require.NoError(t, s.Send(context.Background(), recs))
 	for _, r := range recs {
@@ -188,7 +188,7 @@ func TestSendDoesNotMutateRecords(t *testing.T) {
 func TestSendBatchesBy500AndBytes(t *testing.T) {
 	t.Run("event cap", func(t *testing.T) {
 		fwd := newFakeForwarder(t, http.StatusNoContent)
-		s := newTestSink(t, fwd.URL)
+		s := newTestSink(t, fwd.URL, "c1")
 		recs := make([]Record, 1201)
 		for i := range recs {
 			recs[i] = rec(fmt.Sprintf("r%d", i))
@@ -206,7 +206,7 @@ func TestSendBatchesBy500AndBytes(t *testing.T) {
 	for _, size := range []int{400_000, MaxRecordBytes} {
 		t.Run(fmt.Sprintf("bytes %d", size), func(t *testing.T) {
 			fwd := newFakeForwarder(t, http.StatusNoContent)
-			s := newTestSink(t, fwd.URL)
+			s := newTestSink(t, fwd.URL, "c1")
 			recs := []Record{sizedRec(t, "a", size), sizedRec(t, "b", size), sizedRec(t, "c", size)}
 			require.NoError(t, s.Send(context.Background(), recs))
 			reqs := fwd.all()
@@ -233,13 +233,13 @@ func TestBatchesMeasuresDecoratedEvents(t *testing.T) {
 	a, b = pad(a, n), pad(b, n)
 	assert.Len(t, batches([]Record{a, b}, MaxEventsPerPost), 1)
 
-	s := newTestSink(t, "http://127.0.0.1:1")
+	s := newTestSink(t, "http://127.0.0.1:1", "c1")
 	assert.Len(t, batches(s.decorate([]Record{a, b}), MaxEventsPerPost), 2)
 }
 
 func TestSendRetries5xxThen204(t *testing.T) {
 	fwd := newFakeForwarder(t, http.StatusInternalServerError, http.StatusServiceUnavailable, http.StatusNoContent)
-	s := newTestSink(t, fwd.URL)
+	s := newTestSink(t, fwd.URL, "c1")
 	before500 := counterValue(t, metricForwarderRejections.WithLabelValues("500"))
 	before503 := counterValue(t, metricForwarderRejections.WithLabelValues("503"))
 	require.NoError(t, s.Send(context.Background(), []Record{rec("a")}))
@@ -323,7 +323,7 @@ func TestSendRateLimited(t *testing.T) {
 
 func TestSendCountsAcceptedRecordsAndBytes(t *testing.T) {
 	fwd := newFakeForwarder(t, http.StatusNoContent)
-	s := newTestSink(t, fwd.URL)
+	s := newTestSink(t, fwd.URL, "c1")
 	records, bytesSent := counterValue(t, metricRecordsSent), counterValue(t, metricBytesSent)
 	require.NoError(t, s.Send(context.Background(), []Record{rec("a"), rec("b")}))
 	req := fwd.only(t)
@@ -367,7 +367,7 @@ func TestTwoSinksAndEventsSinkCoexist(t *testing.T) {
 
 func TestConcurrentSendsKeepPayloadsSeparate(t *testing.T) {
 	fwd := newFakeForwarder(t, http.StatusNoContent)
-	s := newTestSink(t, fwd.URL)
+	s := newTestSink(t, fwd.URL, "c2")
 	var wg sync.WaitGroup
 	for i := 0; i < 20; i++ {
 		wg.Add(1)
@@ -386,6 +386,8 @@ func TestConcurrentSendsKeepPayloadsSeparate(t *testing.T) {
 		require.Len(t, p.Data[0].Events, 1)
 		ev := p.Data[0].Events[0]
 		assert.Equal(t, ev.Summary, ev.Attributes["k8s.name"])
+		assert.Equal(t, "c2", ev.Attributes["clusterName"])
+		assert.Equal(t, "k8s:c2:objectstate", p.Data[0].Entity.Name)
 		seen[ev.Summary] = true
 	}
 	assert.Len(t, seen, 20)
