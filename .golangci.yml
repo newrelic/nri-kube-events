@@ -31,6 +31,26 @@ linters:
     - unused
     - whitespace
   settings:
+    depguard:
+      rules:
+        # The rule replaces depguard's default, which allows only the standard library and
+        # so flagged every module this repo already depends on.
+        Main:
+          allow:
+            - $gostd
+            - github.com/newrelic/nri-kube-events
+            - github.com/newrelic/infra-integrations-sdk
+            - github.com/prometheus/client_golang
+            - github.com/prometheus/client_model
+            - github.com/sethgrid/pester
+            - github.com/sirupsen/logrus
+            - github.com/stretchr/testify
+            - golang.org/x/time/rate
+            - gopkg.in/yaml.v3
+            - k8s.io/api
+            - k8s.io/apimachinery
+            - k8s.io/client-go
+            - k8s.io/kubectl
     dupl:
       threshold: 100
     gocyclo:
