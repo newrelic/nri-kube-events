@@ -35,10 +35,41 @@ func firstSentAt(uid string, now time.Time, resendAfter time.Duration) int64 {
 	return now.Unix() - int64(resendAfter.Seconds()*float64(uidOrder(uid)%resendSpread)/resendSpread)
 }
 
-// resendBudget is the most objects one resend scan sends for a store of entries: enough
+// catchUpScans is the number of resend scans over which a backlog of overdue objects is
+// drained: about an hour at the default resend interval of one minute.
+const catchUpScans = 60
+
+// resendBudget is the steady part of one resend scan's budget for a store of entries: enough
 // that every object is resent once per resendSpread scans.
 func resendBudget(entries int) int {
-	return (entries + resendSpread - 1) / resendSpread
+	return ceilDiv(entries, resendSpread)
+}
+
+func ceilDiv(n, d int) int {
+	return (n + d - 1) / d
+}
+
+// scanBudget returns the most objects this scan sends when due objects are overdue in a store
+// of entries, and updates the catch-up rate. The steady part, resendBudget(entries), only
+// keeps pace with the objects that come due each scan. When more are due, as after an outage
+// of the carrier, the forwarder or the account flag, the scan adds a catch-up part of
+// ceil(due/catchUpScans), the largest seen since the backlog started. Holding the rate at its
+// largest value drains the backlog in about catchUpScans scans; a rate recomputed from the
+// shrinking backlog would only halve it every 41 scans. The rate resets once a scan finds no
+// more due objects than the steady part. MaxResendsPerScan caps the result. The caller holds
+// w.mu.
+func (w *Watcher) scanBudget(entries, due int) int {
+	steady := resendBudget(entries)
+	if due <= steady {
+		w.catchUp = 0
+		return due
+	}
+	w.catchUp = max(w.catchUp, ceilDiv(due, catchUpScans))
+	budget := steady + w.catchUp
+	if w.cfg.MaxResendsPerScan > 0 {
+		budget = min(budget, w.cfg.MaxResendsPerScan)
+	}
+	return min(budget, due)
 }
 
 // isDue reports whether e was last sent at least resendAfter before now. With the resend off
@@ -53,8 +84,7 @@ func (w *Watcher) isDue(e Entry, now time.Time) bool {
 // failed, in uidOrder. A failed send is the retry pass's to repeat: a failed tombstone keeps
 // its observed deletion time there, which a resend would replace with a later one. The scan
 // starts at the first order above resyncCursor, wraps past the highest order, and takes at
-// most resendBudget(store.Len()) uids. It moves resyncCursor to the order of the last uid
-// taken.
+// most scanBudget uids. It moves resyncCursor to the order of the last uid taken.
 func (w *Watcher) dueForResend(now time.Time) []string {
 	if w.cfg.ResendAfter <= 0 {
 		return nil
@@ -96,13 +126,13 @@ func (w *Watcher) dueForResend(now time.Time) []string {
 		}
 		return due[i].uid < due[j].uid
 	})
-	budget := min(resendBudget(w.store.Len()), len(due))
+	entriesLen := w.store.Len()
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	budget := w.scanBudget(entriesLen, len(due))
 	if budget == 0 {
 		return nil
 	}
-
-	w.mu.Lock()
-	defer w.mu.Unlock()
 	start := sort.Search(len(due), func(i int) bool { return due[i].order > w.resyncCursor })
 	out := make([]string, 0, budget)
 	for i := 0; i < budget; i++ {

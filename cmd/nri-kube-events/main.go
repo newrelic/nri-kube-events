@@ -258,10 +258,11 @@ func startObjectState(oc ObjectStateConfig, stopChan <-chan struct{}, wg *sync.W
 	flagState := func() string { return poller.State().String() }
 
 	watcherConfig := objects.Config{
-		ClusterName: oc.ClusterName,
-		Namespace:   oc.Namespace,
-		ResendAfter: oc.resendAfter(),
-		AccountFlag: flagState,
+		ClusterName:       oc.ClusterName,
+		Namespace:         oc.Namespace,
+		ResendAfter:       oc.resendAfter(),
+		MaxResendsPerScan: maxResendsPerScan(oc.maxRecordsPerSecond()),
+		AccountFlag:       flagState,
 	}
 	// A Watcher runs once, so every run builds a new one over the same store.
 	run := func(ctx context.Context) error {
@@ -279,6 +280,14 @@ func startObjectState(oc ObjectStateConfig, stopChan <-chan struct{}, wg *sync.W
 		defer wg.Done()
 		watcherExited(ctx, objects.RunGated(ctx, poller, run))
 	}()
+}
+
+// maxResendsPerScan caps one resend scan at the records the sink posts in one resend
+// interval, and at half the client QPS over that interval, since each resend first GETs its
+// object. The other half stays free for the reflectors' lists and the retries.
+func maxResendsPerScan(maxRecordsPerSecond float64) int {
+	perSecond := min(maxRecordsPerSecond, objectStateQPS/2)
+	return int(perSecond * objects.DefaultResendInterval.Seconds())
 }
 
 // watcherExited handles the return of the carrier's run. The run returns only after ctx

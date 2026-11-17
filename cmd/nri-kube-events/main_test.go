@@ -81,3 +81,9 @@ func TestServeErrorTreatsServerClosedAsShutdown(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "address already in use")
 }
+
+func TestMaxResendsPerScan(t *testing.T) {
+	// The default 100 records/s is above half the client QPS, 25/s: 25 × 60 s.
+	assert.Equal(t, 1500, maxResendsPerScan(100))
+	assert.Equal(t, 600, maxResendsPerScan(10))
+}

@@ -61,12 +61,123 @@ func storeConfigMapA(store *Store, lastSent time.Time) {
 	store.Put("uid-a", Entry{GVR: "/v1/configmaps", Kind: "ConfigMap", Namespace: "default", Name: "a", Hash: hash, LastSent: lastSent.Unix()})
 }
 
-func TestResendScanCapsOverdueBacklog(t *testing.T) {
+// A scan over a backlog sends the steady part, ceil(3000/1440) = 3, plus the catch-up part,
+// ceil(3000/60) = 50.
+func TestResendScanAddsCatchUpForBacklog(t *testing.T) {
 	w, store, _ := newResendWatcher(t, 24*time.Hour)
 	putOverdue(store, 3000, time.Unix(1_000_000, 0))
 	due := w.dueForResend(time.Unix(1_000_000, 0).Add(48 * time.Hour))
-	assert.Len(t, due, 3) // ceil(3000/1440)
+	assert.Len(t, due, 53)
 	assert.True(t, sort.SliceIsSorted(due, func(i, j int) bool { return uidOrder(due[i]) < uidOrder(due[j]) }))
+}
+
+func TestResendScanCapsBacklog(t *testing.T) {
+	w, store, _ := newResendWatcher(t, 24*time.Hour)
+	w.cfg.MaxResendsPerScan = 20
+	putOverdue(store, 3000, time.Unix(1_000_000, 0))
+	assert.Len(t, w.dueForResend(time.Unix(1_000_000, 0).Add(48*time.Hour)), 20)
+}
+
+func TestScanBudget(t *testing.T) {
+	w, _, _ := newResendWatcher(t, 24*time.Hour)
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	// No backlog: the scan takes what is due, up to the steady part.
+	assert.Equal(t, 0, w.scanBudget(14400, 0))
+	assert.Equal(t, 10, w.scanBudget(14400, 10))
+	// A backlog of 3,600 adds ceil(3600/60) = 60 to the steady 10.
+	assert.Equal(t, 70, w.scanBudget(14400, 3600))
+	// The catch-up part holds while the backlog shrinks, and grows if it grows.
+	assert.Equal(t, 70, w.scanBudget(14400, 1200))
+	assert.Equal(t, 110, w.scanBudget(14400, 6000))
+	// The catch-up part never takes more than is due.
+	assert.Equal(t, 30, w.scanBudget(14400, 30))
+	// It resets once a scan finds no more due than the steady part.
+	assert.Equal(t, 10, w.scanBudget(14400, 10))
+	assert.Equal(t, 0, w.catchUp)
+	assert.Equal(t, 11, w.scanBudget(14400, 11)) // 10 + ceil(11/60)
+}
+
+// simulateResend runs one resend scan a minute from start for scans scans over store, and
+// records each sent uid's send as the real carrier would: LastSent becomes the scan time. It
+// returns, per uid, the first scan that sent it, and the largest age of a last send at the
+// moment it was resent.
+func simulateResend(w *Watcher, store *Store, start time.Time, scans int) (map[string]int, time.Duration) {
+	firstScan := map[string]int{}
+	var maxAge time.Duration
+	for k := 0; k < scans; k++ {
+		now := start.Add(time.Duration(k) * time.Minute)
+		for _, uid := range w.dueForResend(now) {
+			e, _ := store.Get(uid)
+			maxAge = max(maxAge, now.Sub(time.Unix(e.LastSent, 0)))
+			e.LastSent = now.Unix()
+			store.Put(uid, e)
+			if _, ok := firstScan[uid]; !ok {
+				firstScan[uid] = k
+			}
+		}
+	}
+	return firstScan, maxAge
+}
+
+// putSpread stores n ConfigMap entries whose last sends were spread over the resendAfter
+// before at, as the first sends of one startup spread them.
+func putSpread(store *Store, n int, at time.Time, resendAfter time.Duration) {
+	for i := 0; i < n; i++ {
+		uid := fmt.Sprintf("uid-%05d", i)
+		store.Put(uid, Entry{
+			GVR: "/v1/configmaps", Kind: "ConfigMap", Namespace: "default",
+			Name: fmt.Sprintf("cm-%05d", i), Hash: "0000000000000000", LastSent: firstSentAt(uid, at, resendAfter),
+		})
+	}
+}
+
+// After a six-hour outage a quarter of the store is overdue. The resend sends every one of
+// those objects within about an hour, and no object goes more than resendAfter plus the
+// outage plus that hour without a record.
+func TestResendDrainsBacklogAfterOutage(t *testing.T) {
+	const n = 14400
+	resendAfter := 24 * time.Hour
+	outageStart := time.Unix(1_700_000_000, 0)
+	outage := 6 * time.Hour
+	w, store, _ := newResendWatcher(t, resendAfter)
+	putSpread(store, n, outageStart, resendAfter)
+
+	restart := outageStart.Add(outage)
+	var overdue []string
+	for uid, e := range store.entriesWhere(func(Entry) bool { return true }) {
+		if w.isDue(e, restart) {
+			overdue = append(overdue, uid)
+		}
+	}
+	require.InDelta(t, n/4, len(overdue), n/40)
+
+	firstScan, maxAge := simulateResend(w, store, restart, 180)
+	for _, uid := range overdue {
+		k, ok := firstScan[uid]
+		require.True(t, ok, "%s was never resent", uid)
+		assert.LessOrEqual(t, k, 62, "%s was first resent in scan %d", uid, k)
+	}
+	assert.LessOrEqual(t, maxAge, resendAfter+outage+62*time.Minute)
+
+	// With the backlog drained, the scans fall back to the steady part. A minute slot can
+	// hold one uid more than the average, which adds a catch-up part of one.
+	w.mu.Lock()
+	assert.LessOrEqual(t, w.catchUp, 1)
+	w.mu.Unlock()
+	assert.LessOrEqual(t, len(w.dueForResend(restart.Add(180*time.Minute))), resendBudget(n)+1)
+}
+
+// With no outage, the scans never add a catch-up part.
+func TestResendSteadyStateNeedsNoCatchUp(t *testing.T) {
+	const n = 14400
+	resendAfter := 24 * time.Hour
+	at := time.Unix(1_700_000_000, 0)
+	w, store, _ := newResendWatcher(t, resendAfter)
+	putSpread(store, n, at, resendAfter)
+
+	_, maxAge := simulateResend(w, store, at, 120)
+	assert.LessOrEqual(t, maxAge, resendAfter+2*time.Minute)
 }
 
 func TestResendBudget(t *testing.T) {
@@ -103,8 +214,8 @@ func TestDueNeedsResendOn(t *testing.T) {
 	assert.Empty(t, w.dueForResend(time.Unix(1_000_000, 0).Add(48*time.Hour)))
 }
 
-// Three scans over 2,881 overdue entries (budget 3) take the first nine in scan order, with
-// no uid twice.
+// Three scans over 2,881 overdue entries (budget 3 + ceil(2881/60) = 52) take the first 156
+// in scan order, with no uid twice.
 func TestCursorAdvancesInUIDOrder(t *testing.T) {
 	w, store, _ := newResendWatcher(t, 24*time.Hour)
 	putOverdue(store, 2881, time.Unix(1_000_000, 0))
@@ -114,10 +225,10 @@ func TestCursorAdvancesInUIDOrder(t *testing.T) {
 	var got []string
 	for i := 0; i < 3; i++ {
 		due := w.dueForResend(now)
-		require.Len(t, due, 3)
+		require.Len(t, due, 52)
 		got = append(got, due...)
 	}
-	assert.Equal(t, all[:9], got)
+	assert.Equal(t, all[:156], got)
 }
 
 // A scan that starts below the highest order takes it, then wraps to the lowest orders.
@@ -131,6 +242,7 @@ func TestCursorWraps(t *testing.T) {
 	w.mu.Lock()
 	w.resyncCursor = uidOrder(all[n-2])
 	w.mu.Unlock()
+	w.cfg.MaxResendsPerScan = 3
 	assert.Equal(t, []string{all[n-1], all[0], all[1]}, w.dueForResend(now))
 	w.mu.Lock()
 	assert.Equal(t, uidOrder(all[1]), w.resyncCursor)
@@ -361,7 +473,7 @@ func TestHeartbeatReportsCursor(t *testing.T) {
 	w, store, _ := newResendWatcher(t, 24*time.Hour)
 	putOverdue(store, 2000, time.Unix(1_000_000, 0))
 	due := w.dueForResend(time.Unix(1_000_000, 0).Add(48 * time.Hour))
-	require.Len(t, due, 2)
+	require.Len(t, due, 36) // 2 + ceil(2000/60)
 	assert.Equal(t, fmt.Sprintf("%016x", uidOrder(due[len(due)-1])), w.HeartbeatRecord(time.Now()).Attributes["carrier.resyncCursor"])
 }
 

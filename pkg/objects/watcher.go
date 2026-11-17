@@ -59,6 +59,9 @@ type Config struct {
 	// ResendAfter is the age of the last send after which an unchanged object is sent
 	// again. Zero turns the resend off; it takes no default.
 	ResendAfter time.Duration
+	// MaxResendsPerScan caps the objects one resend scan sends while it drains a backlog.
+	// Zero means no cap.
+	MaxResendsPerScan int
 }
 
 func (c Config) withDefaults() Config {
@@ -111,7 +114,8 @@ type Watcher struct {
 	// resendGetTimeout bounds the GET of one resend; NewWatcher sets resendGetTimeout.
 	resendGetTimeout time.Duration
 
-	// mu guards gvrs, unsynced, startTime, lastFullList, failedSends and resyncCursor.
+	// mu guards gvrs, unsynced, startTime, lastFullList, failedSends, resyncCursor and
+	// catchUp.
 	// The fields are ordered to keep pointer data first, so the guarded ones are not
 	// contiguous.
 	gvrs map[schema.GroupVersionResource]*gvrState
@@ -128,6 +132,9 @@ type Watcher struct {
 	failedSends int64
 	// resyncCursor is where the next resend scan starts; the heartbeat reports it.
 	resyncCursor uint64
+	// catchUp is the catch-up part of the resend budget while a backlog drains; see
+	// scanBudget.
+	catchUp int
 
 	// reflectors counts running reflector goroutines, so shutdown can wait for them.
 	reflectors sync.WaitGroup
