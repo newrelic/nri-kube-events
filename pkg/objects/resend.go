@@ -17,9 +17,10 @@ import (
 // store, and a first send's LastSent falls in one of resendSpread slots of resendAfter.
 const resendSpread = 1440
 
-// resendGetTimeout bounds the GET of one resend. The resend holds its kind's reflector store
-// lock across the GET, so a GET that hangs would stall the kind's watch and every later scan.
-const resendGetTimeout = 30 * time.Second
+// objectGetTimeout bounds the GET of one resend or retry. Both hold the kind's reflector
+// store lock across the GET, so a GET that hangs would stall the kind's watch and every later
+// scan or retry pass.
+const objectGetTimeout = 30 * time.Second
 
 // uidOrder is the position of uid in the resend order: the FNV-1a 64 hash of the uid.
 func uidOrder(uid string) uint64 {
@@ -190,7 +191,7 @@ func (w *Watcher) resendOne(ctx context.Context, uid string) {
 	if e.Namespace != "" {
 		res = w.dyn.Resource(gvr).Namespace(e.Namespace)
 	}
-	getCtx, cancel := context.WithTimeout(ctx, w.resendGetTimeout)
+	getCtx, cancel := context.WithTimeout(ctx, w.getTimeout)
 	obj, err := res.Get(getCtx, e.Name, metav1.GetOptions{})
 	cancel()
 	// A resend that finds the object gone, or its name taken by a new object, is when the

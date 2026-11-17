@@ -504,8 +504,8 @@ func TestResendGetTimesOut(t *testing.T) {
 	storeConfigMapA(store, sent)
 	w.now = func() time.Time { return now }
 	w.dyn = hangingGets{w.dyn}
-	w.resendGetTimeout = 50 * time.Millisecond
-	assert.Equal(t, 30*time.Second, resendGetTimeout)
+	w.getTimeout = 50 * time.Millisecond
+	assert.Equal(t, 30*time.Second, objectGetTimeout)
 
 	w.startResend(context.Background())
 	require.Eventually(t, func() bool { return !w.resendBusy.Load() }, 5*time.Second, 10*time.Millisecond, "the scan never ended")
@@ -518,6 +518,29 @@ func TestResendGetTimesOut(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, sent.Unix(), e.LastSent)
 	assert.Equal(t, []string{"uid-a"}, w.dueForResend(now))
+}
+
+// A retry GET that never returns times out: the pass ends, releases the kind's lock, and the
+// object stays unsynced for the next pass.
+func TestRetryGetTimesOut(t *testing.T) {
+	cm := configMap("a", "uid-a", "v1")
+	w, _, sink := newResendWatcher(t, 0, cm)
+	ctx := context.Background()
+	sink.setFail(true)
+	require.Error(t, w.HandleObject(ctx, cmGVR, OpInitial, cm.Object))
+	sink.setFail(false)
+	require.Equal(t, 1, unsyncedObjects(w))
+	w.dyn = hangingGets{w.dyn}
+	w.getTimeout = 50 * time.Millisecond
+
+	w.startRetry(ctx)
+	require.Eventually(t, func() bool { return !w.retryBusy.Load() }, 5*time.Second, 10*time.Millisecond, "the retry pass never ended")
+	w.background.Wait()
+	s := w.reflectorStore(cmGVR)
+	require.True(t, s.mu.TryLock(), "the kind's lock is still held")
+	s.mu.Unlock()
+	assert.Empty(t, sink.objectRecords())
+	assert.Equal(t, 1, unsyncedObjects(w))
 }
 
 // A uid whose tombstone failed is left to the retry pass, which keeps the observed deletion

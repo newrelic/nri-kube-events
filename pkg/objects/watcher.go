@@ -111,8 +111,8 @@ type Watcher struct {
 	// afterRetryGet, when set, is called by a retry after it fetched an object and before
 	// it sends it. Tests use it to deliver a watch event at that point.
 	afterRetryGet func(uid string)
-	// resendGetTimeout bounds the GET of one resend; NewWatcher sets resendGetTimeout.
-	resendGetTimeout time.Duration
+	// getTimeout bounds the GET of one resend or retry; NewWatcher sets objectGetTimeout.
+	getTimeout time.Duration
 
 	// mu guards gvrs, unsynced, startTime, lastFullList, failedSends, resyncCursor and
 	// catchUp.
@@ -165,17 +165,17 @@ const maxRetryPerPass = 500
 // redaction and is never sent.
 func NewWatcher(cfg Config, dyn dynamic.Interface, disc discovery.DiscoveryInterface, store *Store, sink RecordSink, hmacKey []byte) *Watcher {
 	return &Watcher{
-		cfg:              cfg.withDefaults(),
-		dyn:              dyn,
-		disc:             disc,
-		store:            store,
-		sink:             sink,
-		key:              hmacKey,
-		now:              time.Now,
-		resendGetTimeout: resendGetTimeout,
-		rediscover:       make(chan struct{}, 1),
-		gvrs:             map[schema.GroupVersionResource]*gvrState{},
-		unsynced:         map[string]unsyncedObject{},
+		cfg:        cfg.withDefaults(),
+		dyn:        dyn,
+		disc:       disc,
+		store:      store,
+		sink:       sink,
+		key:        hmacKey,
+		now:        time.Now,
+		getTimeout: objectGetTimeout,
+		rediscover: make(chan struct{}, 1),
+		gvrs:       map[schema.GroupVersionResource]*gvrState{},
+		unsynced:   map[string]unsyncedObject{},
 	}
 }
 
@@ -599,7 +599,9 @@ func (w *Watcher) retryOne(ctx context.Context, uid string, u unsyncedObject) {
 	if u.entry.Namespace != "" {
 		res = w.dyn.Resource(gvr).Namespace(u.entry.Namespace)
 	}
-	obj, err := res.Get(ctx, u.entry.Name, metav1.GetOptions{})
+	getCtx, cancel := context.WithTimeout(ctx, w.getTimeout)
+	obj, err := res.Get(getCtx, u.entry.Name, metav1.GetOptions{})
+	cancel()
 	if w.afterRetryGet != nil {
 		w.afterRetryGet(uid)
 	}
