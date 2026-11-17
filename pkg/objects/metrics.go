@@ -36,6 +36,10 @@ var (
 		Name: metricsPrefix + "hash_store_last_flush_timestamp",
 		Help: "Unix time in seconds of the last hash store flush that returned no error, including a flush with nothing to write.",
 	})
+	metricHashStoreBytesWritten = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: metricsPrefix + "hash_store_bytes_written_total",
+		Help: "Data bytes, keys plus values, of the hash store shard ConfigMaps written to the apiserver with no error. Each write sends the whole shard.",
+	})
 	metricForwarderRejections = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: metricsPrefix + "forwarder_rejections_total",
 		Help: "POST attempts to the infrastructure agent forwarder that did not get HTTP 204, by status code, or transport for a transport error.",
@@ -67,6 +71,7 @@ func objectsCollectors() []prometheus.Collector {
 		metricObjects,
 		metricHashStoreEntries,
 		metricHashStoreLastFlush,
+		metricHashStoreBytesWritten,
 		metricForwarderRejections,
 		metricResends,
 	}

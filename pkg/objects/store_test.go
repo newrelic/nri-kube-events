@@ -252,6 +252,38 @@ func TestFlushWritesOnlyChangedShards(t *testing.T) {
 	assert.Equal(t, 1, gen, "in-place writes keep the generation")
 }
 
+// Each shard write adds the shard's whole data size to the bytes-written counter; a flush
+// with nothing changed adds nothing.
+func TestFlushCountsBytesWritten(t *testing.T) {
+	ctx := context.Background()
+	client := newClient()
+	s := NewStore(client, storeNS)
+	require.NoError(t, s.Load(ctx))
+	for i := 0; i < 12000; i++ {
+		s.Put(testUID(i), testEntry(i))
+	}
+	before := counterValue(t, metricHashStoreBytesWritten)
+	require.NoError(t, s.Flush(ctx))
+	total := 0
+	for _, cm := range shardConfigMaps(t, client) {
+		total += shardBytes(cm.Data)
+	}
+	assert.InDelta(t, float64(total), counterValue(t, metricHashStoreBytesWritten)-before, 0)
+
+	before = counterValue(t, metricHashStoreBytesWritten)
+	require.NoError(t, s.Flush(ctx))
+	assert.InDelta(t, 0, counterValue(t, metricHashStoreBytesWritten)-before, 0)
+
+	e := testEntry(7)
+	e.Hash = "ffffffffffffffff"
+	s.Put(testUID(7), e)
+	require.NoError(t, s.Flush(ctx))
+	s.mu.Lock()
+	data := s.group(s.shards)[shardOf(testUID(7), s.shards)]
+	s.mu.Unlock()
+	assert.InDelta(t, float64(shardBytes(data)), counterValue(t, metricHashStoreBytesWritten)-before, 0)
+}
+
 func TestShardStaysUnder5000(t *testing.T) {
 	ctx := context.Background()
 	client := newClient()

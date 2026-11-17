@@ -109,6 +109,19 @@ objectState:
   # -- Enable object state. The deployment then runs one replica with the `Recreate` strategy and a
   # 90 s termination grace period, the ClusterRole gets get, list and watch on every resource
   # (Secrets included), and a Role grants ConfigMap and Secret writes in the release namespace.
+  # With `rbac.create=false` the chart renders none of that RBAC, and you grant it yourself.
+  #
+  # Cost per 1,000 objects in the cluster. These are estimates from the code, not measurements;
+  # the `nri_kube_events_objects_hash_store_bytes_written_total` metric and the pod's RSS give
+  # the real values.
+  # - Hash store: about 220 bytes per object in the shard ConfigMaps, so about 220 KB, and
+  #   about 0.5 MB of memory.
+  # - Hash store writes: a flush every 30 s rewrites each changed shard whole. The daily resend
+  #   alone changes some shard every minute, so expect up to about 0.3 GB a day written to etcd
+  #   and about 0.6 GB a day if churn changes every shard on every flush. Every client that
+  #   watches ConfigMaps cluster-wide receives each write.
+  # - Startup: the first list of every kind is held in memory at once. That peak is not
+  #   measured yet; set `resources.limits.memory` from the pod's observed peak.
   enabled: false
   # -- Resend an unchanged object after this long. `"0"` turns the resend off.
   resendAfter: "24h"

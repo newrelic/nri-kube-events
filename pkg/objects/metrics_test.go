@@ -54,6 +54,7 @@ func TestRegisterMetricsOnlyWhenCalled(t *testing.T) {
 	require.NoError(t, RegisterMetrics(r))
 	assert.Subset(t, gatheredObjectsFamilies(t, r), []string{
 		"nri_kube_events_objects_bytes_sent_total",
+		"nri_kube_events_objects_hash_store_bytes_written_total",
 		"nri_kube_events_objects_hash_store_entries",
 		"nri_kube_events_objects_hash_store_last_flush_timestamp",
 		"nri_kube_events_objects_records_sent_total",
@@ -66,6 +67,7 @@ func TestRegisterMetricsOnlyWhenCalled(t *testing.T) {
 	assert.ElementsMatch(t, []string{
 		"nri_kube_events_objects_bytes_sent_total",
 		"nri_kube_events_objects_forwarder_rejections_total",
+		"nri_kube_events_objects_hash_store_bytes_written_total",
 		"nri_kube_events_objects_hash_store_entries",
 		"nri_kube_events_objects_hash_store_last_flush_timestamp",
 		"nri_kube_events_objects_objects",

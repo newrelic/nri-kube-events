@@ -595,6 +595,7 @@ func (s *Store) writeShard(ctx context.Context, gen, i int, data map[string]stri
 	if err := upsert(ctx, s.client.CoreV1().ConfigMaps(s.namespace), cm, exists); err != nil {
 		return fmt.Errorf("writing hash store shard %s: %w", cm.Name, err)
 	}
+	metricHashStoreBytesWritten.Add(float64(shardBytes(data)))
 	return nil
 }
 
