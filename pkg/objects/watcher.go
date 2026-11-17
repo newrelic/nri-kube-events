@@ -129,10 +129,12 @@ type Watcher struct {
 
 	// reflectors counts running reflector goroutines, so shutdown can wait for them.
 	reflectors sync.WaitGroup
-	// background counts the heartbeat and retry goroutines, so shutdown can wait for them.
+	// background counts the heartbeat, retry and resend goroutines, so shutdown can wait for
+	// them.
 	background sync.WaitGroup
-	// heartbeatBusy and retryBusy are set while a heartbeat send or a retry pass runs.
-	heartbeatBusy, retryBusy atomic.Bool
+	// heartbeatBusy, retryBusy and resendBusy are set while a heartbeat send, a retry pass
+	// or a resend scan runs.
+	heartbeatBusy, retryBusy, resendBusy atomic.Bool
 }
 
 // unsyncedObject is what a retry needs: the object's identity, to fetch it again or to
@@ -171,7 +173,8 @@ func NewWatcher(cfg Config, dyn dynamic.Interface, disc discovery.DiscoveryInter
 // their timers until ctx is canceled. It then stops the watches and flushes the store once
 // more, and returns that flush's error. Run never loads the store: main loads it once, with
 // a startup deadline, and exits if that fails. Heartbeats and retries of failed sends run
-// in their own goroutines, so the discovery and flush ticks never wait on the Log API.
+// in their own goroutines, as do the resend scans of unchanged objects while ResendAfter is
+// set, so the discovery and flush ticks never wait on the Log API.
 func (w *Watcher) Run(ctx context.Context) error {
 	w.dropOwnStoreEntries()
 	w.mu.Lock()
@@ -215,9 +218,6 @@ func (w *Watcher) Run(ctx context.Context) error {
 		}
 	}
 }
-
-// startResend is a placeholder for the resend scan of unchanged objects.
-func (w *Watcher) startResend(context.Context) {}
 
 // shutdown stops every watch, waits for the reflectors to return, and flushes the store.
 func (w *Watcher) shutdown() error {
@@ -711,7 +711,13 @@ func (w *Watcher) handle(ctx context.Context, gvr schema.GroupVersionResource, o
 		w.store.Delete(uid)
 		return nil
 	}
-	w.store.Put(uid, Entry{GVR: gvrString, Kind: kind, Namespace: namespace, Name: name, Hash: hash, LastSent: now.Unix()})
+	// A first-ever send stores a LastSent spread across ResendAfter, so the objects of one
+	// startup come due for the resend spread out and not all at once.
+	lastSent := now.Unix()
+	if _, known := w.store.Get(uid); !known && w.cfg.ResendAfter > 0 {
+		lastSent = firstSentAt(uid, now, w.cfg.ResendAfter)
+	}
+	w.store.Put(uid, Entry{GVR: gvrString, Kind: kind, Namespace: namespace, Name: name, Hash: hash, LastSent: lastSent})
 	return nil
 }
 
