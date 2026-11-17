@@ -1,0 +1,689 @@
+renders defaults:
+  1: |
+    apiVersion: v1
+    data:
+      newrelic-infra.yml: |
+        is_forward_only: true
+        http_server_enabled: true
+        http_server_port: 8001
+    kind: ConfigMap
+    metadata:
+      labels:
+        app.kubernetes.io/instance: my-release
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: nri-kube-events
+        app.kubernetes.io/version: 2.25.0
+        helm.sh/chart: nri-kube-events-4.1.0
+      name: my-release-nri-kube-events-agent-config
+      namespace: my-namespace
+  2: |
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRole
+    metadata:
+      labels:
+        app.kubernetes.io/instance: my-release
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: nri-kube-events
+        app.kubernetes.io/version: 2.25.0
+        helm.sh/chart: nri-kube-events-4.1.0
+      name: my-release-nri-kube-events
+    rules:
+      - apiGroups:
+          - ""
+        resources:
+          - events
+          - namespaces
+          - nodes
+          - jobs
+          - persistentvolumes
+          - persistentvolumeclaims
+          - pods
+          - services
+        verbs:
+          - get
+          - watch
+          - list
+      - apiGroups:
+          - apps
+        resources:
+          - daemonsets
+          - deployments
+        verbs:
+          - get
+          - watch
+          - list
+      - apiGroups:
+          - batch
+        resources:
+          - cronjobs
+          - jobs
+        verbs:
+          - get
+          - watch
+          - list
+  3: |
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    metadata:
+      labels:
+        app.kubernetes.io/instance: my-release
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: nri-kube-events
+        app.kubernetes.io/version: 2.25.0
+        helm.sh/chart: nri-kube-events-4.1.0
+      name: my-release-nri-kube-events
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: my-release-nri-kube-events
+    subjects:
+      - kind: ServiceAccount
+        name: my-release-nri-kube-events
+        namespace: my-namespace
+  4: |
+    apiVersion: v1
+    data:
+      config.yaml: |-
+        sinks:
+          - name: newRelicInfra
+            config:
+              agentEndpoint: http://localhost:8001/v1/data
+              clusterName: a-cluster
+              agentHTTPTimeout: 30s
+        captureDescribe: true
+        describeRefresh: 24h
+        captureEvents: true
+    kind: ConfigMap
+    metadata:
+      labels:
+        app.kubernetes.io/instance: my-release
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: nri-kube-events
+        app.kubernetes.io/version: 2.25.0
+        helm.sh/chart: nri-kube-events-4.1.0
+      name: my-release-nri-kube-events-config
+      namespace: my-namespace
+  5: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      annotations: null
+      labels:
+        app.kubernetes.io/instance: my-release
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: nri-kube-events
+        app.kubernetes.io/version: 2.25.0
+        helm.sh/chart: nri-kube-events-4.1.0
+      name: my-release-nri-kube-events
+      namespace: my-namespace
+    spec:
+      selector:
+        matchLabels:
+          app.kubernetes.io/name: nri-kube-events
+      template:
+        metadata:
+          annotations:
+            checksum/agent-config: e09ef5b835d14efc531531674aa8f46b7b5cada90614ffae2366c1937857c4c6
+            checksum/config: df1d3727e6d182b00fdc694b26599e5a699a27b45118b81ee7f530437a66706b
+          labels:
+            app.kubernetes.io/instance: my-release
+            app.kubernetes.io/name: nri-kube-events
+        spec:
+          containers:
+            - args:
+                - -config
+                - /app/config/config.yaml
+                - -loglevel
+                - debug
+              image: docker.io/newrelic/nri-kube-events:2.25.0
+              imagePullPolicy: IfNotPresent
+              name: kube-events
+              securityContext:
+                allowPrivilegeEscalation: false
+                privileged: false
+                readOnlyRootFilesystem: true
+              volumeMounts:
+                - mountPath: /app/config
+                  name: config-volume
+            - env:
+                - name: NRIA_LICENSE_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      key: licenseKey
+                      name: my-release-nri-kube-events-license
+                - name: NRIA_OVERRIDE_HOSTNAME_SHORT
+                  valueFrom:
+                    fieldRef:
+                      apiVersion: v1
+                      fieldPath: spec.nodeName
+              image: docker.io/newrelic/k8s-events-forwarder:2.1.1
+              imagePullPolicy: IfNotPresent
+              name: forwarder
+              ports:
+                - containerPort: 8001
+              securityContext:
+                allowPrivilegeEscalation: false
+                privileged: false
+                readOnlyRootFilesystem: true
+              volumeMounts:
+                - mountPath: /var/db/newrelic-infra/data
+                  name: tmpfs-data
+                - mountPath: /var/db/newrelic-infra/user_data
+                  name: tmpfs-user-data
+                - mountPath: /tmp
+                  name: tmpfs-tmp
+                - mountPath: /etc/newrelic-infra.yml
+                  name: config
+                  subPath: newrelic-infra.yml
+          hostNetwork: false
+          nodeSelector:
+            kubernetes.io/os: linux
+          securityContext:
+            fsGroup: 1000
+            runAsNonRoot: true
+            runAsUser: 1000
+          serviceAccountName: my-release-nri-kube-events
+          volumes:
+            - configMap:
+                items:
+                  - key: newrelic-infra.yml
+                    path: newrelic-infra.yml
+                name: my-release-nri-kube-events-agent-config
+              name: config
+            - configMap:
+                name: my-release-nri-kube-events-config
+              name: config-volume
+            - emptyDir: {}
+              name: tmpfs-data
+            - emptyDir: {}
+              name: tmpfs-user-data
+            - emptyDir: {}
+              name: tmpfs-tmp
+  6: |
+    apiVersion: v1
+    data:
+      licenseKey: dXMtd2hhdGV2ZXI=
+    kind: Secret
+    metadata:
+      labels:
+        app.kubernetes.io/instance: my-release
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: nri-kube-events
+        app.kubernetes.io/version: 2.25.0
+        helm.sh/chart: nri-kube-events-4.1.0
+      name: my-release-nri-kube-events-license
+      namespace: my-namespace
+  7: |
+    apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      annotations: null
+      labels:
+        app.kubernetes.io/instance: my-release
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: nri-kube-events
+        app.kubernetes.io/version: 2.25.0
+        helm.sh/chart: nri-kube-events-4.1.0
+      name: my-release-nri-kube-events
+      namespace: my-namespace
+renders with hostNetwork:
+  1: |
+    apiVersion: v1
+    data:
+      newrelic-infra.yml: |
+        is_forward_only: true
+        http_server_enabled: true
+        http_server_port: 8001
+    kind: ConfigMap
+    metadata:
+      labels:
+        app.kubernetes.io/instance: my-release
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: nri-kube-events
+        app.kubernetes.io/version: 2.25.0
+        helm.sh/chart: nri-kube-events-4.1.0
+      name: my-release-nri-kube-events-agent-config
+      namespace: my-namespace
+  2: |
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRole
+    metadata:
+      labels:
+        app.kubernetes.io/instance: my-release
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: nri-kube-events
+        app.kubernetes.io/version: 2.25.0
+        helm.sh/chart: nri-kube-events-4.1.0
+      name: my-release-nri-kube-events
+    rules:
+      - apiGroups:
+          - ""
+        resources:
+          - events
+          - namespaces
+          - nodes
+          - jobs
+          - persistentvolumes
+          - persistentvolumeclaims
+          - pods
+          - services
+        verbs:
+          - get
+          - watch
+          - list
+      - apiGroups:
+          - apps
+        resources:
+          - daemonsets
+          - deployments
+        verbs:
+          - get
+          - watch
+          - list
+      - apiGroups:
+          - batch
+        resources:
+          - cronjobs
+          - jobs
+        verbs:
+          - get
+          - watch
+          - list
+  3: |
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    metadata:
+      labels:
+        app.kubernetes.io/instance: my-release
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: nri-kube-events
+        app.kubernetes.io/version: 2.25.0
+        helm.sh/chart: nri-kube-events-4.1.0
+      name: my-release-nri-kube-events
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: my-release-nri-kube-events
+    subjects:
+      - kind: ServiceAccount
+        name: my-release-nri-kube-events
+        namespace: my-namespace
+  4: |
+    apiVersion: v1
+    data:
+      config.yaml: |-
+        sinks:
+          - name: newRelicInfra
+            config:
+              agentEndpoint: http://localhost:8001/v1/data
+              clusterName: a-cluster
+              agentHTTPTimeout: 30s
+        captureDescribe: true
+        describeRefresh: 24h
+        captureEvents: true
+    kind: ConfigMap
+    metadata:
+      labels:
+        app.kubernetes.io/instance: my-release
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: nri-kube-events
+        app.kubernetes.io/version: 2.25.0
+        helm.sh/chart: nri-kube-events-4.1.0
+      name: my-release-nri-kube-events-config
+      namespace: my-namespace
+  5: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      annotations: null
+      labels:
+        app.kubernetes.io/instance: my-release
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: nri-kube-events
+        app.kubernetes.io/version: 2.25.0
+        helm.sh/chart: nri-kube-events-4.1.0
+      name: my-release-nri-kube-events
+      namespace: my-namespace
+    spec:
+      selector:
+        matchLabels:
+          app.kubernetes.io/name: nri-kube-events
+      strategy:
+        type: Recreate
+      template:
+        metadata:
+          annotations:
+            checksum/agent-config: e09ef5b835d14efc531531674aa8f46b7b5cada90614ffae2366c1937857c4c6
+            checksum/config: df1d3727e6d182b00fdc694b26599e5a699a27b45118b81ee7f530437a66706b
+          labels:
+            app.kubernetes.io/instance: my-release
+            app.kubernetes.io/name: nri-kube-events
+        spec:
+          containers:
+            - args:
+                - -config
+                - /app/config/config.yaml
+                - -loglevel
+                - debug
+              image: docker.io/newrelic/nri-kube-events:2.25.0
+              imagePullPolicy: IfNotPresent
+              name: kube-events
+              securityContext:
+                allowPrivilegeEscalation: false
+                privileged: false
+                readOnlyRootFilesystem: true
+              volumeMounts:
+                - mountPath: /app/config
+                  name: config-volume
+            - env:
+                - name: NRIA_LICENSE_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      key: licenseKey
+                      name: my-release-nri-kube-events-license
+                - name: NRIA_OVERRIDE_HOSTNAME_SHORT
+                  valueFrom:
+                    fieldRef:
+                      apiVersion: v1
+                      fieldPath: spec.nodeName
+              image: docker.io/newrelic/k8s-events-forwarder:2.1.1
+              imagePullPolicy: IfNotPresent
+              name: forwarder
+              ports:
+                - containerPort: 8001
+              securityContext:
+                allowPrivilegeEscalation: false
+                privileged: false
+                readOnlyRootFilesystem: true
+              volumeMounts:
+                - mountPath: /var/db/newrelic-infra/data
+                  name: tmpfs-data
+                - mountPath: /var/db/newrelic-infra/user_data
+                  name: tmpfs-user-data
+                - mountPath: /tmp
+                  name: tmpfs-tmp
+                - mountPath: /etc/newrelic-infra.yml
+                  name: config
+                  subPath: newrelic-infra.yml
+          hostNetwork: true
+          nodeSelector:
+            kubernetes.io/os: linux
+          securityContext:
+            fsGroup: 1000
+            runAsNonRoot: true
+            runAsUser: 1000
+          serviceAccountName: my-release-nri-kube-events
+          volumes:
+            - configMap:
+                items:
+                  - key: newrelic-infra.yml
+                    path: newrelic-infra.yml
+                name: my-release-nri-kube-events-agent-config
+              name: config
+            - configMap:
+                name: my-release-nri-kube-events-config
+              name: config-volume
+            - emptyDir: {}
+              name: tmpfs-data
+            - emptyDir: {}
+              name: tmpfs-user-data
+            - emptyDir: {}
+              name: tmpfs-tmp
+  6: |
+    apiVersion: v1
+    data:
+      licenseKey: dXMtd2hhdGV2ZXI=
+    kind: Secret
+    metadata:
+      labels:
+        app.kubernetes.io/instance: my-release
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: nri-kube-events
+        app.kubernetes.io/version: 2.25.0
+        helm.sh/chart: nri-kube-events-4.1.0
+      name: my-release-nri-kube-events-license
+      namespace: my-namespace
+  7: |
+    apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      annotations: null
+      labels:
+        app.kubernetes.io/instance: my-release
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: nri-kube-events
+        app.kubernetes.io/version: 2.25.0
+        helm.sh/chart: nri-kube-events-4.1.0
+      name: my-release-nri-kube-events
+      namespace: my-namespace
+renders with staging and fedramp:
+  1: |
+    apiVersion: v1
+    data:
+      newrelic-infra.yml: |
+        is_forward_only: true
+        http_server_enabled: true
+        http_server_port: 8001
+
+        staging: true
+        fedramp: true
+    kind: ConfigMap
+    metadata:
+      labels:
+        app.kubernetes.io/instance: my-release
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: nri-kube-events
+        app.kubernetes.io/version: 2.25.0
+        helm.sh/chart: nri-kube-events-4.1.0
+      name: my-release-nri-kube-events-agent-config
+      namespace: my-namespace
+  2: |
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRole
+    metadata:
+      labels:
+        app.kubernetes.io/instance: my-release
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: nri-kube-events
+        app.kubernetes.io/version: 2.25.0
+        helm.sh/chart: nri-kube-events-4.1.0
+      name: my-release-nri-kube-events
+    rules:
+      - apiGroups:
+          - ""
+        resources:
+          - events
+          - namespaces
+          - nodes
+          - jobs
+          - persistentvolumes
+          - persistentvolumeclaims
+          - pods
+          - services
+        verbs:
+          - get
+          - watch
+          - list
+      - apiGroups:
+          - apps
+        resources:
+          - daemonsets
+          - deployments
+        verbs:
+          - get
+          - watch
+          - list
+      - apiGroups:
+          - batch
+        resources:
+          - cronjobs
+          - jobs
+        verbs:
+          - get
+          - watch
+          - list
+  3: |
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    metadata:
+      labels:
+        app.kubernetes.io/instance: my-release
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: nri-kube-events
+        app.kubernetes.io/version: 2.25.0
+        helm.sh/chart: nri-kube-events-4.1.0
+      name: my-release-nri-kube-events
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: my-release-nri-kube-events
+    subjects:
+      - kind: ServiceAccount
+        name: my-release-nri-kube-events
+        namespace: my-namespace
+  4: |
+    apiVersion: v1
+    data:
+      config.yaml: |-
+        sinks:
+          - name: newRelicInfra
+            config:
+              agentEndpoint: http://localhost:8001/v1/data
+              clusterName: a-cluster
+              agentHTTPTimeout: 30s
+        captureDescribe: true
+        describeRefresh: 24h
+        captureEvents: true
+    kind: ConfigMap
+    metadata:
+      labels:
+        app.kubernetes.io/instance: my-release
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: nri-kube-events
+        app.kubernetes.io/version: 2.25.0
+        helm.sh/chart: nri-kube-events-4.1.0
+      name: my-release-nri-kube-events-config
+      namespace: my-namespace
+  5: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      annotations: null
+      labels:
+        app.kubernetes.io/instance: my-release
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: nri-kube-events
+        app.kubernetes.io/version: 2.25.0
+        helm.sh/chart: nri-kube-events-4.1.0
+      name: my-release-nri-kube-events
+      namespace: my-namespace
+    spec:
+      selector:
+        matchLabels:
+          app.kubernetes.io/name: nri-kube-events
+      template:
+        metadata:
+          annotations:
+            checksum/agent-config: 8babec5db1d6c3648eee76df1f2f9d0e5f7e6377eb7bb843c46f59e5a6b8e9a6
+            checksum/config: df1d3727e6d182b00fdc694b26599e5a699a27b45118b81ee7f530437a66706b
+          labels:
+            app.kubernetes.io/instance: my-release
+            app.kubernetes.io/name: nri-kube-events
+        spec:
+          containers:
+            - args:
+                - -config
+                - /app/config/config.yaml
+                - -loglevel
+                - debug
+              image: docker.io/newrelic/nri-kube-events:2.25.0
+              imagePullPolicy: IfNotPresent
+              name: kube-events
+              securityContext:
+                allowPrivilegeEscalation: false
+                privileged: false
+                readOnlyRootFilesystem: true
+              volumeMounts:
+                - mountPath: /app/config
+                  name: config-volume
+            - env:
+                - name: NRIA_LICENSE_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      key: licenseKey
+                      name: my-release-nri-kube-events-license
+                - name: NRIA_OVERRIDE_HOSTNAME_SHORT
+                  valueFrom:
+                    fieldRef:
+                      apiVersion: v1
+                      fieldPath: spec.nodeName
+              image: docker.io/newrelic/k8s-events-forwarder:2.1.1
+              imagePullPolicy: IfNotPresent
+              name: forwarder
+              ports:
+                - containerPort: 8001
+              securityContext:
+                allowPrivilegeEscalation: false
+                privileged: false
+                readOnlyRootFilesystem: true
+              volumeMounts:
+                - mountPath: /var/db/newrelic-infra/data
+                  name: tmpfs-data
+                - mountPath: /var/db/newrelic-infra/user_data
+                  name: tmpfs-user-data
+                - mountPath: /tmp
+                  name: tmpfs-tmp
+                - mountPath: /etc/newrelic-infra.yml
+                  name: config
+                  subPath: newrelic-infra.yml
+          hostNetwork: false
+          nodeSelector:
+            kubernetes.io/os: linux
+          securityContext:
+            fsGroup: 1000
+            runAsNonRoot: true
+            runAsUser: 1000
+          serviceAccountName: my-release-nri-kube-events
+          volumes:
+            - configMap:
+                items:
+                  - key: newrelic-infra.yml
+                    path: newrelic-infra.yml
+                name: my-release-nri-kube-events-agent-config
+              name: config
+            - configMap:
+                name: my-release-nri-kube-events-config
+              name: config-volume
+            - emptyDir: {}
+              name: tmpfs-data
+            - emptyDir: {}
+              name: tmpfs-user-data
+            - emptyDir: {}
+              name: tmpfs-tmp
+  6: |
+    apiVersion: v1
+    data:
+      licenseKey: dXMtd2hhdGV2ZXI=
+    kind: Secret
+    metadata:
+      labels:
+        app.kubernetes.io/instance: my-release
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: nri-kube-events
+        app.kubernetes.io/version: 2.25.0
+        helm.sh/chart: nri-kube-events-4.1.0
+      name: my-release-nri-kube-events-license
+      namespace: my-namespace
+  7: |
+    apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      annotations: null
+      labels:
+        app.kubernetes.io/instance: my-release
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: nri-kube-events
+        app.kubernetes.io/version: 2.25.0
+        helm.sh/chart: nri-kube-events-4.1.0
+      name: my-release-nri-kube-events
+      namespace: my-namespace
