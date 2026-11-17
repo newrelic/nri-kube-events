@@ -237,14 +237,14 @@ func assertObjectRecord(t *testing.T, r Record, cluster string, now time.Time) {
 
 func TestBuildRecordsSmallObject(t *testing.T) {
 	obj := smallDeployment()
-	recs, err := BuildRecords(obj, appsDeployments, OpUpdated, "test-wet-mop-green", testNow)
+	recs, err := BuildRecords(obj, appsDeployments, OpUpdated, "example-cluster-01", testNow)
 	require.NoError(t, err)
 	require.Len(t, recs, 1)
 	r := recs[0]
 	a := r.Attributes
 
 	assert.Equal(t, "Deployment shop/web updated rv 42", r.Summary)
-	assertObjectRecord(t, r, "test-wet-mop-green", testNow)
+	assertObjectRecord(t, r, "example-cluster-01", testNow)
 	assert.Equal(t, "apps", a["k8s.group"])
 	assert.Equal(t, "v1", a["k8s.version"])
 	assert.Equal(t, "Deployment", a["k8s.kind"])

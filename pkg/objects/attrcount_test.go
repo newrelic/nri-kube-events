@@ -141,7 +141,7 @@ func firstEvent(t *testing.T, body []byte) map[string]any {
 }
 
 func TestLargestRecordFitsAfterNormalization(t *testing.T) {
-	recs, err := BuildRecords(largestObject(), cmGVR, OpUpdated, "test-wet-mop-green", time.Unix(1700000000, 0))
+	recs, err := BuildRecords(largestObject(), cmGVR, OpUpdated, "example-cluster-01", time.Unix(1700000000, 0))
 	require.NoError(t, err)
 	a := recs[0].Attributes
 	for _, k := range []string{"k8s.owner.kind", "k8s.owner.name", "k8s.owner.uid", "k8s.labels.truncated",
@@ -167,9 +167,9 @@ func TestLargestRecordFitsAfterNormalization(t *testing.T) {
 	assert.Greater(t, mustMarshalLen(t, Record{Summary: recs[0].Summary, Category: recs[0].Category, Attributes: grown}), MaxRecordBytes,
 		"record 0 was not closed by the byte cap")
 
-	body, err := newTestSink(t, "http://unused", "test-wet-mop-green").payload(recs[:1])
+	body, err := newTestSink(t, "http://unused", "example-cluster-01").payload(recs[:1])
 	require.NoError(t, err)
-	n := normalizeLikeAgent(firstEvent(t, body), "k8s:test-wet-mop-green:objectstate")
+	n := normalizeLikeAgent(firstEvent(t, body), "k8s:example-cluster-01:objectstate")
 	require.NotNil(t, n)
 
 	assert.LessOrEqual(t, len(n), 200)
@@ -197,7 +197,7 @@ func TestLargestRecordFitsAfterNormalization(t *testing.T) {
 
 func TestHeartbeatFitsAfterNormalization(t *testing.T) {
 	cfg := testConfig()
-	cfg.ClusterName = "test-wet-mop-green"
+	cfg.ClusterName = "example-cluster-01"
 	cfg.AccountFlag = func() string { return "on" }
 	w, _, store, _ := newTestWatcher(t, cfg, nil)
 	require.NoError(t, store.Load(context.Background()))

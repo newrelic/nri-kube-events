@@ -36,10 +36,9 @@ const kedaRecommendationAnnotation = "clm10-keda-scaler/cpuutilizationtarget.rec
 // clm10-keda-scaler/cpuutilizationtarget.recommendation.history annotation of a keda.sh
 // ScaledObject. The input is never modified.
 //
-// The Argo CD and KEDA fields come from the NR-634266 ingest ledger
-// (nr-634266/ingest-estimate/ledger.md:66-67,71-72,75-79,91): every Argo CD refresh
-// changes only reconciledAt and generation, and most ScaledObject changes touch only the
-// recommendation annotation. Dropping generation means a record can show an older
+// The Argo CD and KEDA fields come from an ingest measurement on a staging cluster: every
+// Argo CD refresh changes only reconciledAt and generation, and most ScaledObject changes
+// touch only the recommendation annotation. Dropping generation means a record can show an older
 // generation than the live Application until its next real change or the next resend.
 func Normalize(obj map[string]any) map[string]any {
 	out, _ := deepCopy(obj).(map[string]any)
