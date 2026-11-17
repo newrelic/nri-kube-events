@@ -36,6 +36,14 @@ var (
 		Name: metricsPrefix + "hash_store_last_flush_timestamp",
 		Help: "Unix time in seconds of the last hash store flush that returned no error, including a flush with nothing to write.",
 	})
+	metricForwarderRejections = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: metricsPrefix + "forwarder_rejections_total",
+		Help: "POST attempts to the infrastructure agent forwarder that did not get HTTP 204, by status code, or transport for a transport error.",
+	}, []string{"code"})
+	metricResends = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: metricsPrefix + "resends_total",
+		Help: "Unchanged objects re-sent because their last send was older than resendAfter.",
+	})
 )
 
 // RegisterMetrics registers every objects metric with r. It returns the errors of the
@@ -49,6 +57,8 @@ func RegisterMetrics(r prometheus.Registerer) error {
 		metricObjects,
 		metricHashStoreEntries,
 		metricHashStoreLastFlush,
+		metricForwarderRejections,
+		metricResends,
 	} {
 		if err := r.Register(c); err != nil {
 			errs = append(errs, err)
