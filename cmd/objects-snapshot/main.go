@@ -50,7 +50,8 @@ const (
 	exitListFailed = 2
 )
 
-// row is one object of the snapshot. Secret rows have no uid and no hash.
+// row is one object of the snapshot. Secret rows have no uid and no hash, and rows of a
+// non-core kind named Secret have no hash.
 type row struct {
 	uid, kind, group, namespace, name, hash string
 }
@@ -205,11 +206,17 @@ func listKind(ctx context.Context, dyn dynamic.Interface, gvr schema.GroupVersio
 			if objects.IsOwnStoreObject(carrierNamespace, gvr, obj) {
 				continue
 			}
-			// Only Secrets use the redaction key, and Secrets are never listed here.
+			// Only Secrets use the redaction key, and core Secrets are never listed here.
 			red, hash := objects.PrepareObject(gvr, kind, obj, nil)
 			meta, _ := red["metadata"].(map[string]any)
 			r := row{group: gvr.Group, hash: hash}
 			r.kind, _ = red["kind"].(string)
+			// Redaction treats any kind named Secret as one, in every group, and the
+			// carrier redacts it with its own key, which the snapshot does not have. Its
+			// hash cannot match the carrier's, so the row carries none, like a core Secret.
+			if r.kind == "Secret" {
+				r.hash = ""
+			}
 			r.uid, _ = meta["uid"].(string)
 			r.namespace, _ = meta["namespace"].(string)
 			r.name, _ = meta["name"].(string)

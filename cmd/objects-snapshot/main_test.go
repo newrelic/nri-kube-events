@@ -283,3 +283,20 @@ func TestWriteRowsSortedWithHeader(t *testing.T) {
 		"u4\tWidget\t\tns1\tw\th4\n"+
 		"u3\tWidget\texample.com\tns1\tw\th3\n", buf.String())
 }
+
+// A kind named Secret outside the core group is redacted with the carrier's key, so the
+// snapshot cannot reproduce its hash and leaves it empty.
+func TestSnapshotLeavesNonCoreSecretKindUnhashed(t *testing.T) {
+	gvr := schema.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "secrets"}
+	dyn := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
+		gvr: "SecretList",
+	}, &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "example.com/v1",
+		"kind":       "Secret",
+		"metadata":   map[string]any{"name": "s", "namespace": "ns", "uid": "uid-crd-secret"},
+		"data":       map[string]any{"key": "dmFsdWU="},
+	}})
+	rows, err := listKind(t.Context(), dyn, gvr, "Secret", testCarrierNS)
+	require.NoError(t, err)
+	assert.Equal(t, []row{{uid: "uid-crd-secret", kind: "Secret", group: "example.com", namespace: "ns", name: "s"}}, rows)
+}
