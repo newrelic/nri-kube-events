@@ -925,7 +925,11 @@ func (w *Watcher) sendHeartbeat(ctx context.Context) {
 // list has succeeded, with the count of its objects in the store; a kind with no objects
 // is listed with 0. carrier.failedKinds lists, sorted and comma-separated, the GVRs whose
 // most recent list failed; capList drops whole GVRs from the end to keep it within one
-// attribute. timestamp is Unix seconds. The other times are Unix milliseconds, 0 before
+// attribute. A kind whose first list never arrives can be missing from it: when the
+// reflector uses the watch-list stream, client-go retries a 429 or a refused connection
+// inside the stream and never calls the list function that marks the failure. A reader
+// should treat a watched kind that is in neither carrier.kinds nor carrier.failedKinds as
+// not collected. timestamp is Unix seconds. The other times are Unix milliseconds, 0 before
 // they happen.
 func (w *Watcher) HeartbeatRecord(now time.Time) Record {
 	w.mu.Lock()
