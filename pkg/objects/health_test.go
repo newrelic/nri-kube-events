@@ -384,4 +384,8 @@ func TestConditionsUnhealthyByteCapped(t *testing.T) {
 	assert.LessOrEqual(t, len(h.ConditionsUnhealthy), MaxAttrBytes)
 	assert.True(t, h.ConditionsTruncated)
 	assert.True(t, strings.HasSuffix(h.ConditionsUnhealthy, ","))
+	// Each item ",CheckNNNN=False:<reason>," is 318 bytes, and 12 × 318 = 3,816 fits in
+	// MaxAttrBytes while 13 × 318 does not.
+	assert.Equal(t, 12, strings.Count(h.ConditionsUnhealthy, "=False:"))
+	assert.Equal(t, 12*318, len(h.ConditionsUnhealthy))
 }

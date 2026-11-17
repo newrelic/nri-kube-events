@@ -9,6 +9,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"unicode/utf8"
+
+	"gopkg.in/yaml.v3"
 )
 
 // lastAppliedAnnotation holds the object as kubectl last applied it, values included.
@@ -20,7 +23,8 @@ const redactedWhole = "<redacted>"
 
 // Redact returns a deep copy of obj. When obj is a Secret, every value in data and
 // stringData is replaced with "<redacted len=N hmac=XXXXXXXXXXXXXXXX>", in the copy and in
-// the copy's last-applied-configuration annotation. Keys are kept. A Helm release Secret
+// the copy's last-applied-configuration annotation. Keys are kept. Other annotations that
+// may hold a copy of the object are replaced with the same marker (see redactAnnotation). A Helm release Secret
 // (type helm.sh/release.v1) needs no special case: its whole release is data.release.
 // With an empty key the marker is "<redacted len=N>". The input is never modified, so the
 // caller may pass the watch's own object.
@@ -47,37 +51,73 @@ func RedactSecret(obj map[string]any, key []byte) map[string]any {
 }
 
 // redactSecretCopy redacts out, a deep copy the caller owns, in place and returns it.
+// Metadata in a shape other than map[string]any is replaced whole with redactedWhole,
+// because its annotations cannot be reached to redact them.
 func redactSecretCopy(out map[string]any, key []byte) map[string]any {
 	redactValues(out, key)
 
-	meta, ok := out["metadata"].(map[string]any)
+	rawMeta, present := out["metadata"]
+	if !present || rawMeta == nil {
+		return out
+	}
+	meta, ok := rawMeta.(map[string]any)
 	if !ok {
+		out["metadata"] = redactedWhole
 		return out
 	}
 	switch ann := meta["annotations"].(type) {
 	case nil:
 	case map[string]any:
-		if v, present := ann[lastAppliedAnnotation]; present {
+		for k, v := range ann {
 			if raw, isString := v.(string); isString {
-				ann[lastAppliedAnnotation] = redactLastApplied(raw, key)
+				ann[k] = redactAnnotation(k, raw, key)
 			} else {
-				ann[lastAppliedAnnotation] = redactedWhole
+				ann[k] = redactedWhole
 			}
 		}
 	case map[string]string:
 		// deepCopy does not copy this map type, so build a new one and leave the input alone.
-		if raw, present := ann[lastAppliedAnnotation]; present {
-			copied := make(map[string]string, len(ann))
-			for k, v := range ann {
-				copied[k] = v
-			}
-			copied[lastAppliedAnnotation] = redactLastApplied(raw, key)
-			meta["annotations"] = copied
+		copied := make(map[string]string, len(ann))
+		for k, v := range ann {
+			copied[k] = redactAnnotation(k, v, key)
 		}
+		meta["annotations"] = copied
 	default:
 		meta["annotations"] = redactedWhole
 	}
 	return out
+}
+
+// maxPlainAnnotation is the longest Secret annotation value, in runes, that is kept as it is
+// when it is not a JSON object or YAML mapping.
+const maxPlainAnnotation = 256
+
+// redactAnnotation returns the value to send for one annotation of a Secret. Tools such as
+// kubectl and kapp keep a copy of the applied object, values included, in an annotation.
+// The last-applied-configuration annotation is redacted key by key. Any other value that
+// parses as a JSON object or a YAML mapping, or that is longer than maxPlainAnnotation
+// runes, is replaced with a marker. Short scalar values are kept.
+func redactAnnotation(name, value string, key []byte) string {
+	if name == lastAppliedAnnotation {
+		return redactLastApplied(value, key)
+	}
+	if utf8.RuneCountInString(value) > maxPlainAnnotation || isJSONObject(value) || isYAMLMapping(value) {
+		return redactedValue([]byte(value), key)
+	}
+	return value
+}
+
+func isJSONObject(s string) bool {
+	var m map[string]any
+	return json.Unmarshal([]byte(s), &m) == nil && m != nil
+}
+
+func isYAMLMapping(s string) bool {
+	var doc yaml.Node
+	if err := yaml.Unmarshal([]byte(s), &doc); err != nil {
+		return false
+	}
+	return doc.Kind == yaml.DocumentNode && len(doc.Content) > 0 && doc.Content[0].Kind == yaml.MappingNode
 }
 
 // redactValues replaces the values of secret's data (base64) and stringData (plain) in

@@ -261,3 +261,78 @@ func TestRedactSecretIgnoresKindField(t *testing.T) {
 	assert.Equal(t, expectRedacted(key, "plain-token"), out["stringData"].(map[string]any)["token"])
 	assert.Equal(t, b64("hunter2"), obj["data"].(map[string]any)["password"], "input untouched")
 }
+
+func TestRedactSecretNonMapMetadataReplacedWhole(t *testing.T) {
+	obj := secret(map[string]any{"password": b64("hunter2")}, nil)
+	obj["metadata"] = map[string]string{"name": "db", "annotations": `{"data":{"password":"aHVudGVyMg=="}}`}
+	out := Redact(obj, []byte("k"))
+	assert.Equal(t, redactedWhole, out["metadata"])
+	assert.IsType(t, map[string]string{}, obj["metadata"], "input untouched")
+
+	obj = secret(map[string]any{"password": b64("hunter2")}, nil)
+	delete(obj, "metadata")
+	out = Redact(obj, []byte("k"))
+	assert.NotContains(t, out, "metadata")
+}
+
+func TestRedactAppliedObjectAnnotations(t *testing.T) {
+	key := []byte("k")
+	kapp := `{"apiVersion":"v1","kind":"Secret","data":{"password":"aHVudGVyMg=="}}`
+	yamlCopy := "apiVersion: v1\nkind: Secret\nstringData:\n  password: hunter2\n"
+	long := strings.Repeat("a", 300)
+	ann := map[string]any{
+		"kapp.k14s.io/original":              kapp,
+		"example.com/applied-yaml":           yamlCopy,
+		"example.com/long":                   long,
+		"kubernetes.io/service-account.name": "builder",
+		"example.com/count":                  int64(3),
+	}
+	for _, annotations := range []any{ann, toStringMap(ann)} {
+		obj := secret(map[string]any{"password": b64("hunter2")}, nil)
+		obj["metadata"].(map[string]any)["annotations"] = annotations
+		out := Redact(obj, key)
+		got := map[string]string{}
+		switch a := out["metadata"].(map[string]any)["annotations"].(type) {
+		case map[string]any:
+			for k, v := range a {
+				got[k] = v.(string)
+			}
+		case map[string]string:
+			got = a
+		}
+		assert.Equal(t, expectRedacted(key, kapp), got["kapp.k14s.io/original"])
+		assert.Equal(t, expectRedacted(key, yamlCopy), got["example.com/applied-yaml"])
+		assert.Equal(t, expectRedacted(key, long), got["example.com/long"])
+		assert.Equal(t, "builder", got["kubernetes.io/service-account.name"])
+	}
+	// A non-string value under map[string]any fails closed.
+	obj := secret(nil, nil)
+	obj["metadata"].(map[string]any)["annotations"] = ann
+	out := Redact(obj, key)
+	assert.Equal(t, redactedWhole, out["metadata"].(map[string]any)["annotations"].(map[string]any)["example.com/count"])
+	assert.Equal(t, kapp, ann["kapp.k14s.io/original"], "input untouched")
+}
+
+func TestRedactKeepsShortScalarAnnotations(t *testing.T) {
+	obj := secret(nil, nil)
+	obj["metadata"].(map[string]any)["annotations"] = map[string]any{
+		"kubernetes.io/service-account.name": "builder",
+		"example.com/list":                   "- a\n- b",
+		"example.com/exact":                  strings.Repeat("中", 256),
+	}
+	out := Redact(obj, []byte("k"))
+	got := out["metadata"].(map[string]any)["annotations"].(map[string]any)
+	assert.Equal(t, "builder", got["kubernetes.io/service-account.name"])
+	assert.Equal(t, "- a\n- b", got["example.com/list"])
+	assert.Equal(t, strings.Repeat("中", 256), got["example.com/exact"], "256 runes is not longer than 256")
+}
+
+func toStringMap(m map[string]any) map[string]string {
+	out := map[string]string{}
+	for k, v := range m {
+		if s, ok := v.(string); ok {
+			out[k] = s
+		}
+	}
+	return out
+}

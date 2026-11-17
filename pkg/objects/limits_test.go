@@ -29,7 +29,9 @@ func TestCapList(t *testing.T) {
 	assert.LessOrEqual(t, len(s), MaxAttrBytes)
 	assert.True(t, strings.HasPrefix(s, ",abcd,"))
 	assert.True(t, strings.HasSuffix(s, ",abcd,"))
-	assert.Equal(t, strings.Count(s, "abcd"), (utf8.RuneCountInString(s)-1)/5)
+	// 1 + 5k <= 4,094 runes gives k = 818.
+	assert.Equal(t, 818, strings.Count(s, "abcd"))
+	assert.Equal(t, 1+5*818, utf8.RuneCountInString(s))
 
 	// Items of three-byte runes stay far under the rune cap, so the byte cap drops them.
 	var wide []string
@@ -41,7 +43,9 @@ func TestCapList(t *testing.T) {
 	assert.LessOrEqual(t, len(s), MaxAttrBytes)
 	assert.Less(t, utf8.RuneCountInString(s), PartChars)
 	assert.True(t, strings.HasSuffix(s, ",中中中中,"))
-	assert.Equal(t, strings.Count(s, "中中中中"), (len(s)-1)/13)
+	// 1 + 13k <= 4,095 bytes gives k = 314.
+	assert.Equal(t, 314, strings.Count(s, "中中中中"))
+	assert.Equal(t, 1+13*314, len(s))
 
 	// A first item that alone is too long leaves the result empty.
 	s, truncated = capList([]string{strings.Repeat("x", PartChars), "b"})
