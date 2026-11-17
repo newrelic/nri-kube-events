@@ -218,6 +218,7 @@ func TestRedactEmptyKeyOmitsHmac(t *testing.T) {
 
 func TestRedactLastAppliedAnyKindOnSecret(t *testing.T) {
 	key := []byte("k")
+	//nolint:gosec // G101: test values, not credentials
 	for name, raw := range map[string]string{
 		"non-secret kind": `{"kind":"ConfigMap","data":{"password":"aHVudGVyMg=="},"stringData":{"token":"plain-token"}}`,
 		"no kind":         `{"data":{"password":"aHVudGVyMg=="},"stringData":{"token":"plain-token"}}`,

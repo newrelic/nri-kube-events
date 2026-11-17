@@ -50,13 +50,13 @@ const (
 )
 
 type result struct {
+	Start      time.Time     `json:"start"`
+	End        time.Time     `json:"end"`
 	Cluster    string        `json:"cluster"`
 	Context    string        `json:"context"`
 	FailedGVRs []string      `json:"failedGVRs"`
-	Start      time.Time     `json:"start"`
-	End        time.Time     `json:"end"`
-	Secrets    secretSummary `json:"secrets"`
 	Objects    sinkSummary   `json:"objects"`
+	Secrets    secretSummary `json:"secrets"`
 	// ChangeWindowSeconds is the time from the end of the first full list to End: the window
 	// the change counts cover.
 	ChangeWindowSeconds float64 `json:"changeWindowSeconds"`

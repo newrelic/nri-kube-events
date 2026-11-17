@@ -142,6 +142,10 @@ func holdsMapping(n *yaml.Node) bool {
 				return true
 			}
 		}
+	case yaml.AliasNode:
+		// An alias can name a mapping; redaction fails closed.
+		return true
+	case yaml.ScalarNode:
 	}
 	return false
 }

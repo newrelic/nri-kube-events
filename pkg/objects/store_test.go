@@ -29,13 +29,7 @@ const (
 func newClient(objs ...runtime.Object) *fake.Clientset {
 	client := fake.NewClientset(objs...)
 	reject := func(a k8stesting.Action) (bool, runtime.Object, error) {
-		var cm *corev1.ConfigMap
-		switch a := a.(type) {
-		case k8stesting.CreateAction:
-			cm, _ = a.GetObject().(*corev1.ConfigMap)
-		case k8stesting.UpdateAction:
-			cm, _ = a.GetObject().(*corev1.ConfigMap)
-		}
+		cm := actionConfigMap(a)
 		if cm != nil && shardBytes(cm.Data) > apiserverLimit {
 			return true, nil, apierrors.NewRequestEntityTooLargeError(
 				fmt.Sprintf("configmap %s is %d bytes", cm.Name, shardBytes(cm.Data)))
@@ -58,16 +52,26 @@ func testEntry(i int) Entry {
 	}
 }
 
+// actionConfigMap returns the ConfigMap a create or update action carries, or nil.
+func actionConfigMap(a k8stesting.Action) *corev1.ConfigMap {
+	o, ok := a.(interface{ GetObject() runtime.Object })
+	if !ok {
+		return nil
+	}
+	cm, _ := o.GetObject().(*corev1.ConfigMap)
+	return cm
+}
+
 func testUID(i int) string { return fmt.Sprintf("uid-%06d", i) }
 
 // realUID and realEntry give a 226-byte stored entry: a 36-character uid, a CRD GVR and a
 // 40-character name. realUID is a random version-4 UUID, as the apiserver assigns, seeded
 // by i so runs repeat.
 func realUID(i int) string {
-	r := rand.New(rand.NewPCG(uint64(i), 0x9e3779b97f4a7c15))
+	r := rand.New(rand.NewPCG(uint64(i), 0x9e3779b97f4a7c15)) //nolint:gosec // G404: seeded so test uids repeat
 	var b [16]byte
 	for k := range b {
-		b[k] = byte(r.Uint32())
+		b[k] = byte(r.Uint32()) //nolint:gosec // G115: keeps the low 8 bits on purpose
 	}
 	b[6] = b[6]&0x0f | 0x40
 	b[8] = b[8]&0x3f | 0x80
@@ -135,13 +139,7 @@ func countActions(client *fake.Clientset, verb string) int {
 // failWrites makes creates and updates of ConfigMap name fail while *on is true.
 func failWrites(client *fake.Clientset, name string, on *bool) {
 	f := func(a k8stesting.Action) (bool, runtime.Object, error) {
-		var cm *corev1.ConfigMap
-		switch a := a.(type) {
-		case k8stesting.CreateAction:
-			cm, _ = a.GetObject().(*corev1.ConfigMap)
-		case k8stesting.UpdateAction:
-			cm, _ = a.GetObject().(*corev1.ConfigMap)
-		}
+		cm := actionConfigMap(a)
 		if *on && cm != nil && cm.Name == name {
 			return true, nil, fmt.Errorf("injected write failure")
 		}
@@ -528,13 +526,7 @@ func TestReshardRetryAfterAppliedPointerUsesFreshGeneration(t *testing.T) {
 	mode := 1
 	gvr := corev1.SchemeGroupVersion.WithResource("configmaps")
 	f := func(a k8stesting.Action) (bool, runtime.Object, error) {
-		var cm *corev1.ConfigMap
-		switch a := a.(type) {
-		case k8stesting.CreateAction:
-			cm, _ = a.GetObject().(*corev1.ConfigMap)
-		case k8stesting.UpdateAction:
-			cm, _ = a.GetObject().(*corev1.ConfigMap)
-		}
+		cm := actionConfigMap(a)
 		if cm == nil || cm.Name != pointerName {
 			return false, nil, nil
 		}
@@ -670,7 +662,7 @@ func TestHMACKeyCreateRaceUsesExisting(t *testing.T) {
 	client := newClient()
 	winner := []byte("0123456789abcdef0123456789abcdef")
 	// Another writer creates the Secret between our Get and our Create.
-	client.PrependReactor("create", "secrets", func(a k8stesting.Action) (bool, runtime.Object, error) {
+	client.PrependReactor("create", "secrets", func(k8stesting.Action) (bool, runtime.Object, error) {
 		obj := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{Name: HMACSecretName, Namespace: storeNS},
 			Data:       map[string][]byte{HMACSecretKey: winner},

@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,7 +42,7 @@ const (
 	generationLabelKey = "nri-kube-events/generation"
 
 	// HMACSecretName is the Secret that holds the per-cluster redaction key.
-	HMACSecretName = "nri-kube-events-hmac"
+	HMACSecretName = "nri-kube-events-hmac" //nolint:gosec // G101: a Secret's name, not a credential
 	// HMACSecretKey is the data key of the HMAC key inside HMACSecretName.
 	HMACSecretKey = "key"
 	hmacKeyBytes  = 32
@@ -57,28 +58,32 @@ const (
 // pointer, then deletes the older generations. A crash at any step leaves the pointer on a
 // complete generation, and Load merges any newer one.
 type Store struct {
-	client    kubernetes.Interface
-	namespace string
+	client kubernetes.Interface
 
-	// flushMu serializes Load and Flush; mu guards the fields below.
-	flushMu sync.Mutex
-	mu      sync.Mutex
+	// mu guards every field but client, namespace and flushMu. The fields are ordered to
+	// keep pointer data first.
 	entries map[string]Entry
-	shards  int
 	// dirty holds the shard indexes changed since the last successful write.
 	dirty map[int]struct{}
-	// rewrite is set when the entries must be written into a new generation: after a
-	// change of shard count, a failed reshard, or a Load that could not trust the layout.
-	rewrite bool
+	// historyStart is the pointer's history-start annotation, set by Load.
+	historyStart time.Time
+
+	namespace string
+
+	// flushMu serializes Load and Flush.
+	flushMu sync.Mutex
+	mu      sync.Mutex
+	shards  int
 	// gen is the generation the pointer names; hasPointer reports whether the pointer
 	// ConfigMap exists. maxGen is the highest generation seen on the cluster or attempted
 	// by a reshard, so every reshard, retries included, writes a number never used before.
 	gen, maxGen int
 	hasPointer  bool
+	// rewrite is set when the entries must be written into a new generation: after a
+	// change of shard count, a failed reshard, or a Load that could not trust the layout.
+	rewrite bool
 	// cleanup is set while shard ConfigMaps outside the current generation may exist.
 	cleanup bool
-	// historyStart is the pointer's history-start annotation, set by Load.
-	historyStart time.Time
 }
 
 // NewStore returns an empty store with one shard. Call Load to read the stored entries.
@@ -95,7 +100,7 @@ func NewStore(client kubernetes.Interface, namespace string) *Store {
 func shardOf(uid string, shards int) int {
 	h := fnv.New32()
 	_, _ = h.Write([]byte(uid))
-	return int(h.Sum32() % uint32(shards))
+	return int(h.Sum32() % uint32(shards)) //nolint:gosec // G115: shards is at least 1 and far below 2^32
 }
 
 func shardName(gen, i int) string {
@@ -132,13 +137,16 @@ func parsePointer(cm *corev1.ConfigMap) (gen, shards int, ok bool) {
 	return gen, shards, true
 }
 
+// entryFields is the number of |-separated fields of an encoded Entry.
+const entryFields = 6
+
 func encodeEntry(e Entry) string {
 	return strings.Join([]string{e.GVR, e.Kind, e.Namespace, e.Name, e.Hash, strconv.FormatInt(e.LastSent, 10)}, "|")
 }
 
 func decodeEntry(v string) (Entry, bool) {
 	f := strings.Split(v, "|")
-	if len(f) != 6 {
+	if len(f) != entryFields {
 		return Entry{}, false
 	}
 	ts, err := strconv.ParseInt(f[5], 10, 64)
@@ -174,66 +182,22 @@ func (s *Store) Load(ctx context.Context) error {
 		return fmt.Errorf("listing hash store shards: %w", err)
 	}
 
-	var ptr *corev1.ConfigMap
-	byGen := map[int]map[int]*corev1.ConfigMap{}
-	maxGen := 0
-	for k := range list.Items {
-		cm := &list.Items[k]
-		if cm.Name == pointerName {
-			ptr = cm
-			continue
-		}
-		g, i, ok := parseShardName(cm.Name)
-		if !ok {
-			continue
-		}
-		if byGen[g] == nil {
-			byGen[g] = map[int]*corev1.ConfigMap{}
-		}
-		byGen[g][i] = cm
-		maxGen = max(maxGen, g)
-	}
-
+	ptr, byGen, maxGen := splitStoreConfigMaps(list.Items)
 	ptrGen, ptrShards, ptrOK := parsePointer(ptr)
 	complete := ptrOK && maxGen <= ptrGen
 	for i := 0; complete && i < ptrShards; i++ {
 		_, complete = byGen[ptrGen][i]
 	}
 
-	entries := map[string]Entry{}
-	relayout := false
-	cleanup := false
+	var entries map[string]Entry
+	var relayout, cleanup bool
 	if complete {
-		for i := 0; i < ptrShards; i++ {
-			for uid, v := range byGen[ptrGen][i].Data {
-				e, ok := decodeEntry(v)
-				_, dup := entries[uid]
-				if !ok || dup || shardOf(uid, ptrShards) != i {
-					relayout = true
-				}
-				if ok {
-					entries[uid] = e
-				}
-			}
-		}
+		entries, relayout = readGeneration(byGen[ptrGen], ptrShards)
 		// Shards of older generations, or beyond the count, are leftovers of a reshard
 		// that moved the pointer and then stopped before deleting them.
 		cleanup = len(byGen) > 1 || len(byGen[ptrGen]) > ptrShards
 	} else {
-		gens := make([]int, 0, len(byGen))
-		for g := range byGen {
-			gens = append(gens, g)
-		}
-		sort.Ints(gens)
-		for _, g := range gens {
-			for _, cm := range byGen[g] {
-				for uid, v := range cm.Data {
-					if e, ok := decodeEntry(v); ok {
-						entries[uid] = e
-					}
-				}
-			}
-		}
+		entries = mergeGenerations(byGen)
 		// Nothing stored at all is a fresh install: the first Flush with data writes
 		// generation 1, and an empty store writes nothing.
 		relayout = len(byGen) > 0 || ptr != nil
@@ -271,6 +235,73 @@ func (s *Store) Load(ctx context.Context) error {
 	return nil
 }
 
+// splitStoreConfigMaps returns the pointer among items, or nil, the shards by generation and
+// index, and the highest generation of a shard. Names that parse as neither are left out.
+func splitStoreConfigMaps(items []corev1.ConfigMap) (*corev1.ConfigMap, map[int]map[int]*corev1.ConfigMap, int) {
+	var ptr *corev1.ConfigMap
+	byGen := map[int]map[int]*corev1.ConfigMap{}
+	maxGen := 0
+	for k := range items {
+		cm := &items[k]
+		if cm.Name == pointerName {
+			ptr = cm
+			continue
+		}
+		g, i, ok := parseShardName(cm.Name)
+		if !ok {
+			continue
+		}
+		if byGen[g] == nil {
+			byGen[g] = map[int]*corev1.ConfigMap{}
+		}
+		byGen[g][i] = cm
+		maxGen = max(maxGen, g)
+	}
+	return ptr, byGen, maxGen
+}
+
+// readGeneration returns the entries of a complete generation's shards, and whether its
+// layout needs a rewrite: a value that does not parse, a uid stored twice, or a uid in a shard
+// other than its own.
+func readGeneration(shards map[int]*corev1.ConfigMap, count int) (map[string]Entry, bool) {
+	entries := map[string]Entry{}
+	relayout := false
+	for i := 0; i < count; i++ {
+		for uid, v := range shards[i].Data {
+			e, ok := decodeEntry(v)
+			_, dup := entries[uid]
+			if !ok || dup || shardOf(uid, count) != i {
+				relayout = true
+			}
+			if ok {
+				entries[uid] = e
+			}
+		}
+	}
+	return entries, relayout
+}
+
+// mergeGenerations returns the entries of every shard of every generation, the newest
+// generation's copy of each uid winning.
+func mergeGenerations(byGen map[int]map[int]*corev1.ConfigMap) map[string]Entry {
+	gens := make([]int, 0, len(byGen))
+	for g := range byGen {
+		gens = append(gens, g)
+	}
+	sort.Ints(gens)
+	entries := map[string]Entry{}
+	for _, g := range gens {
+		for _, cm := range byGen[g] {
+			for uid, v := range cm.Data {
+				if e, ok := decodeEntry(v); ok {
+					entries[uid] = e
+				}
+			}
+		}
+	}
+	return entries
+}
+
 // HistoryStart returns when this hash store began recording, read from the pointer by
 // Load. A Load that finds no recorded value uses the current time and records it on the
 // pointer: at once if the pointer exists, else at the first Flush that writes data, so a
@@ -294,6 +325,7 @@ func parseHistoryStart(cm *corev1.ConfigMap) (time.Time, bool) {
 	}
 	t, err := time.Parse(time.RFC3339, v)
 	if err != nil {
+		log.WithError(err).WithField("value", v).Warn("objects: the hash store's history-start annotation is not RFC 3339; recording a new history start")
 		return time.Time{}, false
 	}
 	return t, true
@@ -634,7 +666,7 @@ func LoadOrCreateHMACKey(ctx context.Context, client kubernetes.Interface, names
 	}
 
 	key := make([]byte, hmacKeyBytes)
-	if _, err := rand.Read(key); err != nil {
+	if _, err = rand.Read(key); err != nil {
 		return nil, fmt.Errorf("generating hmac key: %w", err)
 	}
 	_, err = secrets.Create(ctx, &corev1.Secret{

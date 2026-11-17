@@ -46,6 +46,10 @@ const (
 	objectStateQPS            = 50
 	objectStateBurst          = 100
 	objectStateStartupTimeout = 2 * time.Minute
+	// objectStateResendQPS is the share of objectStateQPS the resend's GETs may use.
+	objectStateResendQPS = objectStateQPS / 2
+	// objectStateRetryFactor multiplies the wait after each failure of the carrier.
+	objectStateRetryFactor = 2
 )
 
 var (
@@ -260,7 +264,7 @@ func retryObjectState(ctx context.Context, p retryPolicy, attempt func(context.C
 			return
 		case <-time.After(delay):
 		}
-		delay = min(2*delay, p.max)
+		delay = min(objectStateRetryFactor*delay, p.max)
 	}
 }
 
@@ -375,7 +379,7 @@ func (c *objectCarrier) run(ctx context.Context) error {
 // interval, and at half the client QPS over that interval, since each resend first GETs its
 // object. The other half stays free for the reflectors' lists and the retries.
 func maxResendsPerScan(maxRecordsPerSecond float64) int {
-	perSecond := min(maxRecordsPerSecond, objectStateQPS/2)
+	perSecond := min(maxRecordsPerSecond, objectStateResendQPS)
 	return int(perSecond * objects.DefaultResendInterval.Seconds())
 }
 

@@ -46,9 +46,9 @@ const (
 // a Record is the size of the event the sink sends. Attributes["timestamp"] is int64 Unix
 // seconds.
 type Record struct {
+	Attributes map[string]any `json:"attributes"`
 	Summary    string         `json:"summary"`
 	Category   string         `json:"category"`
-	Attributes map[string]any `json:"attributes"`
 }
 
 // Entry is what the hash store keeps per object uid: enough identity to send a tombstone,
@@ -239,14 +239,15 @@ func partKey(i int) string { return fmt.Sprintf("object.p%03d", i) }
 // is never split across records, so every record holds at least one part. An object with no
 // parts still gets one record.
 func groupParts(parts []string, base Record) ([]partGroup, error) {
-	// Measure the base with the three record.* attributes at a width no real value reaches.
-	attrs := make(map[string]any, len(base.Attributes)+3)
+	// Measure the base with the record.* attributes at a width no real value reaches.
+	positions := []string{"record.index", "record.count", "record.firstPart"}
+	attrs := make(map[string]any, len(base.Attributes)+len(positions))
 	for k, v := range base.Attributes {
 		attrs[k] = v
 	}
-	attrs["record.index"] = 999999
-	attrs["record.count"] = 999999
-	attrs["record.firstPart"] = 999999
+	for _, k := range positions {
+		attrs[k] = 999999
+	}
 	base.Attributes = attrs
 	b, err := json.Marshal(base)
 	if err != nil {

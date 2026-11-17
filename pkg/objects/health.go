@@ -9,6 +9,10 @@ import (
 
 // Health is the generic health of an object, derived from its status alone.
 type Health struct {
+	// Ready is the status of the Ready condition, else of the Available condition, else nil.
+	Ready *bool
+	// Phase is status.phase, or "" when the object has none.
+	Phase string
 	// ConditionsUnhealthy lists every bad condition as ",Type=Status:Reason,", sorted by
 	// type, and holds at most PartChars runes and at most MaxAttrBytes bytes. It is empty
 	// when no condition is bad, or when the first bad condition alone exceeds either limit.
@@ -22,10 +26,6 @@ type Health struct {
 	Stale bool
 	// Unhealthy summarizes the other fields and status.health.status.
 	Unhealthy bool
-	// Phase is status.phase, or "" when the object has none.
-	Phase string
-	// Ready is the status of the Ready condition, else of the Available condition, else nil.
-	Ready *bool
 }
 
 // negativeExact are condition types whose True status is bad, compared case-insensitively
@@ -143,20 +143,8 @@ func conditionIsBad(typ, status string) bool {
 // ComputeHealth derives Health from obj's metadata.generation and status. It never modifies obj.
 func ComputeHealth(obj map[string]any) Health {
 	var h Health
-	meta, _ := obj["metadata"].(map[string]any)
 	status, _ := obj["status"].(map[string]any)
-	generation, hasGeneration := number(meta["generation"])
-	// Deleting an object can bump metadata.generation without the controller observing it
-	// (a Pod does), so a terminating object is never stale.
-	if ts, _ := meta["deletionTimestamp"].(string); ts != "" {
-		hasGeneration = false
-	}
-	// metadata.generation counts spec changes. Without a spec there is nothing for a
-	// controller to observe, and an observedGeneration in status describes another object:
-	// a gatekeeper ConstraintPodStatus carries the generation of the constraint it reports on.
-	if _, hasSpec := obj["spec"]; !hasSpec {
-		hasGeneration = false
-	}
+	generation, hasGeneration := stalenessGeneration(obj)
 
 	h.Phase, _ = status["phase"].(string)
 
@@ -188,7 +176,9 @@ func ComputeHealth(obj map[string]any) Health {
 		if typ == "" {
 			continue
 		}
-		if conditionIsBad(typ, st) && !(h.Phase == "Succeeded" && completedReadiness[typ]) {
+		// A Succeeded object's completed readiness conditions are expected to be False.
+		completed := h.Phase == "Succeeded" && completedReadiness[typ]
+		if conditionIsBad(typ, st) && !completed {
 			bad = append(bad, badCondition{typ, st, reason})
 		}
 		switch typ {
@@ -202,21 +192,11 @@ func ComputeHealth(obj map[string]any) Health {
 	}
 
 	sort.SliceStable(bad, func(i, j int) bool { return bad[i].typ < bad[j].typ })
-	// Past PartChars runes or MaxAttrBytes bytes, whole conditions are dropped from the end,
-	// so the string still ends in "," and LIKE '%,Type=%' never matches a cut condition.
-	var b strings.Builder
-	runes := 0
-	for _, c := range bad {
-		item := "," + c.typ + "=" + c.status + ":" + c.reason + ","
-		n := utf8.RuneCountInString(item)
-		if runes+n > PartChars || b.Len()+len(item) > MaxAttrBytes {
-			h.ConditionsTruncated = true
-			break
-		}
-		b.WriteString(item)
-		runes += n
+	items := make([]string, len(bad))
+	for i, c := range bad {
+		items[i] = "," + c.typ + "=" + c.status + ":" + c.reason + ","
 	}
-	h.ConditionsUnhealthy = b.String()
+	h.ConditionsUnhealthy, h.ConditionsTruncated = joinWithin(items)
 
 	if ready != nil {
 		h.Ready = ready
@@ -224,16 +204,54 @@ func ComputeHealth(obj map[string]any) Health {
 		h.Ready = available
 	}
 
+	h.Unhealthy = len(bad) > 0 || h.Stale || badPhaseOrHealth(h.Phase, status)
+	return h
+}
+
+// badPhaseOrHealth reports whether phase is Failed or Unknown, or status.health.status is
+// Degraded, Missing or Unknown.
+func badPhaseOrHealth(phase string, status map[string]any) bool {
 	healthStatus := ""
 	if hs, ok := status["health"].(map[string]any); ok {
 		healthStatus, _ = hs["status"].(string)
 	}
-
-	h.Unhealthy = len(bad) > 0 ||
-		h.Stale ||
-		h.Phase == "Failed" || h.Phase == "Unknown" ||
+	return phase == "Failed" || phase == "Unknown" ||
 		healthStatus == "Degraded" || healthStatus == "Missing" || healthStatus == "Unknown"
-	return h
+}
+
+// stalenessGeneration returns obj's metadata.generation, and false when obj cannot be stale.
+// Deleting an object can bump metadata.generation without the controller observing it (a Pod
+// does), so a terminating object is never stale. metadata.generation counts spec changes.
+// Without a spec there is nothing for a controller to observe, and an observedGeneration in
+// status describes another object: a gatekeeper ConstraintPodStatus carries the generation of
+// the constraint it reports on.
+func stalenessGeneration(obj map[string]any) (float64, bool) {
+	meta, _ := obj["metadata"].(map[string]any)
+	generation, ok := number(meta["generation"])
+	if ts, _ := meta["deletionTimestamp"].(string); ts != "" {
+		return 0, false
+	}
+	if _, hasSpec := obj["spec"]; !hasSpec {
+		return 0, false
+	}
+	return generation, ok
+}
+
+// joinWithin concatenates items. Past PartChars runes or MaxAttrBytes bytes, whole items are
+// dropped from the end, so the string still ends in "," and LIKE '%,Type=%' never matches a
+// cut condition. It reports whether any item was dropped.
+func joinWithin(items []string) (string, bool) {
+	var b strings.Builder
+	runes := 0
+	for _, item := range items {
+		n := utf8.RuneCountInString(item)
+		if runes+n > PartChars || b.Len()+len(item) > MaxAttrBytes {
+			return b.String(), true
+		}
+		b.WriteString(item)
+		runes += n
+	}
+	return b.String(), false
 }
 
 // number reads a JSON number that a decoder may have produced as float64 or int64, or that

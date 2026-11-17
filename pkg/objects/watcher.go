@@ -111,8 +111,6 @@ type Watcher struct {
 	// afterRetryGet, when set, is called by a retry after it fetched an object and before
 	// it sends it. Tests use it to deliver a watch event at that point.
 	afterRetryGet func(uid string)
-	// getTimeout bounds the GET of one resend or retry; NewWatcher sets objectGetTimeout.
-	getTimeout time.Duration
 
 	// mu guards gvrs, unsynced, startTime, lastFullList, failedSends, resyncCursor and
 	// catchUp.
@@ -127,6 +125,8 @@ type Watcher struct {
 
 	key []byte
 	cfg Config
+	// getTimeout bounds the GET of one resend or retry; NewWatcher sets objectGetTimeout.
+	getTimeout time.Duration
 
 	mu          sync.Mutex
 	failedSends int64
