@@ -1,14 +1,12 @@
 package objects
 
 import (
-	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"unicode/utf8"
 
 	"gopkg.in/yaml.v3"
@@ -193,15 +191,4 @@ func redactedValue(value, key []byte) string {
 	m := hmac.New(sha256.New, key)
 	m.Write(value)
 	return fmt.Sprintf("<redacted len=%d hmac=%s>", len(value), hex.EncodeToString(m.Sum(nil))[:16])
-}
-
-// serialize writes obj as compact JSON without HTML escaping and without a trailing newline.
-func serialize(obj map[string]any) (string, error) {
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(obj); err != nil {
-		return "", err
-	}
-	return strings.TrimSuffix(buf.String(), "\n"), nil
 }
