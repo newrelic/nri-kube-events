@@ -620,6 +620,8 @@ func TestHeartbeatRecordShape(t *testing.T) {
 		"carrier.resyncCursor":    "0000000000000000",
 		// The store was never loaded, so its history has no start yet.
 		"carrier.historyStart": int64(0),
+		// testConfig leaves the resend off.
+		"carrier.resendAfter": int64(0),
 	}, hb.Attributes)
 	assert.Equal(t, "carrier heartbeat: 2 kinds", hb.Summary)
 	assert.Equal(t, Category, hb.Category)
@@ -631,6 +633,25 @@ func TestHeartbeatRecordShape(t *testing.T) {
 	w.listFailed(secretGVR, errors.New("forbidden"))
 	assert.Equal(t, 1, w.HeartbeatRecord(now).Attributes["carrier.failedKindCount"])
 	assert.Equal(t, []string{GVRString(secretGVR)}, w.FailedGVRs())
+}
+
+func TestHeartbeatPublishesResendAfterSeconds(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		resendAfter time.Duration
+		want        int64
+	}{
+		{"default 24h", 24 * time.Hour, 86400},
+		{"resend off", 0, 0},
+		{"non-default 6h30m", 6*time.Hour + 30*time.Minute, 23400},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := testConfig()
+			cfg.ResendAfter = tc.resendAfter
+			w, _, _, _ := newTestWatcher(t, cfg, nil)
+			assert.Equal(t, tc.want, w.HeartbeatRecord(time.Unix(1700000000, 0)).Attributes["carrier.resendAfter"])
+		})
+	}
 }
 
 func TestCanceledSendIsNotCountedAsFailed(t *testing.T) {

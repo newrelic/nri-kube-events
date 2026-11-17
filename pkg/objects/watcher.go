@@ -993,6 +993,10 @@ func (w *Watcher) HeartbeatRecord(now time.Time) Record {
 		// carrier.historyStart is when the hash store began recording, which survives
 		// restarts.
 		"carrier.historyStart": unixMilli(w.store.HistoryStart()),
+		// carrier.resendAfter is the resend interval of unchanged objects in whole seconds;
+		// 0 means the resend is off. A reader uses it to judge whether a read window is
+		// long enough to hold a record of every object.
+		"carrier.resendAfter": int64(w.cfg.ResendAfter / time.Second),
 		// carrier.unsyncedObjects is the number of objects whose last send failed and has
 		// not succeeded since; 0 means NRDB holds the version the carrier last saw of
 		// every object.
