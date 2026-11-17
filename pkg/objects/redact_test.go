@@ -327,6 +327,33 @@ func TestRedactKeepsShortScalarAnnotations(t *testing.T) {
 	assert.Equal(t, strings.Repeat("中", 256), got["example.com/exact"], "256 runes is not longer than 256")
 }
 
+// Short structured values that are not one YAML mapping still hold objects: a multi-document
+// stream and a JSON array of objects are redacted.
+func TestRedactShortMultiDocumentAndArrayAnnotations(t *testing.T) {
+	key := []byte("k")
+	values := map[string]string{
+		"example.com/multi-doc":      "---\npassword: hunter2\n",
+		"example.com/second-doc":     "note\n---\npassword: hunter2\n",
+		"example.com/json-array":     `[{"password":"hunter2"}]`,
+		"example.com/nested-array":   `[["a", {"password":"hunter2"}]]`,
+		"example.com/broken-2nd-doc": "note\n---\npassword: [hunter2\n",
+	}
+	ann := map[string]any{}
+	for k, v := range values {
+		ann[k] = v
+	}
+	obj := secret(nil, nil)
+	obj["metadata"].(map[string]any)["annotations"] = ann
+	got := Redact(obj, key)["metadata"].(map[string]any)["annotations"].(map[string]any)
+	for k, v := range values {
+		assert.Equal(t, expectRedacted(key, v), got[k], k)
+	}
+	assert.True(t, isYAMLMapping("a\n---\nb: c"))
+	assert.False(t, isYAMLMapping(`["a", "b"]`))
+	assert.False(t, isYAMLMapping("a\n---\nb"))
+	assert.False(t, isYAMLMapping("foo: bar: baz"), "a first document that does not parse is plain text")
+}
+
 func toStringMap(m map[string]any) map[string]string {
 	out := map[string]string{}
 	for k, v := range m {

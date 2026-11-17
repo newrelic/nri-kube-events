@@ -6,7 +6,10 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"strings"
 	"unicode/utf8"
 
 	"gopkg.in/yaml.v3"
@@ -93,8 +96,9 @@ const maxPlainAnnotation = 256
 // redactAnnotation returns the value to send for one annotation of a Secret. Tools such as
 // kubectl and kapp keep a copy of the applied object, values included, in an annotation.
 // The last-applied-configuration annotation is redacted key by key. Any other value that
-// parses as a JSON object or a YAML mapping, or that is longer than maxPlainAnnotation
-// runes, is replaced with a marker. Short scalar values are kept.
+// parses as a JSON object or holds a YAML mapping in any of its documents (see
+// isYAMLMapping), or that is longer than maxPlainAnnotation runes, is replaced with a marker.
+// Short scalar values and short lists of scalars are kept.
 func redactAnnotation(name, value string, key []byte) string {
 	if name == lastAppliedAnnotation {
 		return redactLastApplied(value, key)
@@ -110,12 +114,36 @@ func isJSONObject(s string) bool {
 	return json.Unmarshal([]byte(s), &m) == nil && m != nil
 }
 
+// isYAMLMapping reports whether any YAML document in s holds a mapping, at the top or inside
+// a sequence. That covers a multi-document stream and a JSON array of objects, which is a
+// YAML flow sequence. A stream whose first document does not parse is plain text; one that
+// fails after its first document is treated as holding a mapping, so it is redacted.
 func isYAMLMapping(s string) bool {
-	var doc yaml.Node
-	if err := yaml.Unmarshal([]byte(s), &doc); err != nil {
-		return false
+	dec := yaml.NewDecoder(strings.NewReader(s))
+	for docs := 0; ; docs++ {
+		var doc yaml.Node
+		if err := dec.Decode(&doc); err != nil {
+			return !errors.Is(err, io.EOF) && docs > 0
+		}
+		if holdsMapping(&doc) {
+			return true
+		}
 	}
-	return doc.Kind == yaml.DocumentNode && len(doc.Content) > 0 && doc.Content[0].Kind == yaml.MappingNode
+}
+
+// holdsMapping reports whether n is a mapping, or a document or sequence that holds one.
+func holdsMapping(n *yaml.Node) bool {
+	switch n.Kind {
+	case yaml.MappingNode:
+		return true
+	case yaml.DocumentNode, yaml.SequenceNode:
+		for _, c := range n.Content {
+			if holdsMapping(c) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // redactValues replaces the values of secret's data (base64) and stringData (plain) in
