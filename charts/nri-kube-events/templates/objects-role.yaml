@@ -1,0 +1,45 @@
+{{- if and .Values.rbac.create (.Values.objectState).enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    {{- include "newrelic.common.labels" . | nindent 4 }}
+  name: {{ include "newrelic.common.naming.fullname" . }}-objects
+  namespace: {{ .Release.Namespace }}
+rules:
+# The hash store finds its shard ConfigMaps by label and deletes old generations.
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - create
+  - update
+  - delete
+# The HMAC key Secret is created once and read on every start.
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    {{- include "newrelic.common.labels" . | nindent 4 }}
+  name: {{ include "newrelic.common.naming.fullname" . }}-objects
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "newrelic.common.naming.fullname" . }}-objects
+subjects:
+- kind: ServiceAccount
+  name: {{ include "newrelic.common.serviceAccount.name" . }}
+  namespace: {{ .Release.Namespace }}
+{{- end }}

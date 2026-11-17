@@ -10,10 +10,13 @@ metadata:
     {{- toYaml .Values.deployment.annotations | nindent 4 }}
   {{- end }}
 spec:
-  {{- if include "newrelic.common.hostNetwork" . -}}
-  {{/* When hostNetwork is enabled, use Recreate strategy to avoid port conflicts during upgrades */}}
+  {{- if or (include "newrelic.common.hostNetwork" .) (.Values.objectState).enabled -}}
+  {{/* Recreate avoids port conflicts under hostNetwork, and with objectState keeps two carriers from writing the hash store at once */}}
   strategy:
     type: Recreate
+  {{- end }}
+  {{- if (.Values.objectState).enabled }}
+  replicas: 1
   {{- end }}
   selector:
     matchLabels:
@@ -50,6 +53,14 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           {{- end }}
           args: ["-config", "/app/config/config.yaml", "-loglevel", "debug"]
+          {{- if (.Values.objectState).enabled }}
+          env:
+            - name: NEW_RELIC_LICENSE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "newrelic.common.license.secretName" . }}
+                  key: {{ include "newrelic.common.license.secretKeyName" . }}
+          {{- end }}
           volumeMounts:
             - name: config-volume
               mountPath: /app/config
@@ -92,6 +103,10 @@ spec:
           {{- end }}
         {{- end }}
       serviceAccountName: {{ include "newrelic.common.serviceAccount.name" . }}
+      {{- if (.Values.objectState).enabled }}
+      {{- /* Watch shutdown plus the hash-store flush */}}
+      terminationGracePeriodSeconds: 90
+      {{- end }}
       volumes:
         {{- if .Values.sinks.newRelicInfra }}
         - name: config

@@ -1,0 +1,263 @@
+suite: objectState switches
+templates:
+  - templates/configmap.yaml
+  - templates/clusterrole.yaml
+  - templates/objects-role.yaml
+  - templates/deployment.yaml
+  - templates/agent-configmap.yaml
+release:
+  name: my-release
+  namespace: my-namespace
+tests:
+  - it: configmap renders the objectState block
+    set:
+      licenseKey: us-whatever
+      cluster: a-cluster
+      objectState.enabled: true
+    template: templates/configmap.yaml
+    asserts:
+      - equal:
+          path: data["config.yaml"]
+          value: |-
+            sinks:
+              - name: newRelicInfra
+                config:
+                  agentEndpoint: http://localhost:8001/v1/data
+                  clusterName: a-cluster
+                  agentHTTPTimeout: 30s
+            captureDescribe: true
+            describeRefresh: 24h
+            captureEvents: true
+            objectState:
+              enabled: true
+              resendAfter: "24h"
+              maxRecordsPerSecond: 100
+              clusterName: a-cluster
+              namespace: my-namespace
+              agentEndpoint: http://localhost:8001/v1/data
+              nrStaging: false
+              fedramp: false
+              proxy: ""
+
+  - it: honors resendAfter 0, staging and fedramp
+    set:
+      licenseKey: us-whatever
+      cluster: a-cluster
+      objectState.enabled: true
+      objectState.resendAfter: "0"
+      global.nrStaging: true
+      global.fedramp.enabled: true
+    template: templates/configmap.yaml
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: |-
+            (?m)^objectState:
+              enabled: true
+              resendAfter: "0"
+              maxRecordsPerSecond: 100
+              clusterName: a-cluster
+              namespace: my-namespace
+              agentEndpoint: http://localhost:8001/v1/data
+              nrStaging: true
+              fedramp: true
+              proxy: ""$
+
+  - it: passes the proxy from global.proxy
+    set:
+      licenseKey: us-whatever
+      cluster: a-cluster
+      objectState.enabled: true
+      global.proxy: http://proxy.example:3128
+    template: templates/configmap.yaml
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: '(?m)^  proxy: "http://proxy.example:3128"$'
+
+  - it: the chart's proxy value wins over global.proxy
+    set:
+      licenseKey: us-whatever
+      cluster: a-cluster
+      objectState.enabled: true
+      proxy: http://local.example:3128
+      global.proxy: http://proxy.example:3128
+    template: templates/configmap.yaml
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: '(?m)^  proxy: "http://local.example:3128"$'
+
+  - it: fails without the forwarder sink
+    set:
+      licenseKey: us-whatever
+      cluster: a-cluster
+      objectState.enabled: true
+      sinks.newRelicInfra: false
+    # The check lives in configmap.yaml, but the render error surfaces first through the
+    # deployment's checksum include, so helm-unittest attributes it to deployment.yaml.
+    template: templates/deployment.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: objectState.enabled requires sinks.newRelicInfra
+
+  - it: clusterrole adds the wildcard read
+    set:
+      licenseKey: us-whatever
+      cluster: a-cluster
+      objectState.enabled: true
+    template: templates/clusterrole.yaml
+    asserts:
+      - equal:
+          path: rules[3]
+          value:
+            apiGroups:
+              - "*"
+            resources:
+              - "*"
+            verbs:
+              - get
+              - list
+              - watch
+      - lengthEqual:
+          path: rules
+          count: 4
+
+  - it: objects role and binding render
+    set:
+      licenseKey: us-whatever
+      cluster: a-cluster
+      objectState.enabled: true
+    template: templates/objects-role.yaml
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: Role
+        documentIndex: 0
+      - equal:
+          path: metadata.name
+          value: my-release-nri-kube-events-objects
+        documentIndex: 0
+      - equal:
+          path: metadata.namespace
+          value: my-namespace
+        documentIndex: 0
+      - equal:
+          path: rules
+          value:
+            - apiGroups:
+                - ""
+              resources:
+                - configmaps
+              verbs:
+                - get
+                - list
+                - create
+                - update
+                - delete
+            - apiGroups:
+                - ""
+              resources:
+                - secrets
+              verbs:
+                - get
+                - create
+        documentIndex: 0
+      - isKind:
+          of: RoleBinding
+        documentIndex: 1
+      - equal:
+          path: roleRef
+          value:
+            apiGroup: rbac.authorization.k8s.io
+            kind: Role
+            name: my-release-nri-kube-events-objects
+        documentIndex: 1
+      - equal:
+          path: subjects
+          value:
+            - kind: ServiceAccount
+              name: my-release-nri-kube-events
+              namespace: my-namespace
+        documentIndex: 1
+
+  - it: deployment uses Recreate, one replica, the license env and a 90 s grace period
+    set:
+      licenseKey: us-whatever
+      cluster: a-cluster
+      objectState.enabled: true
+    template: templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+      - equal:
+          path: spec.replicas
+          value: 1
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: kube-events
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NEW_RELIC_LICENSE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: my-release-nri-kube-events-license
+                key: licenseKey
+      - equal:
+          path: spec.template.spec.terminationGracePeriodSeconds
+          value: 90
+
+  - it: the license env follows a custom license secret
+    set:
+      cluster: a-cluster
+      customSecretName: my-secret
+      customSecretLicenseKey: my-key
+      objectState.enabled: true
+    template: templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NEW_RELIC_LICENSE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: my-secret
+                key: my-key
+
+  - it: defaults render no objects role
+    set:
+      licenseKey: us-whatever
+      cluster: a-cluster
+    template: templates/objects-role.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: defaults render no objectState config, replicas, env or grace period
+    set:
+      licenseKey: us-whatever
+      cluster: a-cluster
+    asserts:
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: objectState
+        template: templates/configmap.yaml
+      - notExists:
+          path: spec.replicas
+        template: templates/deployment.yaml
+      - notExists:
+          path: spec.strategy
+        template: templates/deployment.yaml
+      - notExists:
+          path: spec.template.spec.containers[0].env
+        template: templates/deployment.yaml
+      - notExists:
+          path: spec.template.spec.terminationGracePeriodSeconds
+        template: templates/deployment.yaml
+      - lengthEqual:
+          path: rules
+          count: 3
+        template: templates/clusterrole.yaml

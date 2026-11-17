@@ -99,6 +99,22 @@ scrapers:
   events:
     enabled: true
 
+# -- Object state: watch every API kind and send each object's state as an `InfrastructureEvent`
+# through the forwarder sidecar, so `sinks.newRelicInfra` must stay enabled. Each custom attribute
+# set through `customAttributes` or `global.customAttributes` uses one of the 254 attributes NRDB
+# keeps per event on every object record, and the largest record already uses about 149. Keep
+# custom attributes under about 50, and never name one `clusterName`.
+# @default -- See `values.yaml`
+objectState:
+  # -- Enable object state. The deployment then runs one replica with the `Recreate` strategy and a
+  # 90 s termination grace period, the ClusterRole gets get, list and watch on every resource
+  # (Secrets included), and a Role grants ConfigMap and Secret writes in the release namespace.
+  enabled: false
+  # -- Resend an unchanged object after this long. `"0"` turns the resend off.
+  resendAfter: "24h"
+  # -- Upper bound on object records sent per second.
+  maxRecordsPerSecond: 100
+
 # -- Sets pod's priorityClassName. Can be configured also with `global.priorityClassName`
 priorityClassName: ""
 # -- (bool) Sets pod's hostNetwork. Can be configured also with `global.hostNetwork`
