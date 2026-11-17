@@ -143,19 +143,25 @@ func (s *InfraSink) payload(recs []Record) ([]byte, error) {
 	return s.encode(s.decorate(recs))
 }
 
-// decorate returns copies of recs with the attributes the events sink adds to every event
-// (decorateAttrs in pkg/sinks/new_relic_infra.go).
+// decorate returns the records as this sink posts them; see Decorate.
 func (s *InfraSink) decorate(recs []Record) []Record {
+	return Decorate(recs, s.cfg.ClusterName, s.cfg.IntegrationVersion)
+}
+
+// Decorate returns copies of recs with the attributes the events sink adds to every event
+// (decorateAttrs in pkg/sinks/new_relic_infra.go). InfraSink posts these copies, so the
+// json.Marshal size of a decorated record is the size of the event it sends.
+func Decorate(recs []Record, cluster, integrationVersion string) []Record {
 	out := make([]Record, len(recs))
 	for i, r := range recs {
 		attrs := make(map[string]any, len(r.Attributes)+decoratedAttrs)
 		for k, v := range r.Attributes {
 			attrs[k] = v
 		}
-		attrs["clusterName"] = s.cfg.ClusterName
+		attrs["clusterName"] = cluster
 		attrs["integrationName"] = sdkName
-		attrs["integrationVersion"] = s.cfg.IntegrationVersion
-		attrs["eventRouterVersion"] = s.cfg.IntegrationVersion
+		attrs["integrationVersion"] = integrationVersion
+		attrs["eventRouterVersion"] = integrationVersion
 		out[i] = Record{Summary: r.Summary, Category: r.Category, Attributes: attrs}
 	}
 	return out
