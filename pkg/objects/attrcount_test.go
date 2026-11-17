@@ -1,6 +1,7 @@
 package objects
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // The constants and reservedFields below, and normalizeLikeAgent, copy the event
@@ -191,4 +193,53 @@ func TestLargestRecordFitsAfterNormalization(t *testing.T) {
 	assert.Less(t, 2*MaxRecordBytes+overhead, 1_000_000)
 	t.Logf("record 0: %d parts, %d bytes; normalized: %d keys, %d bytes, overhead %d bytes",
 		countParts(a), recSize, len(n), len(b), overhead)
+}
+
+func TestHeartbeatFitsAfterNormalization(t *testing.T) {
+	cfg := testConfig()
+	cfg.ClusterName = "test-wet-mop-green"
+	cfg.AccountFlag = func() string { return "on" }
+	w, _, store, _ := newTestWatcher(t, cfg, nil)
+	require.NoError(t, store.Load(context.Background()))
+	ctx := context.Background()
+	for i := 0; i < 400; i++ {
+		kind := fmt.Sprintf("Kind%s%03d", strings.Repeat("x", 12), i)
+		gvr := schema.GroupVersionResource{Group: "listed.example.com", Version: "v1", Resource: strings.ToLower(kind) + "s"}
+		w.track(gvr, kind)
+		require.NoError(t, w.newObjectStore(ctx, gvr).Replace(nil, "1"))
+	}
+	var failing []schema.GroupVersionResource
+	for i := 0; i < 300; i++ {
+		failing = append(failing, schema.GroupVersionResource{Group: "failing.example.com", Version: "v1", Resource: fmt.Sprintf("resource%04d", i)})
+	}
+	markFailing(w, failing...)
+
+	hb := w.HeartbeatRecord(time.Unix(1700000000, 0))
+	require.Contains(t, hb.Attributes, "carrier.kinds.p001", "the kinds need more than one part")
+	for k, v := range hb.Attributes {
+		if s, ok := v.(string); ok {
+			assert.LessOrEqual(t, len(s), MaxAttrBytes, k)
+		}
+	}
+
+	body, err := newTestSink(t, "http://unused", cfg.ClusterName).payload([]Record{hb})
+	require.NoError(t, err)
+	n := normalizeLikeAgent(firstEvent(t, body), EntityName(cfg.ClusterName))
+	require.NotNil(t, n)
+	assert.LessOrEqual(t, len(n), 200)
+	for k := range n {
+		assert.False(t, strings.HasPrefix(k, "attr."), "collision on %s", k)
+	}
+	assert.Equal(t, "K8sObjectCarrier", n["type"])
+	assert.Equal(t, "kubernetes.objectState", n["category"])
+	assert.Equal(t, "InfrastructureEvent", n["eventType"])
+	assert.EqualValues(t, 1700000000, n["timestamp"])
+	assert.Equal(t, cfg.ClusterName, n["clusterName"])
+	assert.Equal(t, cfg.ClusterName, n["k8s.cluster.name"])
+	assert.Equal(t, 300, int(n["carrier.failedKindCount"].(float64)))
+
+	b, err := json.Marshal(n)
+	require.NoError(t, err)
+	assert.Less(t, len(b), 1_000_000)
+	t.Logf("heartbeat: %d attributes; normalized: %d keys, %d bytes", len(hb.Attributes), len(n), len(b))
 }
