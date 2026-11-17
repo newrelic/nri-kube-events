@@ -5,12 +5,15 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 
@@ -37,8 +40,12 @@ const (
 	// it with "<redacted len=N hmac=...>", so only the digit count of N reaches the size.
 	standInValueBytes = 64
 	helmValueBytes    = 100_000
-	// watchRetryWait is the pause before a failed Secrets watch is restarted.
+	// watchRetryWait is the pause before a failed Secrets watch is restarted, and the first
+	// pause before a failed relist is retried. Relist pauses double up to maxRelistWait.
 	watchRetryWait = 5 * time.Second
+	maxRelistWait  = time.Minute
+	// relistBackoffFactor multiplies the relist pause after every failure.
+	relistBackoffFactor = 2
 	// watchTimeoutSeconds is the server-side length of one Secrets watch.
 	watchTimeoutSeconds = 1800
 )
@@ -176,8 +183,21 @@ type secretSummary struct {
 	Changes map[string]*secretType `json:"changes"`
 	Error   string                 `json:"error,omitempty"`
 	Initial secretType             `json:"initial"`
-	// WatchGaps counts watch restarts; events between a drop and the relist are missed.
+	// WatchRestarts counts every restart of the change watch, including the clean end of a
+	// watch at its server-side timeout.
+	WatchRestarts int `json:"watchRestarts"`
+	// WatchGaps counts the restarts after a watch failed; events between the failure and the
+	// next watch are missed.
 	WatchGaps int `json:"watchGaps"`
+	// Relists counts the cluster-wide lists that fetched a resourceVersion to restart the
+	// watch from, and RelistFailures those of them that failed and were retried. A watch never
+	// starts from an empty resourceVersion, which would replay every Secret as an add.
+	Relists        int `json:"relists"`
+	RelistFailures int `json:"relistFailures"`
+	// SuppressedAdds counts ADDED events for a Secret already known by name, type and key
+	// count. They are not counted as changes, because a watch replaying existing Secrets
+	// sends them.
+	SuppressedAdds int `json:"suppressedAdds"`
 	// UnparsedEvents counts watch events whose rows could not be read.
 	UnparsedEvents int `json:"unparsedEvents"`
 }
@@ -185,15 +205,26 @@ type secretSummary struct {
 type secretCounter struct {
 	// cols are the column indexes of the change watch, from its first event.
 	cols map[string]int
+	// known counts the Secrets seen, by name, type and key count. A table row has no
+	// namespace and no uid, so this is the closest identity available; a new Secret with the
+	// name, type and key count of a known one in another namespace is not counted.
+	known map[secretRow]int
 	// cluster and version are the values of the attributes the infra sink adds.
 	cluster, version string
 	avgNS            string
 	sum              secretSummary
-	mu               sync.Mutex
+	// retryWait is the pause after a failed watch and the first pause after a failed
+	// relist; maxRetryWait caps the relist pauses.
+	retryWait, maxRetryWait time.Duration
+	mu                      sync.Mutex
 }
 
 func newSecretCounter(cluster, version string) *secretCounter {
-	return &secretCounter{cluster: cluster, version: version, sum: secretSummary{ByType: map[string]*secretType{}, Changes: map[string]*secretType{}}}
+	return &secretCounter{
+		cluster: cluster, version: version, known: map[secretRow]int{},
+		retryWait: watchRetryWait, maxRetryWait: maxRelistWait,
+		sum: secretSummary{ByType: map[string]*secretType{}, Changes: map[string]*secretType{}},
+	}
 }
 
 func addTo(m map[string]*secretType, key string, keys int, bytes int64) {
@@ -241,6 +272,7 @@ func (c *secretCounter) listInitial(ctx context.Context, rc rest.Interface, name
 				c.sum.Initial.Keys += int64(row.Keys)
 				c.sum.Initial.StandInBytes += n
 				addTo(c.sum.ByType, row.Type, row.Keys, n)
+				c.known[row]++
 				c.mu.Unlock()
 			}
 			if tbl.Continue == "" {
@@ -266,44 +298,72 @@ func (c *secretCounter) listInitial(ctx context.Context, rc rest.Interface, name
 
 // watchChanges counts Secret adds, modifies and deletes until ctx ends. A watch event's row
 // carries no namespace, so its stand-in takes a namespace of the cluster's average length.
-// A delete is sized as the carrier's tombstone.
+// A delete is sized as the carrier's tombstone. rv must be a resourceVersion from a list.
 func (c *secretCounter) watchChanges(ctx context.Context, rc rest.Interface, rv string) {
 	for ctx.Err() == nil {
-		next, err := c.watchOnce(ctx, rc, rv)
+		resume, err := c.watchOnce(ctx, rc, rv)
 		if ctx.Err() != nil {
 			return
 		}
 		c.mu.Lock()
-		c.sum.WatchGaps++
-		c.mu.Unlock()
+		c.sum.WatchRestarts++
 		if err != nil {
-			time.Sleep(watchRetryWait)
+			c.sum.WatchGaps++
 		}
-		rv = next
+		c.mu.Unlock()
+		if err == nil && resume != "" {
+			rv = resume
+			continue
+		}
+		if err != nil && !sleepCtx(ctx, c.retryWait) {
+			return
+		}
+		var ok bool
+		if rv, ok = c.relistUntilOK(ctx, rc); !ok {
+			return
+		}
 	}
 }
 
+// watchOnce runs one watch from rv. On a clean end at the server-side timeout it returns a
+// nil error and the resourceVersion to resume from: the newest one an event carried, or rv
+// when no event arrived. It returns "" when events arrived without a resourceVersion, and
+// the caller then relists.
 func (c *secretCounter) watchOnce(ctx context.Context, rc rest.Interface, rv string) (string, error) {
 	stream, err := tableRequest(rc, "").Param("watch", "true").Param("resourceVersion", rv).
 		Param("timeoutSeconds", strconv.Itoa(watchTimeoutSeconds)).Stream(ctx)
 	if err != nil {
-		return c.relist(ctx, rc), err
+		return "", err
 	}
 	defer stream.Close()
 	dec := json.NewDecoder(bufio.NewReader(stream))
+	resume := rv
 	for {
 		var ev struct {
 			Type   string          `json:"type"`
 			Object json.RawMessage `json:"object"`
 		}
 		if err := dec.Decode(&ev); err != nil {
-			return c.relist(ctx, rc), err
+			if errors.Is(err, io.EOF) {
+				return resume, nil
+			}
+			return "", err
 		}
 		if ev.Type == "ERROR" {
-			return c.relist(ctx, rc), fmt.Errorf("secrets watch: %s", ev.Object)
+			return "", fmt.Errorf("secrets watch: %s", ev.Object)
 		}
+		resume = tableResourceVersion(ev.Object)
 		c.countEvent(ev.Type, ev.Object)
 	}
+}
+
+// tableResourceVersion is the metadata.resourceVersion of a table, or "" when it has none.
+func tableResourceVersion(raw []byte) string {
+	var t rawTable
+	if err := json.Unmarshal(raw, &t); err != nil {
+		return ""
+	}
+	return t.Metadata.ResourceVersion
 }
 
 // countEvent counts one watch event's rows. An event whose rows cannot be read counts as
@@ -330,20 +390,82 @@ func (c *secretCounter) countEvent(evType string, object []byte) {
 	}
 }
 
-// relist returns a fresh cluster-wide resourceVersion after a watch ends.
-func (c *secretCounter) relist(ctx context.Context, rc rest.Interface) string {
+// relistUntilOK lists Secrets cluster-wide until the list returns a resourceVersion,
+// pausing between failures with a doubling wait. It returns false when ctx ends first.
+func (c *secretCounter) relistUntilOK(ctx context.Context, rc rest.Interface) (string, bool) {
+	wait := c.retryWait
+	for {
+		c.mu.Lock()
+		c.sum.Relists++
+		c.mu.Unlock()
+		rv, err := c.relist(ctx, rc)
+		if err == nil {
+			return rv, true
+		}
+		if ctx.Err() != nil {
+			return "", false
+		}
+		log.WithError(err).Warn("secrets relist failed; retrying")
+		c.mu.Lock()
+		c.sum.RelistFailures++
+		c.mu.Unlock()
+		if !sleepCtx(ctx, wait) {
+			return "", false
+		}
+		wait = min(wait*relistBackoffFactor, c.maxRetryWait)
+	}
+}
+
+// relist returns a fresh cluster-wide resourceVersion after a watch ends. An empty
+// resourceVersion is an error.
+func (c *secretCounter) relist(ctx context.Context, rc rest.Interface) (string, error) {
 	raw, err := tableRequest(rc, "").Param("limit", "1").Do(ctx).Raw()
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("listing secrets cluster-wide: %w", err)
 	}
-	tbl, err := parseSecretTable(raw, nil)
-	if err != nil {
-		return ""
+	var t rawTable
+	if err := json.Unmarshal(raw, &t); err != nil {
+		return "", fmt.Errorf("decoding secrets table: %w", err)
 	}
-	return tbl.ResourceVersion
+	if t.Metadata.ResourceVersion == "" {
+		return "", errors.New("secrets table has no resourceVersion")
+	}
+	return t.Metadata.ResourceVersion, nil
+}
+
+// sleepCtx pauses for d and reports whether ctx is still live.
+func sleepCtx(ctx context.Context, d time.Duration) bool {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-t.C:
+		return true
+	}
 }
 
 func (c *secretCounter) countChange(evType string, row secretRow) {
+	c.mu.Lock()
+	switch evType {
+	case "ADDED":
+		if c.known[row] > 0 {
+			c.sum.SuppressedAdds++
+			c.mu.Unlock()
+			return
+		}
+		c.known[row]++
+	case "MODIFIED":
+		if c.known[row] == 0 {
+			c.known[row]++
+		}
+	case "DELETED":
+		if c.known[row] > 0 {
+			c.known[row]--
+		}
+	}
+	c.mu.Unlock()
+
 	now := time.Now()
 	var n int64
 	switch evType {

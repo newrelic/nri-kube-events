@@ -33,11 +33,16 @@ import (
 	"github.com/newrelic/nri-kube-events/pkg/objects"
 )
 
+// integrationVersion is set at build time with the carrier's own ldflag,
+// -X 'main.integrationVersion=$(TAG)' (Makefile, Dockerfile), so the sized events carry the
+// version the carrier image writes. Unset, the estimate uses chartAppVersion.
+var integrationVersion string
+
 const (
-	// defaultIntegrationVersion is the chart's appVersion.
-	defaultIntegrationVersion = "2.25.0"
-	defaultQPS                = 20
-	defaultBurst              = 40
+	// chartAppVersion is the chart's appVersion (charts/nri-kube-events/Chart.yaml).
+	chartAppVersion = "2.25.0"
+	defaultQPS      = 20
+	defaultBurst    = 40
 	// hmacKeyBytes is the length of the random key of the run's Secret redaction.
 	hmacKeyBytes    = 32
 	outDirMode      = 0o755
@@ -64,7 +69,7 @@ func main() {
 	cluster := flag.String("cluster", "", "cluster name written into the sized records (default: the context)")
 	duration := flag.Duration("duration", time.Hour, "how long to watch after starting")
 	outDir := flag.String("out", ".", "directory for summary.json, rewritten every minute; created if missing")
-	integrationVersion := flag.String("integration-version", defaultIntegrationVersion, "integrationVersion written into the sized events; only its length reaches the sizes")
+	version := flag.String("integration-version", defaultIntegrationVersion(), "integrationVersion written into the sized events; set it to the deployed image's build TAG. Only its length reaches the sizes")
 	qps := flag.Float64("qps", defaultQPS, "client QPS limit")
 	burst := flag.Int("burst", defaultBurst, "client burst limit")
 	// The hash store's client is a fake, so the namespace needs no counterpart on the
@@ -125,7 +130,7 @@ func main() {
 		cancel()
 	}()
 
-	sink := newCountingSink(*cluster, *integrationVersion)
+	sink := newCountingSink(*cluster, *version)
 	// ResendAfter stays zero: the estimate measures the first send and the changes.
 	w := objects.NewWatcher(objects.Config{
 		ClusterName: *cluster,
@@ -142,7 +147,7 @@ func main() {
 		}
 	}()
 
-	secrets := newSecretCounter(*cluster, *integrationVersion)
+	secrets := newSecretCounter(*cluster, *version)
 	go func() {
 		namespaces, err := listNamespaces(ctx, clientset)
 		if err == nil {
@@ -180,6 +185,15 @@ func main() {
 			return
 		}
 	}
+}
+
+// defaultIntegrationVersion is the build-time integrationVersion, or chartAppVersion when the
+// binary was built without it.
+func defaultIntegrationVersion() string {
+	if integrationVersion != "" {
+		return integrationVersion
+	}
+	return chartAppVersion
 }
 
 func listNamespaces(ctx context.Context, cs kubernetes.Interface) ([]string, error) {
