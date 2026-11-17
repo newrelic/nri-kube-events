@@ -17,6 +17,10 @@ import (
 // store, and a first send's LastSent falls in one of resendSpread slots of resendAfter.
 const resendSpread = 1440
 
+// resendGetTimeout bounds the GET of one resend. The resend holds its kind's reflector store
+// lock across the GET, so a GET that hangs would stall the kind's watch and every later scan.
+const resendGetTimeout = 30 * time.Second
+
 // uidOrder is the position of uid in the resend order: the FNV-1a 64 hash of the uid.
 func uidOrder(uid string) uint64 {
 	h := fnv.New64a()
@@ -45,7 +49,9 @@ func (w *Watcher) isDue(e Entry, now time.Time) bool {
 }
 
 // dueForResend returns the uids this resend scan sends: the due entries of kinds that are
-// watched and listed, leaving out the carrier's own store objects, in uidOrder. The scan
+// watched and listed, leaving out the carrier's own store objects and the uids whose last send
+// failed, in uidOrder. A failed send is the retry pass's to repeat: a failed tombstone keeps
+// its observed deletion time there, which a resend would replace with a later one. The scan
 // starts at the first order above resyncCursor, wraps past the highest order, and takes at
 // most resendBudget(store.Len()) uids. It moves resyncCursor to the order of the last uid
 // taken.
@@ -59,6 +65,10 @@ func (w *Watcher) dueForResend(now time.Time) []string {
 		if st.cancel != nil && st.listed {
 			listed[GVRString(gvr)] = true
 		}
+	}
+	unsynced := make(map[string]struct{}, len(w.unsynced))
+	for uid := range w.unsynced {
+		unsynced[uid] = struct{}{}
 	}
 	w.mu.Unlock()
 
@@ -75,6 +85,9 @@ func (w *Watcher) dueForResend(now time.Time) []string {
 	}
 	due := make([]ordered, 0, len(entries))
 	for uid := range entries {
+		if _, ok := unsynced[uid]; ok {
+			continue
+		}
 		due = append(due, ordered{uid: uid, order: uidOrder(uid)})
 	}
 	sort.Slice(due, func(i, j int) bool {
@@ -140,14 +153,16 @@ func (w *Watcher) resendOne(ctx context.Context, uid string) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if e, ok = w.store.Get(uid); !ok || !w.isDue(e, w.now()) {
+	if e, ok = w.store.Get(uid); !ok || !w.isDue(e, w.now()) || w.isUnsynced(uid) {
 		return
 	}
 	var res dynamic.ResourceInterface = w.dyn.Resource(gvr)
 	if e.Namespace != "" {
 		res = w.dyn.Resource(gvr).Namespace(e.Namespace)
 	}
-	obj, err := res.Get(ctx, e.Name, metav1.GetOptions{})
+	getCtx, cancel := context.WithTimeout(ctx, w.resendGetTimeout)
+	obj, err := res.Get(getCtx, e.Name, metav1.GetOptions{})
+	cancel()
 	// A resend that finds the object gone, or its name taken by a new object, is when the
 	// carrier observes the deletion.
 	switch {
@@ -165,4 +180,12 @@ func (w *Watcher) resendOne(ctx context.Context, uid string) {
 		}
 		metricResends.Inc()
 	}
+}
+
+// isUnsynced reports whether the last send of uid failed and has not succeeded since.
+func (w *Watcher) isUnsynced(uid string) bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	_, ok := w.unsynced[uid]
+	return ok
 }

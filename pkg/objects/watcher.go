@@ -108,6 +108,8 @@ type Watcher struct {
 	// afterRetryGet, when set, is called by a retry after it fetched an object and before
 	// it sends it. Tests use it to deliver a watch event at that point.
 	afterRetryGet func(uid string)
+	// resendGetTimeout bounds the GET of one resend; NewWatcher sets resendGetTimeout.
+	resendGetTimeout time.Duration
 
 	// mu guards gvrs, unsynced, startTime, lastFullList, failedSends and resyncCursor.
 	// The fields are ordered to keep pointer data first, so the guarded ones are not
@@ -156,16 +158,17 @@ const maxRetryPerPass = 500
 // redaction and is never sent.
 func NewWatcher(cfg Config, dyn dynamic.Interface, disc discovery.DiscoveryInterface, store *Store, sink RecordSink, hmacKey []byte) *Watcher {
 	return &Watcher{
-		cfg:        cfg.withDefaults(),
-		dyn:        dyn,
-		disc:       disc,
-		store:      store,
-		sink:       sink,
-		key:        hmacKey,
-		now:        time.Now,
-		rediscover: make(chan struct{}, 1),
-		gvrs:       map[schema.GroupVersionResource]*gvrState{},
-		unsynced:   map[string]unsyncedObject{},
+		cfg:              cfg.withDefaults(),
+		dyn:              dyn,
+		disc:             disc,
+		store:            store,
+		sink:             sink,
+		key:              hmacKey,
+		now:              time.Now,
+		resendGetTimeout: resendGetTimeout,
+		rediscover:       make(chan struct{}, 1),
+		gvrs:             map[schema.GroupVersionResource]*gvrState{},
+		unsynced:         map[string]unsyncedObject{},
 	}
 }
 

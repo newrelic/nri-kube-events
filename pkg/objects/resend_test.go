@@ -10,7 +10,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	k8stesting "k8s.io/client-go/testing"
 )
@@ -218,7 +222,13 @@ func TestResendFailureKeepsObjectDue(t *testing.T) {
 	assert.Equal(t, sent.Unix(), e.LastSent)
 	assert.Equal(t, failures+1, counterValue(t, metricSendFailures))
 	assert.Equal(t, resends, counterValue(t, metricResends))
-	assert.Equal(t, []string{"uid-a"}, w.dueForResend(now.Add(time.Minute)))
+	// The failed send left uid-a unsynced, so scans leave it to the retry pass. The pass finds
+	// the stored hash unchanged, sends nothing and clears it, and the next scan takes it.
+	assert.Empty(t, w.dueForResend(now.Add(time.Minute)))
+	sink.setFail(false)
+	w.retryUnsynced(context.Background())
+	assert.Empty(t, sink.objectRecords())
+	assert.Equal(t, []string{"uid-a"}, w.dueForResend(now.Add(2*time.Minute)))
 }
 
 // A failed GET leaves the object stored as it was, and due.
@@ -353,4 +363,72 @@ func TestHeartbeatReportsCursor(t *testing.T) {
 	due := w.dueForResend(time.Unix(1_000_000, 0).Add(48 * time.Hour))
 	require.Len(t, due, 2)
 	assert.Equal(t, fmt.Sprintf("%016x", uidOrder(due[len(due)-1])), w.HeartbeatRecord(time.Now()).Attributes["carrier.resyncCursor"])
+}
+
+// hangingGets is a dynamic client whose GETs return only when their context ends.
+type hangingGets struct{ dynamic.Interface }
+
+func (h hangingGets) Resource(gvr schema.GroupVersionResource) dynamic.NamespaceableResourceInterface {
+	return hangingResource{h.Interface.Resource(gvr)}
+}
+
+type hangingResource struct {
+	dynamic.NamespaceableResourceInterface
+}
+
+func (r hangingResource) Namespace(string) dynamic.ResourceInterface { return r }
+
+func (r hangingResource) Get(ctx context.Context, _ string, _ metav1.GetOptions, _ ...string) (*unstructured.Unstructured, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+// A GET that never returns times out: the scan sends nothing, releases the kind's lock and
+// ends, and the object stays due.
+func TestResendGetTimesOut(t *testing.T) {
+	sent := time.Unix(1_700_000_000, 0)
+	now := sent.Add(25 * time.Hour)
+	w, store, sink := newResendWatcher(t, 24*time.Hour, configMap("a", "uid-a", "v1"))
+	storeConfigMapA(store, sent)
+	w.now = func() time.Time { return now }
+	w.dyn = hangingGets{w.dyn}
+	w.resendGetTimeout = 50 * time.Millisecond
+	assert.Equal(t, 30*time.Second, resendGetTimeout)
+
+	w.startResend(context.Background())
+	require.Eventually(t, func() bool { return !w.resendBusy.Load() }, 5*time.Second, 10*time.Millisecond, "the scan never ended")
+	w.background.Wait()
+	s := w.reflectorStore(cmGVR)
+	require.True(t, s.mu.TryLock(), "the kind's lock is still held")
+	s.mu.Unlock()
+	assert.Empty(t, sink.objectRecords())
+	e, ok := store.Get("uid-a")
+	require.True(t, ok)
+	assert.Equal(t, sent.Unix(), e.LastSent)
+	assert.Equal(t, []string{"uid-a"}, w.dueForResend(now))
+}
+
+// A uid whose tombstone failed is left to the retry pass, which keeps the observed deletion
+// time; the resend neither picks it nor sends it.
+func TestResendSkipsUnsyncedUIDs(t *testing.T) {
+	sent := time.Unix(1_700_000_000, 0)
+	deleted := sent.Add(24 * time.Hour)
+	now := sent.Add(25 * time.Hour)
+	w, store, sink := newResendWatcher(t, 24*time.Hour)
+	storeConfigMapA(store, sent)
+	e, _ := store.Get("uid-a")
+	sink.setFail(true)
+	w.sendTombstone(context.Background(), "uid-a", e, deleted)
+	sink.setFail(false)
+	require.Equal(t, 1, unsyncedObjects(w))
+
+	w.now = func() time.Time { return now }
+	assert.Empty(t, w.dueForResend(now))
+	w.resendOne(context.Background(), "uid-a")
+	assert.Empty(t, sink.objectRecords())
+
+	w.retryUnsynced(context.Background())
+	recs := sink.objectRecords()
+	require.Equal(t, []string{"deleted:uid-a"}, ops(recs))
+	assert.Equal(t, deleted.Unix(), recs[0].Attributes["timestamp"])
 }
