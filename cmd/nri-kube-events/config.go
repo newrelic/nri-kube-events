@@ -3,6 +3,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -51,6 +52,25 @@ type ObjectStateConfig struct {
 	Enabled             bool    `yaml:"enabled"`
 	NRStaging           bool    `yaml:"nrStaging"`
 	Fedramp             bool    `yaml:"fedramp"`
+}
+
+// validate reports the first setting that keeps the carrier from starting. A negative
+// resendAfter or maxRecordsPerSecond is rejected, where the defaults would otherwise turn
+// the resend off or replace the rate without a word.
+func (c ObjectStateConfig) validate() error {
+	switch {
+	case c.ClusterName == "":
+		return errors.New("objectState.enabled is true but objectState.clusterName is empty")
+	case c.AgentEndpoint == "":
+		return errors.New("objectState.enabled is true but objectState.agentEndpoint is empty")
+	case c.Namespace == "":
+		return errors.New("objectState.enabled is true but objectState.namespace is empty")
+	case c.ResendAfter != nil && *c.ResendAfter < 0:
+		return fmt.Errorf("objectState.resendAfter must not be negative, got %s", *c.ResendAfter)
+	case c.MaxRecordsPerSecond < 0:
+		return fmt.Errorf("objectState.maxRecordsPerSecond must not be negative, got %v", c.MaxRecordsPerSecond)
+	}
+	return nil
 }
 
 func (c ObjectStateConfig) resendAfter() time.Duration {

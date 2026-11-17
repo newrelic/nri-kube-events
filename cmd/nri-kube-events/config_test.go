@@ -125,3 +125,29 @@ func TestObjectStateAbsentIsDisabled(t *testing.T) {
 	assert.False(t, cfg.ObjectState.Enabled)
 	assert.Equal(t, ObjectStateConfig{}, cfg.ObjectState)
 }
+
+func TestObjectStateValidate(t *testing.T) {
+	valid := func() ObjectStateConfig {
+		return ObjectStateConfig{Enabled: true, ClusterName: "c", AgentEndpoint: "http://localhost:8001/v1/data", Namespace: "ns"}
+	}
+	require.NoError(t, valid().validate())
+	zero := time.Duration(0)
+	oc := valid()
+	oc.ResendAfter = &zero
+	require.NoError(t, oc.validate(), "0 turns the resend off")
+
+	negative := -time.Hour
+	for name, mutate := range map[string]func(*ObjectStateConfig){
+		"clusterName":         func(c *ObjectStateConfig) { c.ClusterName = "" },
+		"agentEndpoint":       func(c *ObjectStateConfig) { c.AgentEndpoint = "" },
+		"namespace":           func(c *ObjectStateConfig) { c.Namespace = "" },
+		"resendAfter":         func(c *ObjectStateConfig) { c.ResendAfter = &negative },
+		"maxRecordsPerSecond": func(c *ObjectStateConfig) { c.MaxRecordsPerSecond = -1 },
+	} {
+		oc := valid()
+		mutate(&oc)
+		err := oc.validate()
+		require.Error(t, err, name)
+		assert.Contains(t, err.Error(), name)
+	}
+}
