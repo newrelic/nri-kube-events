@@ -30,8 +30,8 @@ const (
 	DefaultFlushInterval     = 30 * time.Second
 	DefaultResendInterval    = time.Minute
 
-	// AccountFlagNotRequired is the heartbeat's carrier.accountFlag when the carrier runs
-	// without the account collection flag.
+	// AccountFlagNotRequired is the heartbeat's carrier.accountFlag when Config.AccountFlag
+	// is nil. The carrier in nri-kube-events always sets it; tests and tools leave it nil.
 	AccountFlagNotRequired = "not_required"
 
 	// discoveryRetry is how soon a discovery that failed outright is tried again.
