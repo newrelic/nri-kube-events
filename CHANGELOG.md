@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+### 🛡️ Security notices
+- Upgrade all Alpine base image packages at build time, picking up openssl 3.5.9-r1 and zlib 1.4-r0 (CVE-2026-4738, CVE-2026-107496, CVE-2026-95691, CVE-2026-95692, CVE-2026-88822, CVE-2026-88823) @sachin-shankar
+
 ## v2.25.0 - 2026-11-16
 
 ### 🚀 Enhancements
