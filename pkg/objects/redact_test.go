@@ -510,3 +510,80 @@ func toStringMap(m map[string]any) map[string]string {
 	}
 	return out
 }
+
+// The six cases a review probe found unredacted, plus the prose and marker rules.
+func TestRedactReviewProbeCases(t *testing.T) {
+	key := []byte("k")
+	secretValue := "hunter2xyz"
+	marked := expectRedacted(key, secretValue)
+
+	t.Run("Argo CD Helm parameters", func(t *testing.T) {
+		out := Redact(map[string]any{"apiVersion": "argoproj.io/v1alpha1", "kind": "Application", "metadata": map[string]any{"name": "a"},
+			"spec": map[string]any{"source": map[string]any{"helm": map[string]any{"parameters": []any{
+				map[string]any{"name": "db.password", "value": secretValue},
+				map[string]any{"name": "replicas", "value": "3"},
+			}}}}}, key)
+		params := out["spec"].(map[string]any)["source"].(map[string]any)["helm"].(map[string]any)["parameters"].([]any)
+		assert.Equal(t, marked, params[0].(map[string]any)["value"])
+		assert.Equal(t, expectRedacted(key, "3"), params[1].(map[string]any)["value"], "every value of a parameters list")
+		assert.Equal(t, "replicas", params[1].(map[string]any)["name"])
+	})
+	t.Run("credential-named pair in any list", func(t *testing.T) {
+		out := Redact(map[string]any{"apiVersion": "x/v1", "kind": "X", "metadata": map[string]any{"name": "x"},
+			"spec": map[string]any{"settings": []any{
+				map[string]any{"name": "adminToken", "value": secretValue},
+				map[string]any{"name": "region", "value": "us-east-2"},
+			}}}, key)
+		items := out["spec"].(map[string]any)["settings"].([]any)
+		assert.Equal(t, marked, items[0].(map[string]any)["value"])
+		assert.Equal(t, "us-east-2", items[1].(map[string]any)["value"])
+	})
+	t.Run("kapp original annotation", func(t *testing.T) {
+		out := Redact(map[string]any{"apiVersion": "v1", "kind": "ConfigMap", "metadata": map[string]any{"name": "c", "annotations": map[string]any{
+			"kapp.k14s.io/original": `{"apiVersion":"v1","kind":"ConfigMap","data":{"dsn":"hunter2xyz"}}`,
+			"example.com/manifest":  "apiVersion: v1\nkind: ConfigMap\ndata:\n  dsn: hunter2xyz\n",
+			"example.com/note":      "Note: rotated weekly",
+		}}, "data": map[string]any{"dsn": secretValue}}, key)
+		ann := out["metadata"].(map[string]any)["annotations"].(map[string]any)
+		assert.NotContains(t, ann["kapp.k14s.io/original"], secretValue)
+		assert.Contains(t, ann["kapp.k14s.io/original"], marked)
+		assert.True(t, redactedRE.MatchString(ann["example.com/manifest"].(string)), "a YAML manifest is replaced whole")
+		assert.Equal(t, "Note: rotated weekly", ann["example.com/note"], "a short colon note is not a manifest")
+	})
+	t.Run("singular container", func(t *testing.T) {
+		out := Redact(map[string]any{"apiVersion": "argoproj.io/v1alpha1", "kind": "Workflow", "metadata": map[string]any{"name": "w"},
+			"spec": map[string]any{"templates": []any{map[string]any{"container": map[string]any{
+				"image": "busybox", "env": []any{map[string]any{"name": "DB_PASS_X", "value": secretValue}},
+			}}}}}, key)
+		c := out["spec"].(map[string]any)["templates"].([]any)[0].(map[string]any)["container"].(map[string]any)
+		assert.Equal(t, marked, c["env"].([]any)[0].(map[string]any)["value"])
+		assert.Equal(t, "busybox", c["image"])
+	})
+	t.Run("containers map", func(t *testing.T) {
+		out := Redact(map[string]any{"apiVersion": "x/v1", "kind": "X", "metadata": map[string]any{"name": "x"},
+			"spec": map[string]any{"containers": map[string]any{"app": map[string]any{
+				"password": secretValue, "env": []any{map[string]any{"name": "A", "value": secretValue}},
+			}}}}, key)
+		app := out["spec"].(map[string]any)["containers"].(map[string]any)["app"].(map[string]any)
+		assert.Equal(t, marked, app["password"])
+		assert.Equal(t, marked, app["env"].([]any)[0].(map[string]any)["value"])
+	})
+	t.Run("marker prefix", func(t *testing.T) {
+		prefixed := "<redacted>" + secretValue
+		out := Redact(map[string]any{"apiVersion": "x/v1", "kind": "X", "metadata": map[string]any{"name": "x"},
+			"spec": map[string]any{"password": prefixed, "note": "<redacted len=3 hmac=0123456789abcdef>"}}, key)
+		spec := out["spec"].(map[string]any)
+		assert.Equal(t, expectRedacted(key, prefixed), spec["password"], "a string that only starts like a marker is redacted")
+		assert.Equal(t, "<redacted len=3 hmac=0123456789abcdef>", spec["note"], "an exact marker is kept")
+	})
+	t.Run("condition messages are prose", func(t *testing.T) {
+		msg := "failed to refresh token: connection refused"
+		out := Redact(map[string]any{"apiVersion": "x/v1", "kind": "X", "metadata": map[string]any{"name": "x"},
+			"status": map[string]any{"conditions": []any{map[string]any{"type": "Ready", "status": "False", "message": msg}}}}, key)
+		cond := out["status"].(map[string]any)["conditions"].([]any)[0].(map[string]any)
+		assert.Equal(t, msg, cond["message"])
+		assert.False(t, credentialValue("waiting for secret: not found yet"))
+		assert.True(t, credentialValue("token=abc123def"), "a token-like single-line value")
+		assert.True(t, credentialValue("user: app\npassword: correcthorse\n"), "any value in a config file")
+	})
+}

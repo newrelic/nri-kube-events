@@ -2,8 +2,12 @@ package objects
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"regexp"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 // Every kind other than Secret goes through redactObjectCopy, which replaces with the
@@ -11,16 +15,28 @@ import (
 // still changes the record's hash:
 //
 //   - every value of a ConfigMap's data and binaryData (keys are kept);
-//   - the value of every env entry of every container, init container and ephemeral
-//     container, wherever a pod spec sits in the object (names and valueFrom are kept);
+//   - the value of every env entry of every container, wherever a container sits in the
+//     object: under containers, initContainers, ephemeralContainers, sidecars or steps (a
+//     list, or a map of name to container), or under a single container field (names and
+//     valueFrom are kept);
+//   - the value of every {name, value} entry of a list named like env, parameters, params,
+//     vars or variables, as in an Argo CD Application's Helm parameters, and of every
+//     {name, value} entry anywhere whose name looks like a credential;
 //   - every string under a field whose name looks like a credential (credentialName), at
 //     any depth outside metadata, and every string of a map or list under such a field;
 //   - every string, at any depth outside metadata, whose value looks like a credential
 //     (credentialValue): a private key, a JWT, an AWS access key id, a URL with a
-//     password, or a "password: ..." style assignment;
-//   - every annotation whose name looks like a credential or whose value does, and the
-//     last-applied-configuration annotation with the same rules applied to the object it
-//     holds.
+//     password, or a "password: ..." style assignment whose value looks like a token and
+//     not like a word of prose, so a condition message such as "failed to refresh token:
+//     connection refused" is kept;
+//   - every annotation whose name looks like a credential or whose value does; every
+//     annotation that holds a JSON object, such as kubectl's last-applied-configuration or
+//     kapp's kapp.k14s.io/original, with the same rules applied to the object it holds; and
+//     every annotation that holds a YAML manifest (a mapping with apiVersion and kind),
+//     replaced whole.
+//
+// A string that is already exactly a marker is kept. Any other string, including one that
+// only starts like a marker, goes through the same rules.
 //
 // Limits: a credential in a string whose field name and value both look ordinary, such as
 // a password inside a container's args or a free-text field, is sent as it is. Labels are
@@ -96,7 +112,30 @@ var credentialValuePatterns = []*regexp.Regexp{
 	regexp.MustCompile(`eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.`),
 	regexp.MustCompile(`\b(AKIA|ASIA)[0-9A-Z]{16}\b`),
 	regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.-]*://[^/\s:@]+:[^/\s@]+@`),
-	regexp.MustCompile(`(?i)(password|passwd|pwd|secret|token|api[_-]?key)["']?\s*[=:]\s*["']?[^\s"',}]+`),
+}
+
+// assignmentPattern matches a "password: value" style assignment and captures the value.
+var assignmentPattern = regexp.MustCompile(`(?i)(password|passwd|pwd|secret|token|api[_-]?key)["']?\s*[=:]\s*["']?([^\s"',}]+)`)
+
+// markerPattern matches a marker redactedValue or redactedWhole wrote.
+var markerPattern = regexp.MustCompile(`^<redacted(?: len=\d+(?: hmac=[0-9a-f]{16})?)?>$`)
+
+// minAssignedValue is the shortest value of an assignment that counts as a credential.
+const minAssignedValue = 6
+
+// tokenLike reports whether the value of an assignment looks like a credential and not a
+// word: in a multi-line string (a config file) any value of minAssignedValue characters,
+// and in a single line one that also holds a digit or a symbol.
+func tokenLike(value string, multiline bool) bool {
+	if len(value) < minAssignedValue {
+		return false
+	}
+	if multiline {
+		return true
+	}
+	return strings.IndexFunc(value, func(r rune) bool {
+		return (r < 'a' || r > 'z') && (r < 'A' || r > 'Z')
+	}) >= 0
 }
 
 // minCredentialValue is the shortest string credentialValue checks.
@@ -115,6 +154,12 @@ func credentialValue(s string) bool {
 	}
 	for _, re := range credentialValuePatterns {
 		if re.MatchString(s) {
+			return true
+		}
+	}
+	multiline := strings.Contains(s, "\n")
+	for _, m := range assignmentPattern.FindAllStringSubmatch(s, -1) {
+		if tokenLike(m[2], multiline) {
 			return true
 		}
 	}
@@ -172,7 +217,7 @@ func redactTree(field string, v any, key []byte, inCredential bool) any {
 	cred := inCredential || credentialName(field)
 	switch t := v.(type) {
 	case string:
-		if t == "" || strings.HasPrefix(t, "<redacted") {
+		if t == "" || markerPattern.MatchString(t) {
 			return t
 		}
 		switch {
@@ -183,23 +228,32 @@ func redactTree(field string, v any, key []byte, inCredential bool) any {
 		}
 		return t
 	case map[string]any:
-		if isContainerList(field) {
+		switch {
+		case field == "container":
+			redactContainer(t, key)
+			return t
+		case isContainerList(field):
+			// A map of name to container.
+			for k, c := range t {
+				if cm, ok := c.(map[string]any); ok {
+					redactContainer(cm, key)
+				} else {
+					t[k] = redactTree(k, c, key, cred)
+				}
+			}
 			return t
 		}
+		redactNameValue(field, t, key)
 		for k, val := range t {
 			t[k] = redactTree(k, val, key, cred)
 		}
 		return t
 	case []any:
-		if isContainerList(field) {
-			for _, c := range t {
-				if cm, ok := c.(map[string]any); ok {
-					redactContainer(cm, key)
-				}
-			}
-			return t
-		}
 		for i, val := range t {
+			if cm, ok := val.(map[string]any); ok && isContainerList(field) {
+				redactContainer(cm, key)
+				continue
+			}
 			t[i] = redactTree(field, val, key, cred)
 		}
 		return t
@@ -208,8 +262,31 @@ func redactTree(field string, v any, key []byte, inCredential bool) any {
 	}
 }
 
+// nameValueLists are the list fields whose {name, value} entries all hold values that may
+// be credentials.
+var nameValueLists = map[string]bool{
+	"env": true, "extraEnv": true, "parameters": true, "params": true, "vars": true, "variables": true,
+}
+
+// redactNameValue replaces the value of entry, an element of the list field, when entry is a
+// {name, value} pair in a list named in nameValueLists, or when its name looks like a
+// credential.
+func redactNameValue(field string, entry map[string]any, key []byte) {
+	name, isString := entry["name"].(string)
+	if _, has := entry["value"]; !has || !isString {
+		return
+	}
+	if nameValueLists[field] || credentialName(name) {
+		redactEnvValue(entry, key)
+	}
+}
+
 func isContainerList(field string) bool {
-	return field == "containers" || field == "initContainers" || field == "ephemeralContainers"
+	switch field {
+	case "containers", "initContainers", "ephemeralContainers", "sidecars", "steps":
+		return true
+	}
+	return false
 }
 
 // redactContainer redacts the value of every env entry of a container, then the rest of
@@ -248,9 +325,9 @@ func redactEnvValue(entry map[string]any, key []byte) {
 func redactObjectAnnotations(meta map[string]any, key []byte) {
 	redact := func(name, value string) string {
 		switch {
-		case name == lastAppliedAnnotation:
+		case name == lastAppliedAnnotation || isJSONObject(value):
 			return redactLastAppliedObject(value, key)
-		case credentialName(name) || credentialValue(value):
+		case credentialName(name) || credentialValue(value) || isYAMLManifest(value):
 			return redactedValue([]byte(value), key)
 		}
 		return value
@@ -271,8 +348,9 @@ func redactObjectAnnotations(meta map[string]any, key []byte) {
 	}
 }
 
-// redactLastAppliedObject applies Redact to the object a last-applied-configuration of a
-// non-Secret holds. A value that does not parse as a JSON object is replaced whole.
+// redactLastAppliedObject applies Redact to the object that an annotation of a non-Secret
+// holds as JSON, such as last-applied-configuration or kapp.k14s.io/original. A value that
+// does not parse as a JSON object is replaced whole.
 func redactLastAppliedObject(raw string, key []byte) string {
 	var applied map[string]any
 	if err := json.Unmarshal([]byte(raw), &applied); err != nil {
@@ -283,4 +361,26 @@ func redactLastAppliedObject(raw string, key []byte) string {
 		return redactedValue([]byte(raw), key)
 	}
 	return s
+}
+
+// isYAMLManifest reports whether some YAML document in s is a mapping with apiVersion and
+// kind, the shape of an embedded Kubernetes manifest.
+func isYAMLManifest(s string) bool {
+	if !strings.Contains(s, "apiVersion") || !strings.Contains(s, "kind") {
+		return false
+	}
+	dec := yaml.NewDecoder(strings.NewReader(s))
+	for {
+		var doc map[string]any
+		if err := dec.Decode(&doc); err != nil {
+			// A stream that does not decode as mappings is treated as a manifest when it
+			// names both keys, so redaction fails closed.
+			return !errors.Is(err, io.EOF) && strings.Contains(s, "apiVersion:") && strings.Contains(s, "kind:")
+		}
+		if _, ok := doc["apiVersion"]; ok {
+			if _, ok := doc["kind"]; ok {
+				return true
+			}
+		}
+	}
 }
