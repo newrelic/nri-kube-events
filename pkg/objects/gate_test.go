@@ -3,6 +3,7 @@ package objects
 import (
 	"context"
 	"errors"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -324,5 +325,73 @@ func TestFlagOffThenOnReconciles(t *testing.T) {
 	require.Len(t, watchers, 2)
 	for _, w := range watchers {
 		assert.Same(t, store, w.store)
+	}
+}
+
+// TestMain starts gated runs at once, so the tests do not wait out the random start delay.
+// The start-delay tests set their own.
+func TestMain(m *testing.M) {
+	startDelay = func() time.Duration { return 0 }
+	os.Exit(m.Run())
+}
+
+func withStartDelay(t *testing.T, d time.Duration) *atomic.Int32 {
+	t.Helper()
+	old := startDelay
+	var calls atomic.Int32
+	startDelay = func() time.Duration { calls.Add(1); return d }
+	t.Cleanup(func() { startDelay = old })
+	return &calls
+}
+
+// A run starts only after the start delay, at the first start and after every off-to-on
+// flip.
+func TestRunGatedWaitsTheStartDelay(t *testing.T) {
+	calls := withStartDelay(t, 150*time.Millisecond)
+	var starts atomic.Int32
+	run := func(ctx context.Context) error {
+		starts.Add(1)
+		<-ctx.Done()
+		return nil
+	}
+	flag := newFakeFlag(accountflag.On)
+	began := time.Now()
+	g := startGated(t, flag, run)
+	require.Eventually(t, func() bool { return starts.Load() == 1 }, 5*time.Second, 5*time.Millisecond)
+	assert.GreaterOrEqual(t, time.Since(began), 150*time.Millisecond)
+
+	flag.set(accountflag.Off)
+	time.Sleep(20 * time.Millisecond)
+	began = time.Now()
+	flag.set(accountflag.On)
+	require.Eventually(t, func() bool { return starts.Load() == 2 }, 5*time.Second, 5*time.Millisecond)
+	assert.GreaterOrEqual(t, time.Since(began), 150*time.Millisecond)
+	assert.Equal(t, int32(2), calls.Load(), "a delay per start")
+	require.NoError(t, stopGated(t, g))
+}
+
+// A flag that turns off while a start waits cancels the start.
+func TestRunGatedCancelsAPendingStart(t *testing.T) {
+	withStartDelay(t, 200*time.Millisecond)
+	var starts atomic.Int32
+	run := func(ctx context.Context) error {
+		starts.Add(1)
+		<-ctx.Done()
+		return nil
+	}
+	flag := newFakeFlag(accountflag.On)
+	g := startGated(t, flag, run)
+	time.Sleep(50 * time.Millisecond)
+	flag.set(accountflag.Off)
+	time.Sleep(400 * time.Millisecond)
+	assert.Zero(t, starts.Load())
+	require.NoError(t, stopGated(t, g))
+}
+
+func TestStartDelayIsBounded(t *testing.T) {
+	for i := 0; i < 1000; i++ {
+		d := randomStartDelay()
+		require.GreaterOrEqual(t, d, time.Duration(0))
+		require.Less(t, d, maxStartDelay)
 	}
 }
