@@ -1209,7 +1209,7 @@ func TestRetryDoesNotOverwriteNewerWatchEvent(t *testing.T) {
 	recs := sink.objectRecords()
 	require.NotEmpty(t, recs)
 	last := recs[len(recs)-1]
-	assert.Contains(t, last.Attributes["object.p000"], `"k":"v2"`, "newest record is N+1")
+	assert.Contains(t, last.Attributes["object.p000"], `"k":"`+expectRedacted(watcherKey, "v2")+`"`, "newest record is N+1")
 	e, ok := store.Get("uid-a")
 	require.True(t, ok)
 	assert.Equal(t, last.Attributes["object.hash"], e.Hash, "stored hash is hash(N+1)")

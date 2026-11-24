@@ -147,20 +147,166 @@ func TestRedactLeavesInputUntouched(t *testing.T) {
 	assert.Equal(t, "db", obj["metadata"].(map[string]any)["name"], "output shares no maps with input")
 }
 
-func TestRedactIgnoresNonSecret(t *testing.T) {
+func TestRedactConfigMapValuesKeepsKeys(t *testing.T) {
+	key := []byte("k")
 	cm := map[string]any{
 		"apiVersion": "v1",
 		"kind":       "ConfigMap",
 		"metadata": map[string]any{
 			"name":        "cfg",
-			"annotations": map[string]any{lastApplied: `{"kind":"ConfigMap","data":{"k":"v"}}`},
+			"labels":      map[string]any{"app": "web"},
+			"annotations": map[string]any{lastApplied: `{"apiVersion":"v1","kind":"ConfigMap","data":{"k":"v"}}`},
 		},
-		"data": map[string]any{"k": "v"},
+		"data":       map[string]any{"k": "v", "db.conf": "host=db"},
+		"binaryData": map[string]any{"blob": b64("raw")},
 	}
-	out := Redact(cm, []byte("k"))
-	assert.Equal(t, cm, out)
-	out["data"].(map[string]any)["k"] = "changed"
-	assert.Equal(t, "v", cm["data"].(map[string]any)["k"], "a non-Secret is still a deep copy")
+	out := Redact(cm, key)
+	data := out["data"].(map[string]any)
+	assert.Equal(t, expectRedacted(key, "v"), data["k"])
+	assert.Equal(t, expectRedacted(key, "host=db"), data["db.conf"])
+	assert.Equal(t, expectRedacted(key, "raw"), out["binaryData"].(map[string]any)["blob"])
+	meta := out["metadata"].(map[string]any)
+	assert.Equal(t, map[string]any{"app": "web"}, meta["labels"], "labels are kept")
+	assert.Contains(t, meta["annotations"].(map[string]any)[lastApplied], expectRedacted(key, "v"))
+	assert.NotContains(t, meta["annotations"].(map[string]any)[lastApplied], `"k":"v"`)
+	assert.Equal(t, "v", cm["data"].(map[string]any)["k"], "the input is untouched")
+
+	changed := Redact(map[string]any{"apiVersion": "v1", "kind": "ConfigMap", "data": map[string]any{"k": "v2"}}, key)
+	assert.NotEqual(t, Hash(out), Hash(changed), "a changed value still changes the hash")
+}
+
+func TestRedactContainerEnvValuesKeepsNamesAndRefs(t *testing.T) {
+	key := []byte("k")
+	ref := map[string]any{"secretKeyRef": map[string]any{"name": "db", "key": "password"}}
+	container := func() map[string]any {
+		return map[string]any{
+			"name":  "app",
+			"image": "nginx:1.27",
+			"env": []any{
+				map[string]any{"name": "DB_PASSWORD", "value": "hunter2"},
+				map[string]any{"name": "FROM_SECRET", "valueFrom": ref},
+			},
+		}
+	}
+	deploy := map[string]any{
+		"apiVersion": "apps/v1",
+		"kind":       "Deployment",
+		"metadata":   map[string]any{"name": "web"},
+		"spec": map[string]any{"template": map[string]any{"spec": map[string]any{
+			"containers":     []any{container()},
+			"initContainers": []any{container()},
+		}}},
+	}
+	out := Redact(deploy, key)
+	podSpec := out["spec"].(map[string]any)["template"].(map[string]any)["spec"].(map[string]any)
+	for _, field := range []string{"containers", "initContainers"} {
+		c := podSpec[field].([]any)[0].(map[string]any)
+		env := c["env"].([]any)
+		assert.Equal(t, "DB_PASSWORD", env[0].(map[string]any)["name"])
+		assert.Equal(t, expectRedacted(key, "hunter2"), env[0].(map[string]any)["value"], field)
+		assert.Equal(t, map[string]any{"name": "FROM_SECRET", "valueFrom": ref}, env[1], "valueFrom is a reference and is kept")
+		assert.Equal(t, "nginx:1.27", c["image"])
+	}
+}
+
+func TestRedactCredentialNamedFieldsAtAnyDepth(t *testing.T) {
+	key := []byte("k")
+	cr := map[string]any{
+		"apiVersion": "example.com/v1",
+		"kind":       "Database",
+		"metadata":   map[string]any{"name": "db"},
+		"spec": map[string]any{
+			"host": "db.example.com",
+			"auth": map[string]any{
+				"adminPassword": "hunter2",
+				"apiKey":        "abc123",
+				"clientCert":    "cert-bytes",
+				"bearerToken":   map[string]any{"value": "tok", "name": "kept-name"},
+				"secretRef":     map[string]any{"name": "db-secret"},
+				"secretName":    "db-secret",
+				"tokens":        []any{"t1", "t2"},
+			},
+			"selector": map[string]any{"matchExpressions": []any{map[string]any{"key": "app", "operator": "In"}}},
+		},
+	}
+	out := Redact(cr, key)
+	spec := out["spec"].(map[string]any)
+	auth := spec["auth"].(map[string]any)
+	assert.Equal(t, "db.example.com", spec["host"])
+	assert.Equal(t, expectRedacted(key, "hunter2"), auth["adminPassword"])
+	assert.Equal(t, expectRedacted(key, "abc123"), auth["apiKey"])
+	assert.Equal(t, expectRedacted(key, "cert-bytes"), auth["clientCert"])
+	bearer := auth["bearerToken"].(map[string]any)
+	assert.Equal(t, expectRedacted(key, "tok"), bearer["value"], "every string under a credential field")
+	assert.Equal(t, "kept-name", bearer["name"], "identifiers under a credential field are kept")
+	assert.Equal(t, map[string]any{"name": "db-secret"}, auth["secretRef"], "references are kept")
+	assert.Equal(t, "db-secret", auth["secretName"])
+	assert.Equal(t, []any{expectRedacted(key, "t1"), expectRedacted(key, "t2")}, auth["tokens"])
+	assert.Equal(t, "app", spec["selector"].(map[string]any)["matchExpressions"].([]any)[0].(map[string]any)["key"], "a selector key is not a credential")
+}
+
+func TestRedactKeepsSecretVolumeReferences(t *testing.T) {
+	key := []byte("k")
+	vol := map[string]any{"name": "creds", "secret": map[string]any{
+		"secretName": "db", "defaultMode": int64(420), "items": []any{map[string]any{"key": "password", "path": "pw"}},
+	}}
+	pod := map[string]any{
+		"apiVersion": "v1",
+		"kind":       "Pod",
+		"metadata":   map[string]any{"name": "web"},
+		"spec":       map[string]any{"automountServiceAccountToken": false, "volumes": []any{deepCopy(vol)}},
+	}
+	out := Redact(pod, key)
+	spec := out["spec"].(map[string]any)
+	assert.Equal(t, vol, spec["volumes"].([]any)[0], "a Secret volume names the Secret and holds no value")
+	assert.Equal(t, false, spec["automountServiceAccountToken"])
+}
+
+func TestRedactCredentialLookingValues(t *testing.T) {
+	key := []byte("k")
+	// The fake credentials are built by concatenation so secret scanners do not flag them.
+	pem := "PRIVATE " + "KEY-----"
+	//nolint:gosec // G101: test values, not credentials
+	for name, value := range map[string]string{
+		"private key":    "-----BEGIN RSA " + pem + "\nMIIE\n-----END RSA " + pem,
+		"jwt":            "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.sig",
+		"aws access key": "id " + "AKIA" + "ABCDEFGHIJKLMNOP",
+		"url password":   "postgres://app:hunter2@db:5432/app",
+		"assignment":     "replicas: 2\npassword: hunter2\n",
+	} {
+		obj := map[string]any{
+			"apiVersion": "argoproj.io/v1alpha1",
+			"kind":       "Application",
+			"metadata":   map[string]any{"name": "app", "annotations": map[string]any{"example.com/note": value}},
+			"spec":       map[string]any{"source": map[string]any{"helm": map[string]any{"values": value}}},
+		}
+		out := Redact(obj, key)
+		assert.Equal(t, expectRedacted(key, value), out["spec"].(map[string]any)["source"].(map[string]any)["helm"].(map[string]any)["values"], name)
+		assert.Equal(t, expectRedacted(key, value), out["metadata"].(map[string]any)["annotations"].(map[string]any)["example.com/note"], name)
+	}
+	plain := map[string]any{
+		"apiVersion": "v1",
+		"kind":       "Service",
+		"metadata":   map[string]any{"name": "web", "annotations": map[string]any{"example.com/owner": "team-a"}},
+		"spec":       map[string]any{"type": "ClusterIP", "externalName": "db.example.com:5432"},
+		"status":     map[string]any{"lastTransitionTime": "2026-11-17T10:00:00Z", "url": "https://example.com/path"},
+	}
+	assert.Equal(t, plain, Redact(plain, key), "ordinary values are kept")
+}
+
+func TestRedactCredentialNamedAnnotation(t *testing.T) {
+	key := []byte("k")
+	obj := map[string]any{
+		"apiVersion": "v1",
+		"kind":       "ServiceAccount",
+		"metadata": map[string]any{"name": "sa", "annotations": map[string]any{
+			"example.com/api-token": "abc",
+			"example.com/owner":     "team-a",
+		}},
+	}
+	ann := Redact(obj, key)["metadata"].(map[string]any)["annotations"].(map[string]any)
+	assert.Equal(t, expectRedacted(key, "abc"), ann["example.com/api-token"])
+	assert.Equal(t, "team-a", ann["example.com/owner"])
 }
 
 func TestRedactNonAnyMapFieldsReplacedWhole(t *testing.T) {

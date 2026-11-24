@@ -121,6 +121,13 @@ objectState:
   # The hash store ConfigMaps and the HMAC key Secret have fixed names, so enable object state
   # in at most one release per namespace.
   #
+  # Redaction: before a record leaves the pod, the carrier replaces with a keyed hash marker
+  # every Secret and ConfigMap value, every container env value, every string under a field
+  # whose name looks like a credential, every string that looks like a private key, token,
+  # access key or URL with a password, and the same in annotations. Keys, env names and
+  # references are kept. A credential in an ordinary-looking field, such as a container
+  # argument, is not detected.
+  #
   # Describe scraper: with `scrapers.descriptions.enabled` on, the describe scraper stops sending
   # `<Kind>.Description` events for a kind once the carrier has listed and sent it, and resumes
   # when the carrier stops collecting it: the account flag turns off, the carrier stops or fails,

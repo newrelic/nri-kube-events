@@ -22,20 +22,22 @@ const lastAppliedAnnotation = "kubectl.kubernetes.io/last-applied-configuration"
 // fails closed: a value that cannot be redacted key by key is never passed through.
 const redactedWhole = "<redacted>"
 
-// Redact returns a deep copy of obj. When obj is a Secret, every value in data and
-// stringData is replaced with "<redacted len=N hmac=XXXXXXXXXXXXXXXX>", in the copy and in
-// the copy's last-applied-configuration annotation. Keys are kept. Other annotations that
-// may hold a copy of the object are replaced with the same marker (see redactAnnotation). A Helm release Secret
-// (type helm.sh/release.v1) needs no special case: its whole release is data.release.
-// With an empty key the marker is "<redacted len=N>". The input is never modified, so the
-// caller may pass the watch's own object.
+// Redact returns a deep copy of obj with every value that can hold a credential replaced
+// with "<redacted len=N hmac=XXXXXXXXXXXXXXXX>". When obj is a Secret, every value in data
+// and stringData is replaced, in the copy and in the copy's last-applied-configuration
+// annotation. Keys are kept. Other annotations that may hold a copy of the object are
+// replaced with the same marker (see redactAnnotation). A Helm release Secret (type
+// helm.sh/release.v1) needs no special case: its whole release is data.release. Every
+// other kind is redacted by redactObjectCopy. With an empty key the marker is
+// "<redacted len=N>". The input is never modified, so the caller may pass the watch's own
+// object.
 func Redact(obj map[string]any, key []byte) map[string]any {
 	out, _ := deepCopy(obj).(map[string]any)
 	if out == nil {
 		return map[string]any{}
 	}
 	if kind, _ := out["kind"].(string); kind != "Secret" {
-		return out
+		return redactObjectCopy(out, key)
 	}
 	return redactSecretCopy(out, key)
 }
