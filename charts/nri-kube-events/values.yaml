@@ -99,10 +99,10 @@ scrapers:
   events:
     enabled: true
 
-# -- Object state: watch every API kind and send each object's state as an `InfrastructureEvent`
+# -- Object state: watch every kind that can be listed and watched, except Events, and send each object's state as an `InfrastructureEvent`
 # through the forwarder sidecar, so `sinks.newRelicInfra` must stay enabled. Each custom attribute
 # set through `customAttributes` or `global.customAttributes` uses one of the 254 attributes NRDB
-# keeps per event on every object record, and the largest record already uses about 149. Keep
+# keeps per event on every object record, and the largest record already uses about 150. Keep
 # custom attributes under about 50, and never name one `clusterName`.
 # @default -- See `values.yaml`
 objectState:
