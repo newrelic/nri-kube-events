@@ -232,6 +232,7 @@ func assertObjectRecord(t *testing.T, r Record, cluster string, now time.Time) {
 	assert.Equal(t, ObjectType, r.Attributes["type"])
 	assert.Equal(t, cluster, r.Attributes["k8s.cluster.name"])
 	assert.Equal(t, now.Unix(), r.Attributes["timestamp"])
+	assert.Equal(t, now.UnixMilli(), r.Attributes["timestampMs"])
 	assert.NotContains(t, r.Attributes, "logtype")
 }
 
@@ -536,8 +537,26 @@ func TestTombstone(t *testing.T) {
 
 func TestTombstoneUsesObservedTime(t *testing.T) {
 	e := Entry{GVR: "/v1/configmaps", Kind: "ConfigMap", Namespace: "shop", Name: "settings"}
-	r := Tombstone("uid-cm", e, "c", time.Unix(1700000000, 0))
+	r := Tombstone("uid-cm", e, "c", time.Unix(1700000000, 250_000_000))
 	assert.Equal(t, int64(1700000000), r.Attributes["timestamp"])
+	assert.Equal(t, int64(1700000000250), r.Attributes["timestampMs"])
+}
+
+// An update and a delete of one object within the same second carry the same timestamp,
+// and timestampMs orders them.
+func TestTimestampMsOrdersVersionsWithinOneSecond(t *testing.T) {
+	updated := time.Unix(1700000000, 100_000_000)
+	deleted := updated.Add(400 * time.Millisecond)
+	recs, err := BuildRecords(smallConfigMap(), cmGVR, OpUpdated, "c", updated)
+	require.NoError(t, err)
+	e := Entry{GVR: "/v1/configmaps", Kind: "ConfigMap", Namespace: "shop", Name: "settings"}
+	tomb := Tombstone("uid-cm", e, "c", deleted)
+
+	assert.Equal(t, recs[0].Attributes["timestamp"], tomb.Attributes["timestamp"])
+	assert.Less(t, recs[0].Attributes["timestampMs"].(int64), tomb.Attributes["timestampMs"].(int64))
+	for _, r := range recs {
+		assert.Equal(t, int64(1700000000100), r.Attributes["timestampMs"])
+	}
 }
 
 func TestGVRStringParse(t *testing.T) {

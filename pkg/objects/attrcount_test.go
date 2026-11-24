@@ -179,6 +179,7 @@ func TestLargestRecordFitsAfterNormalization(t *testing.T) {
 	assert.Equal(t, "kubernetes.objectState", n["category"])
 	assert.Equal(t, "K8sObject", n["type"])
 	assert.EqualValues(t, 1700000000, n["timestamp"])
+	assert.EqualValues(t, int64(1700000000000), n["timestampMs"])
 	assert.Equal(t, "InfrastructureEvent", n["eventType"])
 
 	b, err := json.Marshal(n)

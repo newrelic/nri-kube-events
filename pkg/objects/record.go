@@ -44,7 +44,9 @@ const (
 
 // Record is one InfrastructureEvent. Its JSON shape is the SDK v3 event, so json.Marshal of
 // a Record is the size of the event the sink sends. Attributes["timestamp"] is int64 Unix
-// seconds.
+// seconds. Object records and tombstones also carry Attributes["timestampMs"], the same
+// time in int64 Unix milliseconds, so a reader can order two versions of one object sent
+// within the same second.
 type Record struct {
 	Attributes map[string]any `json:"attributes"`
 	Summary    string         `json:"summary"`
@@ -303,6 +305,7 @@ func identity(cluster string, gvr schema.GroupVersionResource, kind, namespace, 
 	return map[string]any{
 		"type":             ObjectType,
 		"timestamp":        at.Unix(),
+		"timestampMs":      at.UnixMilli(),
 		"k8s.cluster.name": cluster,
 		"k8s.group":        gvr.Group,
 		"k8s.version":      gvr.Version,
