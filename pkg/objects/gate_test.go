@@ -21,12 +21,46 @@ import (
 // channel buffered 1, so quick changes collapse into one receive.
 type fakeFlag struct {
 	changed chan struct{}
+	polled  chan struct{}
 	mu      sync.Mutex
+	polls   uint64
+	onPoll  uint64
 	state   accountflag.State
 }
 
+func (f *fakeFlag) OnSincePoll() uint64 {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.onPoll
+}
+
 func newFakeFlag(s accountflag.State) *fakeFlag {
-	return &fakeFlag{changed: make(chan struct{}, 1), state: s}
+	return &fakeFlag{changed: make(chan struct{}, 1), polled: make(chan struct{}, 1), state: s}
+}
+
+func (f *fakeFlag) Polls() uint64 {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.polls
+}
+
+func (f *fakeFlag) Polled() <-chan struct{} { return f.polled }
+
+// poll records one more successful poll that reads the current state.
+func (f *fakeFlag) poll() {
+	f.mu.Lock()
+	f.polls++
+	f.mu.Unlock()
+	select {
+	case f.polled <- struct{}{}:
+	default:
+	}
+}
+
+// turnOn is the flag read on in two polls in a row.
+func (f *fakeFlag) turnOn() {
+	f.set(accountflag.On)
+	f.poll()
 }
 
 func (f *fakeFlag) State() accountflag.State {
@@ -37,14 +71,19 @@ func (f *fakeFlag) State() accountflag.State {
 
 func (f *fakeFlag) Changed() <-chan struct{} { return f.changed }
 
+// set is a poll that reads s.
 func (f *fakeFlag) set(s accountflag.State) {
 	f.mu.Lock()
+	if s == accountflag.On && f.state != accountflag.On {
+		f.onPoll = f.polls + 1
+	}
 	f.state = s
 	f.mu.Unlock()
 	select {
 	case f.changed <- struct{}{}:
 	default:
 	}
+	f.poll()
 }
 
 type gated struct {
@@ -118,10 +157,10 @@ func TestRunGatedNeverOverlapsRuns(t *testing.T) {
 	}
 	done := startGated(t, flag, run)
 	for i := 0; i < 20; i++ {
-		flag.set(accountflag.On)
+		flag.turnOn()
 		flag.set(accountflag.Off)
 	}
-	flag.set(accountflag.On)
+	flag.turnOn()
 	require.Eventually(t, func() bool { return running.Load() == 1 }, time.Second, time.Millisecond)
 	require.NoError(t, stopGated(t, done))
 	assert.EqualValues(t, 1, maxRunning.Load())
@@ -154,7 +193,7 @@ func TestRunGatedRestartsOnlyAfterSlowStop(t *testing.T) {
 		require.Eventually(t, func() bool { return starts.Load() == i }, time.Second, time.Millisecond)
 		flag.set(accountflag.Off)
 		require.Eventually(t, func() bool { return stopping.Load() == i }, time.Second, time.Millisecond)
-		flag.set(accountflag.On)
+		flag.turnOn()
 	}
 	require.Eventually(t, func() bool { return starts.Load() == 6 && running.Load() == 1 },
 		time.Second, time.Millisecond)
@@ -303,7 +342,7 @@ func TestFlagOffThenOnReconciles(t *testing.T) {
 	sink.mu.Unlock()
 	assert.Zero(t, callsWhileOff, "nothing is sent while the flag is off, the heartbeat included")
 
-	flag.set(accountflag.On)
+	flag.turnOn()
 	require.Eventually(t, func() bool { return len(sink.objectRecords()) >= 2 }, 5*time.Second, 10*time.Millisecond)
 	require.NoError(t, stopGated(t, done))
 
@@ -328,93 +367,139 @@ func TestFlagOffThenOnReconciles(t *testing.T) {
 	}
 }
 
-// TestMain starts gated runs at once, so the tests do not wait out the random start delay.
-// The start-delay tests set their own.
+// TestMain lets a restart after a flap happen at once; the restart-window tests set their own.
 func TestMain(m *testing.M) {
-	startDelay = func() time.Duration { return 0 }
+	restartWindow = 0
 	os.Exit(m.Run())
 }
 
-func withStartDelay(t *testing.T, d time.Duration) *atomic.Int32 {
+func withRestartWindow(t *testing.T, d time.Duration) {
 	t.Helper()
-	old := startDelay
-	var calls atomic.Int32
-	startDelay = func() time.Duration { calls.Add(1); return d }
-	t.Cleanup(func() { startDelay = old })
-	return &calls
+	old := restartWindow
+	restartWindow = d
+	t.Cleanup(func() { restartWindow = old })
 }
 
-// A run starts at once when the flag is already on, as after a pod restart, and only after
-// the start delay when the flag turns on at run time.
-func TestRunGatedWaitsTheStartDelayOnlyAfterAFlip(t *testing.T) {
-	calls := withStartDelay(t, 150*time.Millisecond)
+// countingRun counts its starts and runs until its context ends.
+func countingRun(starts *atomic.Int32) func(context.Context) error {
+	return func(ctx context.Context) error {
+		starts.Add(1)
+		<-ctx.Done()
+		return nil
+	}
+}
+
+// First enable at run time: the flag was off, and the watcher starts only when a second
+// poll in a row reads on.
+func TestRunGatedStartsOnTheSecondOnPollAfterOff(t *testing.T) {
 	var starts atomic.Int32
+	flag := newFakeFlag(accountflag.Off)
+	g := startGated(t, flag, countingRun(&starts))
+	time.Sleep(20 * time.Millisecond)
+	flag.set(accountflag.On)
+	time.Sleep(100 * time.Millisecond)
+	assert.Zero(t, starts.Load(), "one on poll does not start it")
+	flag.poll()
+	require.Eventually(t, func() bool { return starts.Load() == 1 }, 5*time.Second, time.Millisecond)
+	require.NoError(t, stopGated(t, g))
+}
+
+// A pod restart, or a carrier retry, with the flag on starts at the first poll that reads
+// on, with no debounce.
+func TestRunGatedStartsAtOnceWhenTheFlagIsOnAtStart(t *testing.T) {
+	withRestartWindow(t, time.Hour)
+	var starts atomic.Int32
+	flag := newFakeFlag(accountflag.Unknown)
+	g := startGated(t, flag, countingRun(&starts))
+	time.Sleep(20 * time.Millisecond)
+	flag.set(accountflag.On)
+	require.Eventually(t, func() bool { return starts.Load() == 1 }, 5*time.Second, time.Millisecond)
+	require.NoError(t, stopGated(t, g))
+
+	var again atomic.Int32
+	g = startGated(t, newFakeFlag(accountflag.On), countingRun(&again))
+	require.Eventually(t, func() bool { return again.Load() == 1 }, 5*time.Second, time.Millisecond)
+	require.NoError(t, stopGated(t, g))
+}
+
+// A flap within the restart window starts the watcher again only when the window ends;
+// turning the flag off still stops it at once.
+func TestRunGatedFlapWithinTheWindowStartsWhenItEnds(t *testing.T) {
+	withRestartWindow(t, 400*time.Millisecond)
+	var starts atomic.Int32
+	var stops atomic.Int32
 	run := func(ctx context.Context) error {
 		starts.Add(1)
 		<-ctx.Done()
+		stops.Add(1)
 		return nil
 	}
 	flag := newFakeFlag(accountflag.On)
 	began := time.Now()
 	g := startGated(t, flag, run)
 	require.Eventually(t, func() bool { return starts.Load() == 1 }, 5*time.Second, time.Millisecond)
-	assert.Less(t, time.Since(began), 150*time.Millisecond, "no delay with the flag already on")
-	assert.Zero(t, calls.Load())
-
 	flag.set(accountflag.Off)
-	time.Sleep(20 * time.Millisecond)
-	began = time.Now()
-	flag.set(accountflag.On)
+	require.Eventually(t, func() bool { return stops.Load() == 1 }, time.Second, time.Millisecond, "off stops at once")
+	flag.turnOn()
+	time.Sleep(100 * time.Millisecond)
+	assert.Equal(t, int32(1), starts.Load(), "no second start inside the window")
 	require.Eventually(t, func() bool { return starts.Load() == 2 }, 5*time.Second, 5*time.Millisecond)
-	assert.GreaterOrEqual(t, time.Since(began), 150*time.Millisecond)
-	assert.Equal(t, int32(1), calls.Load(), "one delay, for the start after the flip")
+	assert.GreaterOrEqual(t, time.Since(began), 400*time.Millisecond)
 	require.NoError(t, stopGated(t, g))
 }
 
-// A flag that turns on after RunGated saw it off waits the delay, as New Relic turning the
-// flag on for every cluster of an account at once.
-func TestRunGatedWaitsWhenTheFlagTurnsOnLater(t *testing.T) {
-	withStartDelay(t, 150*time.Millisecond)
-	var starts atomic.Int32
+// A flap after the restart window starts the watcher on the second on poll.
+func TestRunGatedFlapAfterTheWindowStartsOnTheSecondPoll(t *testing.T) {
+	withRestartWindow(t, 100*time.Millisecond)
+	var starts, stops atomic.Int32
 	run := func(ctx context.Context) error {
 		starts.Add(1)
 		<-ctx.Done()
+		stops.Add(1)
 		return nil
 	}
-	flag := newFakeFlag(accountflag.Off)
+	flag := newFakeFlag(accountflag.On)
 	g := startGated(t, flag, run)
-	time.Sleep(20 * time.Millisecond)
+	require.Eventually(t, func() bool { return starts.Load() == 1 }, 5*time.Second, time.Millisecond)
+	time.Sleep(150 * time.Millisecond)
+	flag.set(accountflag.Off)
+	require.Eventually(t, func() bool { return stops.Load() == 1 }, time.Second, time.Millisecond)
+	flag.set(accountflag.On)
+	time.Sleep(50 * time.Millisecond)
+	assert.Equal(t, int32(1), starts.Load(), "waits for a second on poll")
 	began := time.Now()
-	flag.set(accountflag.On)
-	require.Eventually(t, func() bool { return starts.Load() == 1 }, 5*time.Second, 5*time.Millisecond)
-	assert.GreaterOrEqual(t, time.Since(began), 150*time.Millisecond)
+	flag.poll()
+	require.Eventually(t, func() bool { return starts.Load() == 2 }, 5*time.Second, time.Millisecond)
+	assert.Less(t, time.Since(began), 100*time.Millisecond, "no window wait")
 	require.NoError(t, stopGated(t, g))
 }
 
-// A flag that turns off while a start waits cancels the start.
-func TestRunGatedCancelsAPendingStart(t *testing.T) {
-	withStartDelay(t, 200*time.Millisecond)
+// A flag that turns off while a start waits for its second poll, or for the restart
+// window, cancels the start.
+func TestRunGatedOffDuringTheDebounceCancels(t *testing.T) {
 	var starts atomic.Int32
-	run := func(ctx context.Context) error {
-		starts.Add(1)
-		<-ctx.Done()
-		return nil
-	}
 	flag := newFakeFlag(accountflag.Off)
-	g := startGated(t, flag, run)
+	g := startGated(t, flag, countingRun(&starts))
 	time.Sleep(20 * time.Millisecond)
 	flag.set(accountflag.On)
+	time.Sleep(20 * time.Millisecond)
+	flag.set(accountflag.Off)
+	flag.poll()
+	time.Sleep(100 * time.Millisecond)
+	assert.Zero(t, starts.Load(), "off before the second on poll")
+	require.NoError(t, stopGated(t, g))
+
+	withRestartWindow(t, 300*time.Millisecond)
+	var windowed atomic.Int32
+	flag = newFakeFlag(accountflag.On)
+	g = startGated(t, flag, countingRun(&windowed))
+	require.Eventually(t, func() bool { return windowed.Load() == 1 }, 5*time.Second, time.Millisecond)
+	flag.set(accountflag.Off)
+	time.Sleep(50 * time.Millisecond)
+	flag.turnOn()
 	time.Sleep(50 * time.Millisecond)
 	flag.set(accountflag.Off)
 	time.Sleep(400 * time.Millisecond)
-	assert.Zero(t, starts.Load())
+	assert.Equal(t, int32(1), windowed.Load(), "off during the window wait")
 	require.NoError(t, stopGated(t, g))
-}
-
-func TestStartDelayIsBounded(t *testing.T) {
-	for i := 0; i < 1000; i++ {
-		d := randomStartDelay()
-		require.GreaterOrEqual(t, d, time.Duration(0))
-		require.Less(t, d, maxStartDelay)
-	}
 }

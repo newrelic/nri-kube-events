@@ -79,7 +79,7 @@ func TestFinalHeartbeatAcrossFlagFlipsAndShutdown(t *testing.T) {
 	assert.Equal(t, int64(0), hbs[0].Attributes["carrier.stoppedAt"])
 
 	sink.reset()
-	flag.set(accountflag.On)
+	flag.turnOn()
 	require.Eventually(t, running, 5*time.Second, 5*time.Millisecond, "running heartbeats resume")
 	assert.Equal(t, int64(0), heartbeats(sink.records())[0].Attributes["carrier.stoppedAt"])
 

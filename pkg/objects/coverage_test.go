@@ -113,7 +113,7 @@ func TestCoverageAcrossFlagFlips(t *testing.T) {
 	assert.False(t, cfg.Coverage.Covers(cmResourceGR), "nothing is covered while the flag is off")
 
 	for i := 0; i < 2; i++ {
-		flag.set(accountflag.On)
+		flag.turnOn()
 		require.Eventually(t, func() bool { return cfg.Coverage.Covers(cmResourceGR) }, 5*time.Second, 5*time.Millisecond)
 		flag.set(accountflag.Off)
 		select {

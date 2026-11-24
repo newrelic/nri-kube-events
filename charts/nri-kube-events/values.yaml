@@ -171,7 +171,10 @@ objectState:
   # With `rbac.create=false` the chart renders none of that RBAC, and you grant it yourself.
   # This value only installs the carrier. Collection is switched at run time by the account flag
   # `Infra_Agent/k8s_object_state_enabled`, which is off by default: while it is off the carrier
-  # sends nothing and the describe scraper runs as before, and turning it off is the rollback.
+  # sends nothing and the describe scraper runs as before, and turning it off is the rollback;
+  # it stops collection at the next poll. When the flag turns on while the pod runs, the
+  # carrier starts after two polls in a row read it on (about 60 s), and at most once every
+  # 5 minutes; a pod that starts with the flag on starts at the first poll.
   # This value cannot be a runtime flag, because what it installs cannot change at run time: the
   # cluster-wide get, list and watch on every resource, Secrets included, and the one-replica
   # `Recreate` strategy. A flag cannot grant or revoke RBAC or change the deployment strategy.

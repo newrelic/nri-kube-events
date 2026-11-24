@@ -443,3 +443,15 @@ func TestRegisterMetrics(t *testing.T) {
 		"nri_kube_events_objects_account_flag_poll_failures_total",
 	}, names)
 }
+
+// Polls counts the successful polls, and OnSincePoll names the poll that turned the state
+// On, so a caller can tell that a later poll read On too.
+func TestPollsAndOnSincePoll(t *testing.T) {
+	srv := newCmdServer(t, flagOff, flagOn, flagOn)
+	p := newTestPoller(t, srv.URL)
+	runScript(t, p, srv)
+	assert.Equal(t, On, p.State())
+	assert.GreaterOrEqual(t, p.Polls(), uint64(3), "the script, and the last answer repeated")
+	assert.Equal(t, uint64(2), p.OnSincePoll(), "the second poll turned it on")
+	assert.True(t, drained(p.Polled()))
+}

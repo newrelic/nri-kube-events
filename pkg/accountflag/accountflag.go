@@ -80,10 +80,14 @@ type Config struct {
 type Poller struct {
 	client  *http.Client
 	changed chan struct{}
+	polled  chan struct{}
 	// after returns the channel Run waits on between polls. Tests replace it.
 	after func(time.Duration) <-chan time.Time
 	cfg   Config
-	state atomic.Int32
+	polls atomic.Uint64
+	// onPoll is the number of the poll that last turned the state On.
+	onPoll atomic.Uint64
+	state  atomic.Int32
 }
 
 // NewPoller validates cfg and returns a poller in state Unknown.
@@ -114,6 +118,7 @@ func NewPoller(cfg Config) (*Poller, error) {
 		cfg:     cfg,
 		client:  client,
 		changed: make(chan struct{}, 1),
+		polled:  make(chan struct{}, 1),
 		after:   time.After,
 	}
 	setStateMetric(Unknown)
@@ -155,6 +160,17 @@ func (p *Poller) State() State { return State(p.state.Load()) }
 // Changed receives after every state change. It is buffered 1, so changes that arrive
 // while nobody reads collapse into one notification.
 func (p *Poller) Changed() <-chan struct{} { return p.changed }
+
+// Polls returns the number of successful polls so far.
+func (p *Poller) Polls() uint64 { return p.polls.Load() }
+
+// OnSincePoll returns the number of the poll that last turned the state On, so a caller can
+// tell whether a later poll also read On.
+func (p *Poller) OnSincePoll() uint64 { return p.onPoll.Load() }
+
+// Polled receives after every successful poll, after State reflects it. It is buffered 1,
+// so polls that arrive while nobody reads collapse into one notification.
+func (p *Poller) Polled() <-chan struct{} { return p.polled }
 
 // Run polls at once, then every Interval after a success. After a failure it waits
 // InitialBackoff, doubling per consecutive failure up to MaxBackoff. It returns when ctx
@@ -227,7 +243,14 @@ func (p *Poller) poll(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	p.apply(enabled, found)
+	if p.apply(enabled, found) == On {
+		p.onPoll.Store(p.polls.Load() + 1)
+	}
+	p.polls.Add(1)
+	select {
+	case p.polled <- struct{}{}:
+	default:
+	}
 	return nil
 }
 
@@ -236,8 +259,9 @@ func (p *Poller) redact(s string) string {
 }
 
 // apply moves the state for one successful answer. An explicit value sets it. An answer
-// without the flag keeps On or Off and turns Unknown into Off.
-func (p *Poller) apply(enabled, found bool) {
+// without the flag keeps On or Off and turns Unknown into Off. It returns the new state
+// when the state changed, and Unknown when it did not.
+func (p *Poller) apply(enabled, found bool) State {
 	cur := p.State()
 	next := cur
 	switch {
@@ -249,7 +273,7 @@ func (p *Poller) apply(enabled, found bool) {
 		next = Off
 	}
 	if next == cur {
-		return
+		return 0
 	}
 	p.state.Store(int32(next))
 	setStateMetric(next)
@@ -259,6 +283,7 @@ func (p *Poller) apply(enabled, found bool) {
 	}
 	log.WithFields(log.Fields{"from": cur.String(), "to": next.String()}).
 		Info("accountflag: collection flag changed")
+	return next
 }
 
 type command struct {
