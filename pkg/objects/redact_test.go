@@ -272,7 +272,6 @@ func TestRedactCredentialLookingValues(t *testing.T) {
 		"jwt":            "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.sig",
 		"aws access key": "id " + "AKIA" + "ABCDEFGHIJKLMNOP",
 		"url password":   "postgres://app:hunter2@db:5432/app",
-		"assignment":     "replicas: 2\npassword: hunter2\n",
 	} {
 		obj := map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
@@ -525,7 +524,7 @@ func TestRedactReviewProbeCases(t *testing.T) {
 			}}}}}, key)
 		params := out["spec"].(map[string]any)["source"].(map[string]any)["helm"].(map[string]any)["parameters"].([]any)
 		assert.Equal(t, marked, params[0].(map[string]any)["value"])
-		assert.Equal(t, expectRedacted(key, "3"), params[1].(map[string]any)["value"], "every value of a parameters list")
+		assert.Equal(t, "3", params[1].(map[string]any)["value"], "an ordinary parameter is kept")
 		assert.Equal(t, "replicas", params[1].(map[string]any)["name"])
 	})
 	t.Run("credential-named pair in any list", func(t *testing.T) {
@@ -585,5 +584,75 @@ func TestRedactReviewProbeCases(t *testing.T) {
 		assert.False(t, credentialValue("waiting for secret: not found yet"))
 		assert.True(t, credentialValue("token=abc123def"), "a token-like single-line value")
 		assert.True(t, credentialValue("user: app\npassword: correcthorse\n"), "any value in a config file")
+	})
+}
+
+// The second review's cases: {key, value} pairs, YAML and JSON text with credential keys,
+// parameter lists both ways, and the letters-only single-line limit.
+func TestRedactSecondReviewCases(t *testing.T) {
+	key := []byte("k")
+	secretValue := "hunter2xyz"
+	marked := expectRedacted(key, secretValue)
+	spec := func(out map[string]any) map[string]any { return out["spec"].(map[string]any) }
+
+	t.Run("key value pairs", func(t *testing.T) {
+		out := Redact(map[string]any{"apiVersion": "x/v1", "kind": "X", "metadata": map[string]any{"name": "x"},
+			"spec": map[string]any{"settings": []any{
+				map[string]any{"key": "DB_PASSWORD", "value": secretValue},
+				map[string]any{"key": "region", "value": "us-east-2"},
+			}}}, key)
+		items := spec(out)["settings"].([]any)
+		assert.Equal(t, marked, items[0].(map[string]any)["value"])
+		assert.Equal(t, "us-east-2", items[1].(map[string]any)["value"])
+	})
+	t.Run("parameter lists keep ordinary values and redact credentials", func(t *testing.T) {
+		token := "ghp" + "A1b2C3d4E5f6G7h8I9j0K1l2M3n4"
+		out := Redact(map[string]any{"apiVersion": "tekton.dev/v1", "kind": "PipelineRun", "metadata": map[string]any{"name": "p"},
+			"spec": map[string]any{"params": []any{
+				map[string]any{"name": "image", "value": "nginx:1.27"},
+				map[string]any{"name": "revision", "value": "4b825dc642cb6eb9a060e54bf8d69288fbee4904"},
+				map[string]any{"name": "registryPassword", "value": secretValue},
+				map[string]any{"name": "auth", "value": token},
+			}}}, key)
+		params := spec(out)["params"].([]any)
+		assert.Equal(t, "nginx:1.27", params[0].(map[string]any)["value"])
+		assert.Equal(t, "4b825dc642cb6eb9a060e54bf8d69288fbee4904", params[1].(map[string]any)["value"], "a commit is not a token")
+		assert.Equal(t, marked, params[2].(map[string]any)["value"], "a credential name")
+		assert.Equal(t, expectRedacted(key, token), params[3].(map[string]any)["value"], "a token-like value")
+	})
+	t.Run("env lists stay fully redacted", func(t *testing.T) {
+		out := Redact(map[string]any{"apiVersion": "x/v1", "kind": "X", "metadata": map[string]any{"name": "x"},
+			"spec": map[string]any{"extraEnv": []any{map[string]any{"name": "LOG_LEVEL", "value": "debug"}}}}, key)
+		assert.Equal(t, expectRedacted(key, "debug"), spec(out)["extraEnv"].([]any)[0].(map[string]any)["value"])
+	})
+	t.Run("Helm values text", func(t *testing.T) {
+		values := "image:\n  tag: \"1.27\" # pinned\ndb:\n  host: db.example.com\n  pass: hunter2xyz\n"
+		out := Redact(map[string]any{"apiVersion": "argoproj.io/v1alpha1", "kind": "Application", "metadata": map[string]any{"name": "a"},
+			"spec": map[string]any{"source": map[string]any{"helm": map[string]any{"values": values}}}}, key)
+		got := spec(out)["source"].(map[string]any)["helm"].(map[string]any)["values"].(string)
+		assert.NotContains(t, got, secretValue)
+		assert.Contains(t, got, marked)
+		assert.Contains(t, got, "db.example.com")
+		assert.Contains(t, got, "# pinned", "comments are kept")
+	})
+	t.Run("YAML copy of data in an annotation", func(t *testing.T) {
+		//nolint:gosec // G101: test values, not credentials
+		out := Redact(map[string]any{"apiVersion": "v1", "kind": "Service", "metadata": map[string]any{"name": "s", "annotations": map[string]any{
+			"example.com/copy": "data:\n  dsn: postgres://app:hunter2xyz@db/app\n  password: hunter2xyz\n",
+		}}}, key)
+		got := out["metadata"].(map[string]any)["annotations"].(map[string]any)["example.com/copy"].(string)
+		assert.NotContains(t, got, secretValue)
+	})
+	t.Run("JSON text value", func(t *testing.T) {
+		out := Redact(map[string]any{"apiVersion": "x/v1", "kind": "X", "metadata": map[string]any{"name": "x"},
+			"spec": map[string]any{"config": `{"user":"app","password":"hunter2xyz"}`}}, key)
+		got := spec(out)["config"].(string)
+		assert.NotContains(t, got, secretValue)
+		assert.Contains(t, got, `"user":"app"`)
+	})
+	t.Run("known limit: a letters-only single-line value", func(t *testing.T) {
+		assert.False(t, credentialValue("retrying because password=supersecret was refused"),
+			"kept, so prose with a credential word stays; a value with a digit or symbol is caught")
+		assert.True(t, credentialValue("password=supersecret1"))
 	})
 }
