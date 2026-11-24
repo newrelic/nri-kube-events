@@ -211,3 +211,36 @@ func TestFailedListIsReportedAndRetried(t *testing.T) {
 func newDynamicWith(kinds map[schema.GroupVersionResource]string) *dynamicfake.FakeDynamicClient {
 	return dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), kinds)
 }
+
+// A watch that the API server closes at once is reopened with backoff, not in a tight loop.
+func TestWatchThatClosesAtOnceBacksOff(t *testing.T) {
+	w, dyn, _, _ := newTestWatcher(t, testConfig(), nil, configMap("a", "uid-a", "v1"))
+	var opens atomic.Int32
+	dyn.PrependWatchReactor("configmaps", func(k8stesting.Action) (bool, watch.Interface, error) {
+		opens.Add(1)
+		fw := watch.NewFake()
+		fw.Stop()
+		return true, fw, nil
+	})
+	runWatcher(t, w)
+	time.Sleep(1500 * time.Millisecond)
+	// Waits of 0.5 to 1 s, then 1 to 2 s: at most 3 opens in 1.5 s.
+	assert.LessOrEqual(t, int(opens.Load()), 3)
+	assert.Positive(t, int(opens.Load()))
+}
+
+// A watch that ends with a non-expiry error is reopened with backoff too.
+func TestWatchErrorBacksOff(t *testing.T) {
+	w, dyn, _, _ := newTestWatcher(t, testConfig(), nil, configMap("a", "uid-a", "v1"))
+	var opens atomic.Int32
+	dyn.PrependWatchReactor("configmaps", func(k8stesting.Action) (bool, watch.Interface, error) {
+		opens.Add(1)
+		fw := watch.NewFakeWithChanSize(1, false)
+		fw.Error(&metav1.Status{Status: metav1.StatusFailure, Code: 500, Message: "conversion webhook failed"})
+		fw.Stop()
+		return true, fw, nil
+	})
+	runWatcher(t, w)
+	time.Sleep(1500 * time.Millisecond)
+	assert.LessOrEqual(t, int(opens.Load()), 3)
+}

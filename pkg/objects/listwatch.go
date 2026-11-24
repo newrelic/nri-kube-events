@@ -32,6 +32,9 @@ const (
 	// request picks a timeout between it and twice it, so watches of all kinds do not
 	// expire together.
 	watchTimeoutMin = 5 * time.Minute
+	// shortWatch is how soon after it opened a watch that ends without an event counts as
+	// failed, and is retried with backoff.
+	shortWatch = 10 * time.Second
 )
 
 // errRelist reports that a watch can no longer resume from its resource version.
@@ -123,34 +126,49 @@ func (w *Watcher) watchKind(ctx context.Context, gvr schema.GroupVersionResource
 			wait = min(backoffFactor*wait, listRetryMax)
 			continue
 		}
-		wait = listRetryInitial
-		next, err := s.consume(ctx, wi, rv)
+		opened := time.Now()
+		next, events, err := s.consume(ctx, wi, rv)
 		wi.Stop()
 		if errors.Is(err, errRelist) {
 			return
 		}
 		rv = next
+		// A watch that ends with an error, or soon after it opened without delivering an
+		// event, is retried with backoff, so one kind whose API server keeps closing its
+		// watch cannot spend the client's shared rate limit.
+		if ctx.Err() == nil && (err != nil || (events == 0 && time.Since(opened) < shortWatch)) {
+			if err != nil {
+				w.warner.warn(log.WithError(err).WithField("gvr", GVRString(gvr)), "objects: watch ended with an error; retrying")
+			}
+			sleepCtx(ctx, jittered(wait))
+			wait = min(backoffFactor*wait, listRetryMax)
+			continue
+		}
+		wait = listRetryInitial
 	}
 }
 
 // consume hands the events of wi to s until wi ends, and returns the last resource version
-// seen. It returns errRelist when the watch reports that rv is too old.
-func (s *objectStore) consume(ctx context.Context, wi watch.Interface, rv string) (string, error) {
+// seen and the number of events. It returns errRelist when the watch reports that rv is
+// too old.
+func (s *objectStore) consume(ctx context.Context, wi watch.Interface, rv string) (string, int, error) {
+	events := 0
 	for {
 		select {
 		case <-ctx.Done():
-			return rv, ctx.Err()
+			return rv, events, ctx.Err()
 		case ev, ok := <-wi.ResultChan():
 			if !ok {
-				return rv, nil
+				return rv, events, nil
 			}
 			if ev.Type == watch.Error {
 				err := apierrors.FromObject(ev.Object)
 				if apierrors.IsResourceExpired(err) || apierrors.IsGone(err) {
-					return rv, errRelist
+					return rv, events, errRelist
 				}
-				return rv, err
+				return rv, events, err
 			}
+			events++
 			u, isObject := ev.Object.(*unstructured.Unstructured)
 			if !isObject {
 				continue
