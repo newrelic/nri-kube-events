@@ -9,7 +9,7 @@ release:
   name: my-release
   namespace: my-namespace
 tests:
-  - it: configmap renders the objectState block
+  - it: configmap renders the objectState block; describe capture stays on and skips covered kinds at run time
     set:
       licenseKey: us-whatever
       cluster: a-cluster
@@ -38,6 +38,18 @@ tests:
               nrStaging: false
               fedramp: false
               proxy: ""
+
+  - it: describe capture off stays off with object state on
+    set:
+      licenseKey: us-whatever
+      cluster: a-cluster
+      objectState.enabled: true
+      scrapers.descriptions.enabled: false
+    template: templates/configmap.yaml
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: '(?m)^captureDescribe: false$'
 
   - it: honors resendAfter 0, staging and fedramp
     set:

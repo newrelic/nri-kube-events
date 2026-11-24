@@ -16,6 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/newrelic/nri-kube-events/pkg/objects"
 )
@@ -213,7 +214,7 @@ func TestStartObjectStateFailuresDoNotStopTheProcess(t *testing.T) {
 		returned := make(chan struct{})
 		go func() {
 			defer close(returned)
-			startObjectState(oc, stop, wg)
+			startObjectState(oc, nil, stop, wg)
 		}()
 		select {
 		case <-returned:
@@ -251,14 +252,14 @@ func TestDisabledObjectStateRegistersNoMetrics(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
 	wg := &sync.WaitGroup{}
-	startObjectStateIfEnabled(ObjectStateConfig{ClusterName: "c", Namespace: "ns"}, stop, wg)
+	startObjectStateIfEnabled(ObjectStateConfig{ClusterName: "c", Namespace: "ns"}, nil, stop, wg)
 	wg.Wait()
 	assert.Empty(t, objectsFamilies(t, r))
 	assert.Empty(t, objectsFamilies(t, prometheus.DefaultGatherer))
 
 	// The same call with the carrier on registers the families there, even though its
 	// config is invalid and it starts nothing.
-	startObjectStateIfEnabled(ObjectStateConfig{Enabled: true}, stop, wg)
+	startObjectStateIfEnabled(ObjectStateConfig{Enabled: true}, nil, stop, wg)
 	assert.Contains(t, objectsFamilies(t, r), "nri_kube_events_objects_carrier_failures_total")
 }
 
@@ -274,4 +275,39 @@ func TestMaxResendsPerScan(t *testing.T) {
 	// The default 100 records/s is above half the client QPS, 25/s: 25 × 60 s.
 	assert.Equal(t, 1500, maxResendsPerScan(100))
 	assert.Equal(t, 600, maxResendsPerScan(10))
+}
+
+// The describe path skips covered resources only with describe capture on and the carrier
+// enabled.
+func TestDescribeCoverage(t *testing.T) {
+	on := ObjectStateConfig{Enabled: true}
+	assert.NotNil(t, describeCoverage(true, on))
+	assert.Nil(t, describeCoverage(false, on), "describe capture off")
+	assert.Nil(t, describeCoverage(true, ObjectStateConfig{}), "carrier off")
+}
+
+// A carrier that never starts covers nothing, so the describe path keeps describing.
+func TestFailedCarrierCoversNothing(t *testing.T) {
+	oldRetry, oldKubeConfig := objectStateRetry, *kubeConfig
+	objectStateRetry = retryPolicy{initial: 10 * time.Millisecond, max: 10 * time.Millisecond}
+	*kubeConfig = t.TempDir() + "/missing-kubeconfig"
+	t.Cleanup(func() { objectStateRetry, *kubeConfig = oldRetry, oldKubeConfig })
+	g := freshObjectStateRegistry(t)
+
+	// With the license key set, startup gets as far as the missing kubeconfig.
+	t.Setenv(licenseKeyEnv, "test-license-key")
+	oc := ObjectStateConfig{
+		Enabled: true, ClusterName: "c", Namespace: "ns",
+		AgentEndpoint: "http://localhost:8001/v1/data",
+	}
+	coverage := describeCoverage(true, oc)
+	require.NotNil(t, coverage)
+	stop := make(chan struct{})
+	wg := &sync.WaitGroup{}
+	before := carrierFailures(t, g)
+	startObjectState(oc, coverage, stop, wg)
+	require.Eventually(t, func() bool { return failureDelta(t, g, before)[objects.StageStartup] >= 2 }, 5*time.Second, 5*time.Millisecond)
+	assert.False(t, coverage.Covers(schema.GroupResource{Resource: "pods"}))
+	close(stop)
+	wg.Wait()
 }

@@ -53,6 +53,9 @@ type Config struct {
 	// AccountFlag reports the account collection flag for the heartbeat's
 	// carrier.accountFlag. Nil reports AccountFlagNotRequired.
 	AccountFlag func() string
+	// Coverage, when set, records the resources this watcher collects, for the describe
+	// path to skip. The watcher clears it when it stops.
+	Coverage *Coverage
 
 	ClusterName, Namespace                                              string
 	DiscoveryInterval, HeartbeatInterval, FlushInterval, ResendInterval time.Duration
@@ -112,8 +115,8 @@ type Watcher struct {
 	// it sends it. Tests use it to deliver a watch event at that point.
 	afterRetryGet func(uid string)
 
-	// mu guards gvrs, unsynced, startTime, lastFullList, failedSends, resyncCursor and
-	// catchUp.
+	// mu guards gvrs, unsynced, startTime, lastFullList, failedSends, resyncCursor,
+	// catchUp and stopped.
 	// The fields are ordered to keep pointer data first, so the guarded ones are not
 	// contiguous.
 	gvrs map[schema.GroupVersionResource]*gvrState
@@ -144,6 +147,9 @@ type Watcher struct {
 	// heartbeatBusy, retryBusy and resendBusy are set while a heartbeat send, a retry pass
 	// or a resend scan runs.
 	heartbeatBusy, retryBusy, resendBusy atomic.Bool
+	// stopped, guarded by mu, is set when shutdown begins. A list that completes after it
+	// no longer marks its resource covered.
+	stopped bool
 }
 
 // unsyncedObject is what a retry needs: the object's identity, to fetch it again or to
@@ -229,9 +235,13 @@ func (w *Watcher) Run(ctx context.Context) error {
 	}
 }
 
-// shutdown stops every watch, waits for the reflectors to return, and flushes the store.
+// shutdown clears the coverage, stops every watch, waits for the reflectors to return, and
+// flushes the store. The coverage is cleared first, so the describe path resumes while the
+// watches still run, and every change is sent by at least one of the two.
 func (w *Watcher) shutdown() error {
 	w.mu.Lock()
+	w.stopped = true
+	w.cfg.Coverage.clear()
 	for _, st := range w.gvrs {
 		if st.cancel != nil {
 			st.cancel()
@@ -350,6 +360,7 @@ func (w *Watcher) syncWatches(ctx context.Context) {
 			removedPending = true
 		}
 		delete(w.gvrs, gvr)
+		w.cfg.Coverage.set(gvr.GroupResource(), false)
 	}
 	if removedPending && len(w.gvrs) > 0 && w.allResolvedLocked() {
 		w.lastFullList = w.now()
@@ -425,6 +436,7 @@ func (w *Watcher) listFailed(gvr schema.GroupVersionResource, err error) {
 		return
 	}
 	st.listFailing = true
+	w.cfg.Coverage.set(gvr.GroupResource(), false)
 	if !st.resolved && err != nil {
 		log.WithError(err).WithField("gvr", GVRString(gvr)).Warn("objects: list failed; the kind sends no deletes until a list succeeds")
 	}
@@ -445,7 +457,9 @@ func (w *Watcher) FailedGVRs() []string {
 	return out
 }
 
-// markListed marks gvr as listed: its kind joins the heartbeat's kinds.
+// markListed marks gvr as listed: its kind joins the heartbeat's kinds, and, until the
+// watcher stops, its resource is covered. Replace calls it after every object of the list
+// was sent or marked unsynced.
 func (w *Watcher) markListed(gvr schema.GroupVersionResource) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -455,6 +469,9 @@ func (w *Watcher) markListed(gvr schema.GroupVersionResource) {
 	}
 	st.listed = true
 	st.listFailing = false
+	if !w.stopped {
+		w.cfg.Coverage.set(gvr.GroupResource(), true)
+	}
 	w.resolveLocked(st)
 }
 

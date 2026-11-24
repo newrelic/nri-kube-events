@@ -120,6 +120,14 @@ objectState:
   #
   # The hash store ConfigMaps and the HMAC key Secret have fixed names, so enable object state
   # in at most one release per namespace.
+  #
+  # Describe scraper: with `scrapers.descriptions.enabled` on, the describe scraper stops sending
+  # `<Kind>.Description` events for a kind once the carrier has listed and sent it, and resumes
+  # when the carrier stops collecting it: the account flag turns off, the carrier stops or fails,
+  # or the kind's list fails. On resume it describes every cached object of the kind once. The
+  # carrier collects all 10 kinds the describe scraper watches, so while it runs no description
+  # is sent: no event per object change and none per object every `resyncPeriod`. No
+  # `<Kind>.Description` history is written for that time, and none is backfilled.
 
   # -- Enable object state. The deployment then runs one replica with the `Recreate` strategy and a
   # 90 s termination grace period, the ClusterRole gets get, list and watch on every resource
@@ -127,9 +135,10 @@ objectState:
   # With `rbac.create=false` the chart renders none of that RBAC, and you grant it yourself.
   # This value only installs the carrier. Collection is switched at run time by the account flag
   # `Infra_Agent/k8s_object_state_enabled`, which is off by default: while it is off the carrier
-  # sends nothing, and turning it off is the rollback. This value cannot be a runtime flag,
-  # because the RBAC and the deployment strategy it sets are part of the install and a flag
-  # cannot grant or revoke them.
+  # sends nothing and the describe scraper runs as before, and turning it off is the rollback.
+  # This value cannot be a runtime flag, because what it installs cannot change at run time: the
+  # cluster-wide get, list and watch on every resource, Secrets included, and the one-replica
+  # `Recreate` strategy. A flag cannot grant or revoke RBAC or change the deployment strategy.
   enabled: false
   # -- Resend an unchanged object after this long. `"0"` turns the resend off.
   resendAfter: "24h"

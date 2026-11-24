@@ -18,6 +18,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
@@ -100,7 +101,9 @@ func main() {
 		}()
 	}
 
-	if cfg.CaptureDescribe == nil || *cfg.CaptureDescribe {
+	captureDescribe := cfg.CaptureDescribe == nil || *cfg.CaptureDescribe
+	coverage := describeCoverage(captureDescribe, cfg.ObjectState)
+	if captureDescribe {
 		resync := DefaultDescribeRefresh
 		if cfg.DescribeRefresh != nil {
 			resync = *cfg.DescribeRefresh
@@ -112,7 +115,13 @@ func main() {
 			activeObjectHandlers[name] = sink
 		}
 
-		descRouter := descriptions.NewRouter(resourceInformers, activeObjectHandlers, opts...)
+		// A nil *objects.Coverage must reach NewRouter as a nil interface.
+		var routerCoverage descriptions.Coverage
+		if coverage != nil {
+			routerCoverage = coverage
+			logrus.Info("Descriptions skip the resources that object state collects while it collects them")
+		}
+		descRouter := descriptions.NewRouter(resourceInformers, activeObjectHandlers, routerCoverage, opts...)
 
 		wg.Add(1)
 		go func() {
@@ -129,7 +138,7 @@ func main() {
 
 	// The carrier starts after the Kubernetes Events and describe paths, and never blocks
 	// or stops them.
-	startObjectStateIfEnabled(cfg.ObjectState, stopChan, wg)
+	startObjectStateIfEnabled(cfg.ObjectState, coverage, stopChan, wg)
 
 	// After the stop signal, main waits for every path to return; upstream exited with
 	// status 1 as soon as the Prometheus server shut down. The wait lets the carrier flush
@@ -186,11 +195,24 @@ type retryPolicy struct {
 	initial, max time.Duration
 }
 
+// describeCoverage returns the Coverage the carrier writes and the describe path reads, or
+// nil when the describe path describes every object: when describe capture is off or the
+// carrier is off. The describe path skips a resource only while the running carrier covers
+// it, so with the account flag off, or with a carrier that failed to start, describe
+// capture is unchanged.
+func describeCoverage(captureDescribe bool, oc ObjectStateConfig) *objects.Coverage {
+	if !captureDescribe || !oc.Enabled {
+		return nil
+	}
+	return objects.NewCoverage()
+}
+
 // startObjectStateIfEnabled starts the object-state carrier when oc enables it. With the
-// carrier off it starts nothing and registers no metric.
-func startObjectStateIfEnabled(oc ObjectStateConfig, stopChan <-chan struct{}, wg *sync.WaitGroup) {
+// carrier off it starts nothing and registers no metric. A non-nil coverage receives the
+// resources the carrier collects.
+func startObjectStateIfEnabled(oc ObjectStateConfig, coverage *objects.Coverage, stopChan <-chan struct{}, wg *sync.WaitGroup) {
 	if oc.Enabled {
-		startObjectState(oc, stopChan, wg)
+		startObjectState(oc, coverage, stopChan, wg)
 	}
 }
 
@@ -200,7 +222,7 @@ func startObjectStateIfEnabled(oc ObjectStateConfig, stopChan <-chan struct{}, w
 // carrier does not start, and a failed startup or a run that ends early is logged, counted
 // in nri_kube_events_objects_carrier_failures_total, and retried with backoff. The carrier
 // polls the command API and runs the watcher only while the account flag is on.
-func startObjectState(oc ObjectStateConfig, stopChan <-chan struct{}, wg *sync.WaitGroup) {
+func startObjectState(oc ObjectStateConfig, coverage *objects.Coverage, stopChan <-chan struct{}, wg *sync.WaitGroup) {
 	if err := objects.RegisterMetrics(objectStateRegisterer); err != nil {
 		logrus.WithError(err).Error("objects: could not register metrics")
 	}
@@ -224,7 +246,7 @@ func startObjectState(oc ObjectStateConfig, stopChan <-chan struct{}, wg *sync.W
 		var c *objectCarrier
 		retryObjectState(ctx, objectStateRetry, func(ctx context.Context) (string, error) {
 			if c == nil {
-				started, err := newObjectCarrier(ctx, oc)
+				started, err := newObjectCarrier(ctx, oc, coverage)
 				if err != nil {
 					return objects.StageStartup, err
 				}
@@ -282,7 +304,7 @@ type objectCarrier struct {
 
 // newObjectCarrier builds the carrier's clients, loads the HMAC key and the hash store
 // within objectStateStartupTimeout, and builds the sink and the poller. oc is valid.
-func newObjectCarrier(ctx context.Context, oc ObjectStateConfig) (*objectCarrier, error) {
+func newObjectCarrier(ctx context.Context, oc ObjectStateConfig, coverage *objects.Coverage) (*objectCarrier, error) {
 	licenseKey := os.Getenv(licenseKeyEnv)
 	if licenseKey == "" {
 		return nil, fmt.Errorf("objectState.enabled is true but the %s env var is empty", licenseKeyEnv)
@@ -352,6 +374,7 @@ func newObjectCarrier(ctx context.Context, oc ObjectStateConfig) (*objectCarrier
 		ResendAfter:       oc.resendAfter(),
 		MaxResendsPerScan: maxResendsPerScan(oc.maxRecordsPerSecond()),
 		AccountFlag:       flagState,
+		Coverage:          coverage,
 	}
 	return c, nil
 }
@@ -433,7 +456,7 @@ func createEventsInformer(stopChan <-chan struct{}) cache.SharedIndexInformer {
 }
 
 // createInformers creates a SharedIndexInformer that will listen for resources we care aobut.
-func createInformers(stopChan <-chan struct{}, resync time.Duration) []cache.SharedIndexInformer {
+func createInformers(stopChan <-chan struct{}, resync time.Duration) []descriptions.Informer {
 	clientset, err := getClientset(*kubeConfig)
 	if err != nil {
 		logrus.Fatalf("could not create kubernetes client: %v", err)
@@ -454,17 +477,17 @@ func createInformers(stopChan <-chan struct{}, resync time.Duration) []cache.Sha
 
 	sharedInformers.Start(stopChan)
 
-	return []cache.SharedIndexInformer{
-		cronjobsInformer,
-		daemonsetsInformer,
-		deploymentInformer,
-		namespacesInformer,
-		nodesInformer,
-		jobsInformer,
-		pvInformer,
-		pvcInformer,
-		podsInformer,
-		servicesInformer,
+	return []descriptions.Informer{
+		{SharedIndexInformer: cronjobsInformer, Resource: schema.GroupResource{Group: "batch", Resource: "cronjobs"}},
+		{SharedIndexInformer: daemonsetsInformer, Resource: schema.GroupResource{Group: "apps", Resource: "daemonsets"}},
+		{SharedIndexInformer: deploymentInformer, Resource: schema.GroupResource{Group: "apps", Resource: "deployments"}},
+		{SharedIndexInformer: namespacesInformer, Resource: schema.GroupResource{Resource: "namespaces"}},
+		{SharedIndexInformer: nodesInformer, Resource: schema.GroupResource{Resource: "nodes"}},
+		{SharedIndexInformer: jobsInformer, Resource: schema.GroupResource{Group: "batch", Resource: "jobs"}},
+		{SharedIndexInformer: pvInformer, Resource: schema.GroupResource{Resource: "persistentvolumes"}},
+		{SharedIndexInformer: pvcInformer, Resource: schema.GroupResource{Resource: "persistentvolumeclaims"}},
+		{SharedIndexInformer: podsInformer, Resource: schema.GroupResource{Resource: "pods"}},
+		{SharedIndexInformer: servicesInformer, Resource: schema.GroupResource{Resource: "services"}},
 	}
 }
 
