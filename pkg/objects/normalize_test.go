@@ -254,3 +254,28 @@ func TestNoiseRemovalDoesNotMutateInput(t *testing.T) {
 
 	assert.Equal(t, appBefore, app)
 }
+
+func TestHPACurrentMetricsIgnored(t *testing.T) {
+	hpa := func(cpu int64, replicas int64) map[string]any {
+		return map[string]any{
+			"apiVersion": "autoscaling/v2",
+			"kind":       "HorizontalPodAutoscaler",
+			"metadata":   map[string]any{"name": "web", "namespace": "default"},
+			"spec":       map[string]any{"minReplicas": int64(2), "maxReplicas": int64(10)},
+			"status": map[string]any{
+				"currentReplicas": replicas,
+				"desiredReplicas": replicas,
+				"currentMetrics": []any{map[string]any{"type": "Resource", "resource": map[string]any{
+					"name": "cpu", "current": map[string]any{"averageUtilization": cpu},
+				}}},
+			},
+		}
+	}
+	assert.Equal(t, Hash(hpa(40, 3)), Hash(hpa(55, 3)), "a usage change alone")
+	assert.NotEqual(t, Hash(hpa(40, 3)), Hash(hpa(40, 4)), "a replica change")
+	other := hpa(40, 3)
+	other["apiVersion"] = "example.com/v1"
+	changed := hpa(55, 3)
+	changed["apiVersion"] = "example.com/v1"
+	assert.NotEqual(t, Hash(other), Hash(changed), "the same kind name in another group")
+}

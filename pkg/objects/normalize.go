@@ -16,6 +16,10 @@ const leaderAnnotation = "control-plane.alpha.kubernetes.io/leader"
 // leaseGroup is the API group of the Lease kind whose spec.renewTime is dropped.
 const leaseGroup = "coordination.k8s.io"
 
+// autoscalingGroup is the API group of the HorizontalPodAutoscaler kind whose
+// status.currentMetrics is dropped.
+const autoscalingGroup = "autoscaling"
+
 // argoGroup is the API group of the Argo CD Application kind whose status.reconciledAt
 // and metadata.generation are dropped.
 const argoGroup = "argoproj.io"
@@ -23,8 +27,13 @@ const argoGroup = "argoproj.io"
 // Normalize returns a deep copy of obj without the fields that change on every heartbeat
 // or write but carry no state: metadata.managedFields, metadata.resourceVersion, the
 // leader-election annotation, lastHeartbeatTime in every status.conditions entry,
-// spec.renewTime of a coordination.k8s.io Lease, and status.reconciledAt and
-// metadata.generation of an argoproj.io Application. The input is never modified.
+// spec.renewTime of a coordination.k8s.io Lease, status.currentMetrics of an autoscaling
+// HorizontalPodAutoscaler, and status.reconciledAt and metadata.generation of an
+// argoproj.io Application. The input is never modified.
+//
+// The HPA controller rewrites currentMetrics on every sync, every 15 s by default, while
+// usage moves. A change of desired or current replicas, or of a condition, still changes
+// the hash, and the record body keeps currentMetrics as it was at that change.
 //
 // An Argo CD refresh that finds nothing to change still writes reconciledAt and bumps
 // generation, so without this rule every refresh would resend every Application. Dropping
@@ -57,6 +66,12 @@ func Normalize(obj map[string]any) map[string]any {
 	if isKind(out, leaseGroup, "Lease") {
 		if spec, ok := out["spec"].(map[string]any); ok {
 			delete(spec, "renewTime")
+		}
+	}
+
+	if isKind(out, autoscalingGroup, "HorizontalPodAutoscaler") {
+		if status, ok := out["status"].(map[string]any); ok {
+			delete(status, "currentMetrics")
 		}
 	}
 
