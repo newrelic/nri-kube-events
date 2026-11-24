@@ -271,12 +271,13 @@ func TestBuildRecordsSmallObject(t *testing.T) {
 	assert.Equal(t, 1, a["record.count"])
 	assert.Equal(t, 0, a["record.firstPart"])
 
-	// The part holds compact JSON with HTML escaping off and managedFields kept.
+	// The part holds compact JSON with HTML escaping off and without managedFields.
 	p0, ok := a["object.p000"].(string)
 	require.True(t, ok)
 	text := join([]string{p0})
 	assert.Contains(t, text, `"note":"<b>&</b>"`)
-	assert.Contains(t, text, `"managedFields"`)
+	assert.NotContains(t, text, `"managedFields"`)
+	assert.Contains(t, obj["metadata"].(map[string]any), "managedFields", "the input keeps it")
 	assert.False(t, strings.HasSuffix(text, "\n"))
 	sum := sha256.Sum256([]byte(text))
 	assert.Equal(t, hex.EncodeToString(sum[:]), a["object.sha256"])
@@ -294,7 +295,7 @@ func TestBuildRecordsBodyIsTheRawObject(t *testing.T) {
 	recs, err := BuildRecords(obj, gvr, OpUpdated, "c", testNow)
 	require.NoError(t, err)
 	a := recs[0].Attributes
-	text, err := serialize(obj)
+	text, err := serialize(withoutManagedFields(obj))
 	require.NoError(t, err)
 	assert.Equal(t, text, join([]string{a["object.p000"].(string)}))
 	assert.Contains(t, text, `"reconciledAt"`)
@@ -390,10 +391,10 @@ func TestBuildRecordsSpansRecords(t *testing.T) {
 	// Grow the object until its JSON needs 111 parts.
 	target := 110*Step + 1
 	obj["spec"].(map[string]any)["filler"] = ""
-	withEmpty, err := serialize(obj)
+	withEmpty, err := serialize(withoutManagedFields(obj))
 	require.NoError(t, err)
 	obj["spec"].(map[string]any)["filler"] = strings.Repeat("f", target-utf8.RuneCountInString(withEmpty))
-	text, err := serialize(obj)
+	text, err := serialize(withoutManagedFields(obj))
 	require.NoError(t, err)
 	require.Equal(t, target, utf8.RuneCountInString(text))
 
@@ -583,7 +584,7 @@ func TestGVRStringParse(t *testing.T) {
 // object.sha256.
 func assertRecordsRebuild(t *testing.T, obj map[string]any, recs []Record) {
 	t.Helper()
-	text, err := serialize(obj)
+	text, err := serialize(withoutManagedFields(obj))
 	require.NoError(t, err)
 	nparts := recs[0].Attributes["object.parts"].(int)
 	var parts []string
@@ -620,7 +621,7 @@ func fillToParts(t *testing.T, obj map[string]any, set func(string), text string
 	r := []rune(text)
 	partsAt := func(l int) int {
 		set(string(r[:l]))
-		s, err := serialize(obj)
+		s, err := serialize(withoutManagedFields(obj))
 		require.NoError(t, err)
 		return len(Split(s))
 	}
@@ -656,7 +657,7 @@ func TestBuildRecordsEscapeHeavyUnderPostLimit(t *testing.T) {
 	obj := smallDeployment()
 	spec := obj["spec"].(map[string]any)
 	spec["filler"] = ""
-	empty, err := serialize(obj)
+	empty, err := serialize(withoutManagedFields(obj))
 	require.NoError(t, err)
 	// Each `"` or newline serializes to two runes, so this fills the object to 110 parts.
 	n := (110*Step - utf8.RuneCountInString(empty)) / 2

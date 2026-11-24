@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 	"time"
@@ -124,10 +125,12 @@ func serialize(obj map[string]any) (string, error) {
 
 // BuildRecords serializes obj, which must already be redacted, and returns the records of
 // this version, all with the same timestamp and identity. Each record holds at most
-// PartsPerRecord parts and encodes to at most MaxRecordBytes. The body and every attribute
-// except object.hash come from obj as it is; Hash normalizes its own copy.
+// PartsPerRecord parts and encodes to at most MaxRecordBytes. The body is obj without
+// metadata.managedFields, which records which client wrote each field and often makes up a
+// third or more of the JSON; every attribute except object.hash comes from obj as it is,
+// and Hash normalizes its own copy. obj is never modified.
 func BuildRecords(obj map[string]any, gvr schema.GroupVersionResource, op Op, cluster string, now time.Time) ([]Record, error) {
-	text, err := serialize(obj)
+	text, err := serialize(withoutManagedFields(obj))
 	if err != nil {
 		return nil, fmt.Errorf("serializing object: %w", err)
 	}
@@ -331,4 +334,21 @@ func labelString(meta map[string]any) (string, bool) {
 		items[i] = k + "=" + v
 	}
 	return capList(items)
+}
+
+// withoutManagedFields returns obj without metadata.managedFields: obj itself when it has
+// none, and otherwise a shallow copy with a shallow copy of metadata.
+func withoutManagedFields(obj map[string]any) map[string]any {
+	meta, ok := obj["metadata"].(map[string]any)
+	if !ok {
+		return obj
+	}
+	if _, has := meta["managedFields"]; !has {
+		return obj
+	}
+	out := maps.Clone(obj)
+	m := maps.Clone(meta)
+	delete(m, "managedFields")
+	out["metadata"] = m
+	return out
 }
