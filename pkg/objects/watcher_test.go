@@ -622,6 +622,8 @@ func TestHeartbeatRecordShape(t *testing.T) {
 		"carrier.historyStart": int64(0),
 		// testConfig leaves the resend off.
 		"carrier.resendAfter": int64(0),
+		"carrier.state":       CarrierStateRunning,
+		"carrier.stoppedAt":   int64(0),
 	}, hb.Attributes)
 	assert.Equal(t, "carrier heartbeat: 2 kinds", hb.Summary)
 	assert.Equal(t, Category, hb.Category)

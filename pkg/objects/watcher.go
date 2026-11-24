@@ -40,6 +40,17 @@ const (
 	shutdownFlushTimeout = 30 * time.Second
 	// heartbeatSendTimeout bounds one heartbeat send.
 	heartbeatSendTimeout = 30 * time.Second
+	// finalHeartbeatTimeout bounds the send of the last heartbeat of a run, so a forwarder
+	// that does not answer delays the stop by at most this long.
+	finalHeartbeatTimeout = 5 * time.Second
+
+	// CarrierStateRunning, CarrierStateStopped and CarrierStateFailed are the heartbeat's
+	// carrier.state. Every heartbeat of a running watcher says running. The last heartbeat
+	// of a run says stopped when the run's context was canceled (the account flag turned
+	// off, or the process is shutting down), and failed when the run ended on its own.
+	CarrierStateRunning = "running"
+	CarrierStateStopped = "stopped"
+	CarrierStateFailed  = "failed"
 
 	crdGroup    = "apiextensions.k8s.io"
 	crdResource = "customresourcedefinitions"
@@ -130,6 +141,8 @@ type Watcher struct {
 	cfg Config
 	// getTimeout bounds the GET of one resend or retry; NewWatcher sets objectGetTimeout.
 	getTimeout time.Duration
+	// finalTimeout bounds SendFinalHeartbeat; NewWatcher sets finalHeartbeatTimeout.
+	finalTimeout time.Duration
 
 	mu          sync.Mutex
 	failedSends int64
@@ -171,17 +184,18 @@ const maxRetryPerPass = 500
 // redaction and is never sent.
 func NewWatcher(cfg Config, dyn dynamic.Interface, disc discovery.DiscoveryInterface, store *Store, sink RecordSink, hmacKey []byte) *Watcher {
 	return &Watcher{
-		cfg:        cfg.withDefaults(),
-		dyn:        dyn,
-		disc:       disc,
-		store:      store,
-		sink:       sink,
-		key:        hmacKey,
-		now:        time.Now,
-		getTimeout: objectGetTimeout,
-		rediscover: make(chan struct{}, 1),
-		gvrs:       map[schema.GroupVersionResource]*gvrState{},
-		unsynced:   map[string]unsyncedObject{},
+		cfg:          cfg.withDefaults(),
+		dyn:          dyn,
+		disc:         disc,
+		store:        store,
+		sink:         sink,
+		key:          hmacKey,
+		now:          time.Now,
+		getTimeout:   objectGetTimeout,
+		finalTimeout: finalHeartbeatTimeout,
+		rediscover:   make(chan struct{}, 1),
+		gvrs:         map[schema.GroupVersionResource]*gvrState{},
+		unsynced:     map[string]unsyncedObject{},
 	}
 }
 
@@ -235,9 +249,11 @@ func (w *Watcher) Run(ctx context.Context) error {
 	}
 }
 
-// shutdown clears the coverage, stops every watch, waits for the reflectors to return, and
-// flushes the store. The coverage is cleared first, so the describe path resumes while the
-// watches still run, and every change is sent by at least one of the two.
+// shutdown clears the coverage, stops every watch, waits for the reflectors and the
+// background sends to return, sends the stopped heartbeat, and flushes the store. The
+// coverage is cleared first, so the describe path resumes while the watches still run, and
+// every change is sent by at least one of the two. The stopped heartbeat goes after every
+// running one of this run has returned, so it is the run's last heartbeat.
 func (w *Watcher) shutdown() error {
 	w.mu.Lock()
 	w.stopped = true
@@ -250,6 +266,7 @@ func (w *Watcher) shutdown() error {
 	w.mu.Unlock()
 	w.reflectors.Wait()
 	w.background.Wait()
+	w.SendFinalHeartbeat(CarrierStateStopped)
 
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownFlushTimeout)
 	defer cancel()
@@ -936,6 +953,23 @@ func (w *Watcher) sendHeartbeat(ctx context.Context) {
 	}
 }
 
+// SendFinalHeartbeat sends the last heartbeat of a run, with carrier.state set to state and
+// carrier.stoppedAt to now. It runs within its own finalHeartbeatTimeout, never within the
+// run's context, which is already canceled. A failed send is logged and counted in
+// failedSends and nri_kube_events_objects_send_failures_total, and returns; it never
+// blocks the stop past the timeout.
+func (w *Watcher) SendFinalHeartbeat(state string) {
+	ctx, cancel := context.WithTimeout(context.Background(), w.finalTimeout)
+	defer cancel()
+	now := w.now()
+	if err := w.sink.Send(ctx, []Record{w.heartbeatRecord(now, state, now)}); err != nil {
+		w.countFailedSend(ctx)
+		log.WithError(err).WithField("state", state).Warn("objects: sending the final heartbeat")
+		return
+	}
+	log.WithField("state", state).Info("objects: sent the final heartbeat")
+}
+
 // HeartbeatRecord builds the carrier heartbeat and sets the objects gauge from the same
 // counts. carrier.kinds lists, as sorted
 // "Kind=count," pairs cut by Split into carrier.kinds.pNNN parts, every watched kind whose
@@ -946,9 +980,15 @@ func (w *Watcher) sendHeartbeat(ctx context.Context) {
 // reflector uses the watch-list stream, client-go retries a 429 or a refused connection
 // inside the stream and never calls the list function that marks the failure. A reader
 // should treat a watched kind that is in neither carrier.kinds nor carrier.failedKinds as
-// not collected. timestamp is Unix seconds. The other times are Unix milliseconds, 0 before
-// they happen.
+// not collected. carrier.state is CarrierStateRunning and carrier.stoppedAt is 0.
+// timestamp is Unix seconds. The other times are Unix milliseconds, 0 before they happen.
 func (w *Watcher) HeartbeatRecord(now time.Time) Record {
+	return w.heartbeatRecord(now, CarrierStateRunning, time.Time{})
+}
+
+// heartbeatRecord is HeartbeatRecord with carrier.state set to state and carrier.stoppedAt
+// to stoppedAt, which is zero for a running heartbeat.
+func (w *Watcher) heartbeatRecord(now time.Time, state string, stoppedAt time.Time) Record {
 	w.mu.Lock()
 	kindOfGVR := map[string]string{}
 	var failedGVRs []string
@@ -1018,6 +1058,10 @@ func (w *Watcher) HeartbeatRecord(now time.Time) Record {
 		// not succeeded since; 0 means NRDB holds the version the carrier last saw of
 		// every object.
 		"carrier.unsyncedObjects": unsynced,
+		// carrier.state is running on every heartbeat of a running watcher, and stopped or
+		// failed on the last one; carrier.stoppedAt is when that last one was built.
+		"carrier.state":     state,
+		"carrier.stoppedAt": unixMilli(stoppedAt),
 	}
 	for i, p := range Split(b.String()) {
 		attrs[fmt.Sprintf("carrier.kinds.p%03d", i)] = p

@@ -384,7 +384,8 @@ func newObjectCarrier(ctx context.Context, oc ObjectStateConfig, coverage *objec
 func (c *objectCarrier) run(ctx context.Context) error {
 	// A Watcher runs once, so every run builds a new one over the same store.
 	runWatcher := func(ctx context.Context) error {
-		return objects.NewWatcher(c.watcherConfig, c.dynamicClient, c.discoveryClient, c.store, c.sink, c.hmacKey).Run(ctx)
+		w := objects.NewWatcher(c.watcherConfig, c.dynamicClient, c.discoveryClient, c.store, c.sink, c.hmacKey)
+		return runReporting(ctx, w.Run, w.SendFinalHeartbeat)
 	}
 	pollCtx, stopPoll := context.WithCancel(ctx)
 	polled := make(chan struct{})
@@ -395,6 +396,19 @@ func (c *objectCarrier) run(ctx context.Context) error {
 	err := objects.RunGated(ctx, c.poller, runWatcher)
 	stopPoll()
 	<-polled
+	return err
+}
+
+// runReporting calls run, and when run returns while ctx is live calls final with
+// objects.CarrierStateFailed. A watcher's Run that returns while its context is live has
+// failed, and its shutdown, which sends the stopped heartbeat, did not run. Run has no such
+// return today, so this guards a future one. After a canceled ctx the watcher has already
+// sent its stopped heartbeat, so runReporting sends nothing.
+func runReporting(ctx context.Context, run func(context.Context) error, final func(state string)) error {
+	err := run(ctx)
+	if ctx.Err() == nil {
+		final(objects.CarrierStateFailed)
+	}
 	return err
 }
 

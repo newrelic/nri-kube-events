@@ -311,3 +311,24 @@ func TestFailedCarrierCoversNothing(t *testing.T) {
 	close(stop)
 	wg.Wait()
 }
+
+// runReporting sends the failed heartbeat only when run returns while ctx is live.
+func TestRunReportingSendsFailedOnlyWhenRunEndsOnItsOwn(t *testing.T) {
+	var states []string
+	final := func(s string) { states = append(states, s) }
+	runErr := errors.New("watcher ended")
+
+	err := runReporting(context.Background(), func(context.Context) error { return runErr }, final)
+	assert.ErrorIs(t, err, runErr)
+	assert.Equal(t, []string{objects.CarrierStateFailed}, states)
+
+	states = nil
+	ctx, cancel := context.WithCancel(context.Background())
+	err = runReporting(ctx, func(ctx context.Context) error {
+		cancel()
+		<-ctx.Done()
+		return nil
+	}, final)
+	assert.NoError(t, err)
+	assert.Empty(t, states, "after a cancel the watcher sent its own stopped heartbeat")
+}
