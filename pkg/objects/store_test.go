@@ -857,3 +857,73 @@ func TestHistoryStartSurvivesReshard(t *testing.T) {
 	require.NoError(t, r.Load(ctx))
 	assert.True(t, s.HistoryStart().Equal(r.HistoryStart()))
 }
+
+// With a budget a flush writes the shards that changed first, stays within the budget but
+// writes at least one shard, and leaves the rest dirty for later flushes, until every
+// shard is written.
+func TestFlushBudgetWritesOldestShardsFirst(t *testing.T) {
+	ctx := context.Background()
+	client := newClient()
+	s := NewStore(client, storeNS)
+	require.NoError(t, s.Load(ctx))
+	for i := 0; i < 12000; i++ {
+		s.Put(testUID(i), testEntry(i))
+	}
+	require.NoError(t, s.Flush(ctx))
+	s.mu.Lock()
+	shards := s.shards
+	s.mu.Unlock()
+	require.Greater(t, shards, 2)
+
+	// Change every shard, one after another.
+	for i := 0; i < 12000; i++ {
+		e := testEntry(i)
+		e.Hash = "ffffffffffffffff"
+		s.Put(testUID(i), e)
+	}
+	s.mu.Lock()
+	first := s.takeDirtyPeek()
+	one := shardBytes(s.group(s.shards)[first])
+	s.mu.Unlock()
+
+	client.ClearActions()
+	require.NoError(t, s.FlushBudget(ctx, 1))
+	assert.Equal(t, 1, countActions(client, "update"), "a budget below one shard still writes one")
+	s.mu.Lock()
+	_, stillDirty := s.dirty[first]
+	left := len(s.dirty)
+	s.mu.Unlock()
+	assert.False(t, stillDirty, "the shard that changed first is written first")
+	assert.Equal(t, shards-1, left)
+
+	client.ClearActions()
+	require.NoError(t, s.FlushBudget(ctx, 2*one+one/2))
+	assert.Equal(t, 2, countActions(client, "update"))
+
+	for flushes := 0; ; flushes++ {
+		s.mu.Lock()
+		n := len(s.dirty)
+		s.mu.Unlock()
+		if n == 0 {
+			break
+		}
+		require.Less(t, flushes, shards)
+		require.NoError(t, s.FlushBudget(ctx, one))
+	}
+	r := NewStore(client, storeNS)
+	require.NoError(t, r.Load(ctx))
+	got, ok := r.Get(testUID(11999))
+	require.True(t, ok)
+	assert.Equal(t, "ffffffffffffffff", got.Hash)
+}
+
+// takeDirtyPeek returns the dirty shard that changed first. The caller holds s.mu.
+func (s *Store) takeDirtyPeek() int {
+	first, at := -1, time.Time{}
+	for i, since := range s.dirty {
+		if first < 0 || since.Before(at) || (since.Equal(at) && i < first) {
+			first, at = i, since
+		}
+	}
+	return first
+}

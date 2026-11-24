@@ -26,8 +26,16 @@ import (
 const (
 	DefaultDiscoveryInterval = 5 * time.Minute
 	DefaultHeartbeatInterval = 60 * time.Second
-	DefaultFlushInterval     = 30 * time.Second
-	DefaultResendInterval    = time.Minute
+	DefaultFlushInterval     = 60 * time.Second
+	// flushBudgetBytes bounds the hash store bytes one flush tick writes. With
+	// DefaultFlushInterval it caps the writes to etcd at about 1.4 GB a day, whatever the
+	// number of objects; on a 200,000-object store (about 44 MB in 49 shards) every
+	// changed shard is written within about 45 minutes. A shard written late only means
+	// that a restart in between sends again the objects that changed in it, never that a
+	// change is lost: the list after the restart compares every object with the stored
+	// hash. Shutdown flushes everything.
+	flushBudgetBytes      = 1_000_000
+	DefaultResendInterval = time.Minute
 
 	// discoveryRetry is how soon a discovery that failed outright is tried again.
 	discoveryRetry = 10 * time.Second
@@ -247,7 +255,7 @@ func (w *Watcher) Run(ctx context.Context) error {
 			w.startHeartbeat(ctx)
 		case <-flushT.C:
 			w.startRetry(ctx)
-			if err := w.store.Flush(ctx); err != nil {
+			if err := w.store.FlushBudget(ctx, flushBudgetBytes); err != nil {
 				log.WithError(err).Warn("objects: flushing hash store")
 			}
 		case <-resendC:

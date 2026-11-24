@@ -786,7 +786,7 @@ func TestConfigDefaults(t *testing.T) {
 	w := NewWatcher(Config{ClusterName: "c"}, newDynamic(), newTestDiscovery(), NewStore(newClient(), testNS), &recordingSink{}, watcherKey)
 	assert.Equal(t, 5*time.Minute, w.cfg.DiscoveryInterval)
 	assert.Equal(t, 60*time.Second, w.cfg.HeartbeatInterval)
-	assert.Equal(t, 30*time.Second, w.cfg.FlushInterval)
+	assert.Equal(t, 60*time.Second, w.cfg.FlushInterval)
 }
 
 func TestSecretRedactedBeforeSend(t *testing.T) {

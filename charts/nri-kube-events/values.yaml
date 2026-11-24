@@ -111,9 +111,13 @@ objectState:
   # the real values.
   # - Hash store: about 220 bytes per object in the shard ConfigMaps, so about 220 KB, and
   #   about 0.5 MB of memory.
-  # - Hash store writes: a flush every 30 s rewrites each changed shard whole. The daily resend
-  #   alone changes some shard every minute, so expect up to about 0.3 GB a day written to etcd
-  #   and about 0.6 GB a day if churn changes every shard on every flush. Every client that
+  # - Hash store writes: a flush every 60 s rewrites the changed shards whole, oldest change
+  #   first, and writes at most about 1 MB per flush, so writes to etcd stay under about 1.4 GB
+  #   a day whatever the cluster size (16 KB/s). A small store writes far less. On a
+  #   200,000-object store (about 44 MB in 49 shards) every changed shard is written within
+  #   about 45 minutes; a restart in between sends the objects of the shards not yet written
+  #   again, and loses nothing. The `nri_kube_events_objects_hash_store_bytes_written_total`
+  #   and `..._hash_store_dirty_shards` metrics show the actual load. Every client that
   #   watches ConfigMaps cluster-wide receives each write.
   # - Memory: the carrier lists at most 2 kinds at once, in pages of 100 objects (10 for
   #   Secrets), and queues at most 32 MB of records, so its buffers stay under about 150 MB

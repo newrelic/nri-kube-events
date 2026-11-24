@@ -36,6 +36,10 @@ var (
 		Name: metricsPrefix + "hash_store_last_flush_timestamp",
 		Help: "Unix time in seconds of the last hash store flush that returned no error, including a flush with nothing to write.",
 	})
+	metricHashStoreDirtyShards = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: metricsPrefix + "hash_store_dirty_shards",
+		Help: "Hash store shards changed since their last write, as of the last flush. A flush writes at most about 1 MB, so on a large store some shards wait for later flushes.",
+	})
 	metricHashStoreBytesWritten = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: metricsPrefix + "hash_store_bytes_written_total",
 		Help: "Data bytes, keys plus values, of the hash store shard ConfigMaps written to the apiserver with no error. Each write sends the whole shard.",
@@ -80,6 +84,7 @@ func objectsCollectors() []prometheus.Collector {
 		metricHashStoreEntries,
 		metricHashStoreLastFlush,
 		metricHashStoreBytesWritten,
+		metricHashStoreDirtyShards,
 		metricForwarderRejections,
 		metricCarrierFailures,
 		metricResends,

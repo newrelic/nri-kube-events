@@ -70,6 +70,7 @@ func TestRegisterMetricsOnlyWhenCalled(t *testing.T) {
 		"nri_kube_events_objects_carrier_failures_total",
 		"nri_kube_events_objects_forwarder_rejections_total",
 		"nri_kube_events_objects_hash_store_bytes_written_total",
+		"nri_kube_events_objects_hash_store_dirty_shards",
 		"nri_kube_events_objects_hash_store_entries",
 		"nri_kube_events_objects_hash_store_last_flush_timestamp",
 		"nri_kube_events_objects_objects",

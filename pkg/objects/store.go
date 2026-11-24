@@ -63,8 +63,9 @@ type Store struct {
 	// mu guards every field but client, namespace and flushMu. The fields are ordered to
 	// keep pointer data first.
 	entries map[string]Entry
-	// dirty holds the shard indexes changed since the last successful write.
-	dirty map[int]struct{}
+	// dirty holds, per shard index changed since its last successful write, when it first
+	// changed.
+	dirty map[int]time.Time
 	// historyStart is the pointer's history-start annotation, set by Load.
 	historyStart time.Time
 
@@ -93,7 +94,7 @@ func NewStore(client kubernetes.Interface, namespace string) *Store {
 		namespace: namespace,
 		entries:   map[string]Entry{},
 		shards:    1,
-		dirty:     map[int]struct{}{},
+		dirty:     map[int]time.Time{},
 	}
 }
 
@@ -221,7 +222,7 @@ func (s *Store) Load(ctx context.Context) error {
 	defer s.mu.Unlock()
 	s.entries = entries
 	s.shards = shards
-	s.dirty = map[int]struct{}{}
+	s.dirty = map[int]time.Time{}
 	s.rewrite = relayout || (complete && shards != ptrShards)
 	s.hasPointer = ptr != nil
 	s.gen = 0
@@ -361,7 +362,7 @@ func (s *Store) Put(uid string, e Entry) {
 		return
 	}
 	s.entries[uid] = e
-	s.dirty[shardOf(uid, s.shards)] = struct{}{}
+	s.markDirty(shardOf(uid, s.shards))
 }
 
 // Len returns the number of entries in the store.
@@ -379,7 +380,7 @@ func (s *Store) Delete(uid string) {
 		return
 	}
 	delete(s.entries, uid)
-	s.dirty[shardOf(uid, s.shards)] = struct{}{}
+	s.markDirty(shardOf(uid, s.shards))
 }
 
 // entriesWhere returns a copy of the entries for which keep returns true.
@@ -416,14 +417,33 @@ func (s *Store) Missing(gvr string, listed map[string]struct{}, listOK bool) []s
 	return out
 }
 
-// Flush persists the changes since the last Flush. With nothing changed it makes no API
-// calls. If the shard count holds, Flush updates the current generation's dirty shards in
-// place, and a shard that fails stays dirty for the next Flush. If a shard would pass 5,000
+// markDirty records that shard i changed, keeping the time of its first change. The
+// caller holds s.mu.
+func (s *Store) markDirty(i int) {
+	if _, ok := s.dirty[i]; !ok {
+		s.dirty[i] = time.Now()
+	}
+}
+
+// Flush persists every change since the last Flush; see FlushBudget.
+func (s *Store) Flush(ctx context.Context) error {
+	return s.FlushBudget(ctx, 0)
+}
+
+// FlushBudget persists the changes since the last flush, writing the dirty shards that
+// changed first before the others. With a positive budget it stops before a shard whose
+// write would take the bytes written in this call past budget, but always writes at least
+// one shard; the shards left stay dirty for the next call. A budget of 0 writes every
+// dirty shard. A reshard writes every shard whatever the budget.
+//
+// With nothing changed it makes no API calls. If the shard count holds, it updates the
+// current generation's dirty shards in place, and a shard that fails stays dirty for the
+// next flush. If a shard would pass 5,000
 // entries or 900,000 bytes, Flush raises the count and reshards: it writes every shard of a
 // new generation, moves the pointer to it, and only then deletes the older generations. A
 // failure before the pointer moves leaves the old generation in use and untouched, and the
 // next Flush retries the reshard.
-func (s *Store) Flush(ctx context.Context) (err error) {
+func (s *Store) FlushBudget(ctx context.Context, budget int) (err error) {
 	s.flushMu.Lock()
 	defer s.flushMu.Unlock()
 	defer func() {
@@ -446,28 +466,28 @@ func (s *Store) Flush(ctx context.Context) (err error) {
 	}
 	if s.rewrite || !s.hasPointer {
 		newGen := s.maxGen + 1
-		s.dirty = map[int]struct{}{}
+		s.dirty = map[int]time.Time{}
 		s.rewrite = false
 		s.mu.Unlock()
 		return s.reshard(ctx, newGen, groups)
 	}
 	gen := s.gen
-	write := make([]int, 0, len(s.dirty))
-	for i := range s.dirty {
-		write = append(write, i)
-	}
-	s.dirty = map[int]struct{}{}
+	write := s.takeDirty(groups, budget)
 	cleanup := s.cleanup
+	metricHashStoreDirtyShards.Set(float64(len(s.dirty)))
 	s.mu.Unlock()
 
 	var firstErr error
-	for _, i := range write {
-		if err := s.writeShard(ctx, gen, i, groups[i], true); err != nil {
+	for _, d := range write {
+		if err := s.writeShard(ctx, gen, d.shard, groups[d.shard], true); err != nil {
 			if firstErr == nil {
 				firstErr = err
 			}
 			s.mu.Lock()
-			s.dirty[i] = struct{}{}
+			if _, again := s.dirty[d.shard]; !again {
+				s.dirty[d.shard] = d.since
+			}
+			metricHashStoreDirtyShards.Set(float64(len(s.dirty)))
 			s.mu.Unlock()
 		}
 	}
@@ -477,6 +497,42 @@ func (s *Store) Flush(ctx context.Context) (err error) {
 		}
 	}
 	return firstErr
+}
+
+// dirtyShard is a dirty shard index and when it first changed.
+type dirtyShard struct {
+	since time.Time
+	shard int
+}
+
+// takeDirty removes from s.dirty, and returns oldest change first, the shards one flush
+// writes within budget bytes (see FlushBudget). The caller holds s.mu.
+func (s *Store) takeDirty(groups []map[string]string, budget int) []dirtyShard {
+	all := make([]dirtyShard, 0, len(s.dirty))
+	for i, since := range s.dirty {
+		all = append(all, dirtyShard{shard: i, since: since})
+	}
+	sort.Slice(all, func(a, b int) bool {
+		if !all[a].since.Equal(all[b].since) {
+			return all[a].since.Before(all[b].since)
+		}
+		return all[a].shard < all[b].shard
+	})
+	var take []dirtyShard
+	written := 0
+	for _, d := range all {
+		n := 0
+		if d.shard < len(groups) {
+			n = shardBytes(groups[d.shard])
+		}
+		if budget > 0 && len(take) > 0 && written+n > budget {
+			break
+		}
+		take = append(take, d)
+		written += n
+		delete(s.dirty, d.shard)
+	}
+	return take
 }
 
 // reshard writes groups as generation gen, moves the pointer to it, and deletes every other
