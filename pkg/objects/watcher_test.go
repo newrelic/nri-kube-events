@@ -1005,7 +1005,9 @@ func TestRunDoesNotReloadStore(t *testing.T) {
 	}
 	cancel()
 	select {
-	case <-done:
+	case err := <-done:
+		// Run returns the shutdown flush's error; the failing list does not reach it.
+		assert.NoError(t, err)
 	case <-time.After(10 * time.Second):
 		t.Fatal("Run did not return after cancel")
 	}

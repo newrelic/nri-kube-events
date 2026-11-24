@@ -147,7 +147,8 @@ func carrierOver(t *testing.T, dyn *dynamicfake.FakeDynamicClient, disc *discove
 	go func() { done <- w.Run(ctx) }()
 	t.Cleanup(func() {
 		cancel()
-		<-done
+		// Run returns the shutdown flush's error.
+		assert.NoError(t, <-done)
 	})
 	require.Eventually(t, func() bool { return store.Len() == want }, 5*time.Second, 10*time.Millisecond)
 	return store
