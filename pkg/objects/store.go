@@ -126,20 +126,8 @@ func shardName(gen, i int) string {
 	return shardNamePrefix + slotOf(gen) + "-" + strconv.Itoa(i)
 }
 
-// ShardNames returns every name a shard ConfigMap can have.
-func ShardNames() []string {
-	gens := []int{1, 2} // one generation of each slot
-	out := make([]string, 0, len(gens)*MaxShards)
-	for _, gen := range gens {
-		for i := 0; i < MaxShards; i++ {
-			out = append(out, shardName(gen, i))
-		}
-	}
-	return out
-}
-
 // parseShard returns the generation, from its label, and the index of a shard ConfigMap.
-// A name outside ShardNames, or a generation whose slot is not the name's, does not parse.
+// A name outside the slots and MaxShards indexes, or a generation whose slot is not the name's, does not parse.
 func parseShard(cm *corev1.ConfigMap) (gen, i int, ok bool) {
 	rest, found := strings.CutPrefix(cm.Name, shardNamePrefix)
 	if !found {

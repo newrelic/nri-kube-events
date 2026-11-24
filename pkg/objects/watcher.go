@@ -428,7 +428,7 @@ func (w *Watcher) listFailed(gvr schema.GroupVersionResource, err error) {
 }
 
 // markListed marks gvr as listed: its kind joins the heartbeat's kinds, and, until the
-// watcher stops, its resource is covered. Replace calls it after every object of the list
+// watcher stops, its resource is covered. finishList calls it after every object of the list
 // was sent or marked unsynced.
 func (w *Watcher) markListed(gvr schema.GroupVersionResource) {
 	w.mu.Lock()
@@ -1051,7 +1051,7 @@ type objectStore struct {
 	gvr schema.GroupVersionResource
 
 	mu sync.Mutex
-	// replaced is set after the kind's first list reached Replace.
+	// replaced is set after the kind's first list finished (finishList).
 	replaced bool
 }
 
@@ -1070,15 +1070,12 @@ func (s *objectStore) handle(op Op, obj any) {
 	}
 }
 
-// Add handles a watch ADDED event, as OpInitial while the first list is still running.
+// Add handles a watch ADDED event. A watch starts only after the kind's first list, so its
+// events are never part of the initial state.
 func (s *objectStore) Add(obj any) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	op := OpAdded
-	if !s.replaced {
-		op = OpInitial
-	}
-	s.handle(op, obj)
+	s.handle(OpAdded, obj)
 	if isCRDResource(s.gvr) {
 		s.w.triggerRediscovery()
 	}
@@ -1179,24 +1176,4 @@ func (s *objectStore) tombstoneMissing(l *listing) {
 			s.w.forgetCRDObjects(s.ctx, group, plural)
 		}
 	}
-}
-
-// Replace handles items as one complete list of the kind, as listKind does page by page.
-func (s *objectStore) Replace(items []any, _ string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	l := s.beginList()
-	for _, item := range items {
-		if s.ctx.Err() != nil {
-			return s.ctx.Err()
-		}
-		if u, ok := item.(*unstructured.Unstructured); ok {
-			s.listItem(l, u)
-		}
-	}
-	if s.ctx.Err() != nil {
-		return s.ctx.Err()
-	}
-	s.finishList(l)
-	return nil
 }
