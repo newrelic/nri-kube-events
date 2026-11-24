@@ -774,21 +774,25 @@ func upsert(ctx context.Context, cms configMapWriter, cm *corev1.ConfigMap, exis
 }
 
 // LoadOrCreateHMACKey returns the per-cluster redaction key from Secret
-// nri-kube-events-hmac, creating the Secret with 32 random bytes when it is absent. If
-// another writer creates it first, the existing key is used.
+// nri-kube-events-hmac. The chart creates that Secret without data, so the carrier needs no
+// right to create Secrets; the first start fills it with 32 random bytes by an update. If
+// the Secret is absent, as in an install without the chart, it is created. If another
+// writer fills or creates it first, that key is used.
 func LoadOrCreateHMACKey(ctx context.Context, client kubernetes.Interface, namespace string) ([]byte, error) {
 	secrets := client.CoreV1().Secrets(namespace)
 	sec, err := secrets.Get(ctx, HMACSecretName, metav1.GetOptions{})
-	if err == nil {
+	switch {
+	case err == nil && len(sec.Data[HMACSecretKey]) > 0:
 		return keyFromSecret(sec)
-	}
-	if !apierrors.IsNotFound(err) {
+	case err == nil:
+		return fillHMACKey(ctx, secrets, sec)
+	case !apierrors.IsNotFound(err):
 		return nil, fmt.Errorf("reading secret %s: %w", HMACSecretName, err)
 	}
 
-	key := make([]byte, hmacKeyBytes)
-	if _, err = rand.Read(key); err != nil {
-		return nil, fmt.Errorf("generating hmac key: %w", err)
+	key, err := newHMACKey()
+	if err != nil {
+		return nil, err
 	}
 	_, err = secrets.Create(ctx, &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -809,7 +813,48 @@ func LoadOrCreateHMACKey(ctx context.Context, client kubernetes.Interface, names
 	if err != nil {
 		return nil, fmt.Errorf("reading secret %s after create race: %w", HMACSecretName, err)
 	}
+	if len(sec.Data[HMACSecretKey]) == 0 {
+		return fillHMACKey(ctx, secrets, sec)
+	}
 	return keyFromSecret(sec)
+}
+
+// fillHMACKey writes a new key into sec, an existing Secret without one, and returns it. An
+// update that conflicts with another writer returns the key that writer stored.
+func fillHMACKey(ctx context.Context, secrets secretWriter, sec *corev1.Secret) ([]byte, error) {
+	key, err := newHMACKey()
+	if err != nil {
+		return nil, err
+	}
+	filled := sec.DeepCopy()
+	if filled.Data == nil {
+		filled.Data = map[string][]byte{}
+	}
+	filled.Data[HMACSecretKey] = key
+	if _, err = secrets.Update(ctx, filled, metav1.UpdateOptions{}); err == nil {
+		return key, nil
+	}
+	if !apierrors.IsConflict(err) {
+		return nil, fmt.Errorf("writing the key into secret %s: %w", HMACSecretName, err)
+	}
+	latest, err := secrets.Get(ctx, HMACSecretName, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("reading secret %s after an update conflict: %w", HMACSecretName, err)
+	}
+	return keyFromSecret(latest)
+}
+
+type secretWriter interface {
+	Get(context.Context, string, metav1.GetOptions) (*corev1.Secret, error)
+	Update(context.Context, *corev1.Secret, metav1.UpdateOptions) (*corev1.Secret, error)
+}
+
+func newHMACKey() ([]byte, error) {
+	key := make([]byte, hmacKeyBytes)
+	if _, err := rand.Read(key); err != nil {
+		return nil, fmt.Errorf("generating hmac key: %w", err)
+	}
+	return key, nil
 }
 
 func keyFromSecret(sec *corev1.Secret) ([]byte, error) {

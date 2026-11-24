@@ -999,3 +999,24 @@ func TestChartRoleNamesEveryShard(t *testing.T) {
 	assert.Contains(t, role, "- "+pointerName)
 	assert.Contains(t, role, "- "+HMACSecretName)
 }
+
+// The chart creates the HMAC Secret without data; the first start fills it by an update and
+// later starts read the same key.
+func TestHMACKeyFillsTheChartsEmptySecret(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: HMACSecretName, Namespace: storeNS}})
+	k1, err := LoadOrCreateHMACKey(ctx, client, storeNS)
+	require.NoError(t, err)
+	assert.Len(t, k1, hmacKeyBytes)
+	secretActions := map[string]int{}
+	for _, a := range client.Actions() {
+		if a.GetResource().Resource == "secrets" {
+			secretActions[a.GetVerb()]++
+		}
+	}
+	assert.Zero(t, secretActions["create"], "no Secret create")
+	assert.Equal(t, 1, secretActions["update"])
+	k2, err := LoadOrCreateHMACKey(ctx, client, storeNS)
+	require.NoError(t, err)
+	assert.Equal(t, k1, k2)
+}

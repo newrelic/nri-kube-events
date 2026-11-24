@@ -1,5 +1,6 @@
 suite: objectState switches
 templates:
+  - templates/objects-hmac-secret.yaml
   - templates/configmap.yaml
   - templates/clusterrole.yaml
   - templates/objects-role.yaml
@@ -164,6 +165,7 @@ tests:
               - configmaps
             verbs:
               - create
+              - list
         documentIndex: 0
       - equal:
           path: rules[1].verbs
@@ -199,20 +201,15 @@ tests:
               - ""
             resources:
               - secrets
-            verbs:
-              - create
-        documentIndex: 0
-      - equal:
-          path: rules[3]
-          value:
-            apiGroups:
-              - ""
-            resources:
-              - secrets
             resourceNames:
               - nri-kube-events-hmac
             verbs:
               - get
+              - update
+        documentIndex: 0
+      - lengthEqual:
+          path: rules
+          count: 3
         documentIndex: 0
       - isKind:
           of: RoleBinding
@@ -384,3 +381,30 @@ tests:
     asserts:
       - notExists:
           path: spec.template.spec.automountServiceAccountToken
+
+  - it: the chart creates the HMAC key Secret without data
+    set:
+      licenseKey: us-whatever
+      cluster: a-cluster
+      objectState.enabled: true
+    template: templates/objects-hmac-secret.yaml
+    asserts:
+      - isKind:
+          of: Secret
+      - equal:
+          path: metadata.name
+          value: nri-kube-events-hmac
+      - equal:
+          path: metadata.namespace
+          value: my-namespace
+      - notExists:
+          path: data
+
+  - it: no HMAC key Secret with object state off
+    set:
+      licenseKey: us-whatever
+      cluster: a-cluster
+    template: templates/objects-hmac-secret.yaml
+    asserts:
+      - hasDocuments:
+          count: 0

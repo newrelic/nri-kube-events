@@ -7,14 +7,16 @@ metadata:
   name: {{ include "newrelic.common.naming.fullname" . }}-objects
   namespace: {{ .Release.Namespace }}
 rules:
-# The hash store creates its pointer and shard ConfigMaps. Kubernetes RBAC cannot limit
-# create by name. The ClusterRole's get, list and watch let it find them by label.
+# The hash store creates its pointer and shard ConfigMaps, and finds them by label. Kubernetes
+# RBAC cannot limit create or list by name. The ClusterRole grants list too; the Role repeats
+# it so it is enough on its own for the hash store.
 - apiGroups:
   - ""
   resources:
   - configmaps
   verbs:
   - create
+  - list
 # It updates and deletes only its own ConfigMaps: the pointer and every shard name, two
 # slots of objects.MaxShards (128) shards each (pkg/objects/store.go).
 - apiGroups:
@@ -32,13 +34,9 @@ rules:
   - get
   - update
   - delete
-# The HMAC key Secret is created once and read on every start.
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
-  - create
+# The chart creates the HMAC key Secret without data (objects-hmac-secret.yaml); the carrier
+# fills it on its first start and reads it on every start. It cannot create Secrets, so it
+# cannot mint a ServiceAccount token Secret for another ServiceAccount in the namespace.
 - apiGroups:
   - ""
   resources:
@@ -47,6 +45,7 @@ rules:
   - nri-kube-events-hmac
   verbs:
   - get
+  - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

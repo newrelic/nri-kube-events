@@ -132,7 +132,11 @@ objectState:
   #
   # The hash store ConfigMaps and the HMAC key Secret have fixed names, so enable object state
   # in at most one release per namespace. The Role lets the carrier update and delete only
-  # those names; Kubernetes RBAC cannot limit create by name. The ServiceAccount can read every
+  # those names; Kubernetes RBAC cannot limit create by name. The chart creates the HMAC key
+  # Secret without data and the carrier fills it on its first start, so the carrier cannot
+  # create Secrets. A GitOps tool that compares the live Secret with the chart sees the key
+  # the carrier added; ignore differences in that Secret's data. With `rbac.create=false`,
+  # grant the same rules the chart's objects Role holds (templates/objects-role.yaml). The ServiceAccount can read every
   # Secret, so with object state enabled the pod does not automount its token, and only the
   # integration container gets one, through a projected volume; the forwarder sidecar does
   # not.
