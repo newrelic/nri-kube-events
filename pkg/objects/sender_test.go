@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -215,4 +216,54 @@ func TestWarnerRateLimits(t *testing.T) {
 	require.NotNil(t, last)
 	assert.True(t, strings.HasPrefix(last.Message, "objects:"))
 	assert.Contains(t, last.Data, "suppressedWarnings")
+}
+
+// rejectAllSink rejects every Send, heartbeats included, and counts the calls.
+type rejectAllSink struct {
+	calls atomic.Int32
+}
+
+func (s *rejectAllSink) Send(context.Context, []Record) error {
+	s.calls.Add(1)
+	return fmt.Errorf("status 404: not found: %w", ErrRejected)
+}
+
+// A forwarder that rejects every request is a forwarder failure, not a batch of poison
+// objects: nothing is stored as sent, every object stays unsynced for the retry pass, the
+// metric counts it, and the group is not bisected.
+func TestForwarderThatRejectsEverythingKeepsObjectsUnsynced(t *testing.T) {
+	sink := &rejectAllSink{}
+	store := NewStore(newClient(), testNS)
+	w := NewWatcher(testConfig(), newDynamic(), newTestDiscovery(coreList(cmResource())), store, sink, watcherKey)
+	w.track(cmGVR, "ConfigMap")
+	before := counterValue(t, metricForwarderRejectsAll)
+	rejectedBefore := counterValue(t, metricRecordsRejected)
+	items := make([]pendingSend, 0, 8)
+	for i := 0; i < 8; i++ {
+		_, hash := prepareObject(cmGVR, "ConfigMap", configMap(fmt.Sprintf("cm-%d", i), fmt.Sprintf("uid-%d", i), "v").Object, watcherKey)
+		recs := []Record{{Attributes: map[string]any{"type": ObjectType, "k8s.uid": fmt.Sprintf("uid-%d", i)}}}
+		items = append(items, pendingSend{uid: fmt.Sprintf("uid-%d", i), op: OpAdded, recs: recs, size: queuedSize(recs),
+			entry: Entry{GVR: "/v1/configmaps", Kind: "ConfigMap", Namespace: "default", Name: fmt.Sprintf("cm-%d", i), Hash: hash}})
+	}
+	err := w.deliver(context.Background(), items)
+	require.ErrorIs(t, err, errForwarderRejectsAll)
+	assert.Equal(t, int32(2), sink.calls.Load(), "the group and one heartbeat probe, no bisection")
+	assert.Empty(t, storeUIDs(store), "nothing is stored as sent")
+	assert.Equal(t, 8, unsyncedObjects(w))
+	assert.Equal(t, 1.0, counterValue(t, metricForwarderRejectsAll)-before)
+	assert.Equal(t, 0.0, counterValue(t, metricRecordsRejected)-rejectedBefore, "no object is counted as poison")
+}
+
+// While the forwarder rejects everything, the sender waits between groups.
+func TestSenderBacksOffWhileTheForwarderRejectsEverything(t *testing.T) {
+	sink := &rejectAllSink{}
+	w := startedSender(t, sink)
+	w.track(cmGVR, "ConfigMap")
+	cms := w.newObjectStore(context.Background(), cmGVR)
+	for i := 0; i < 50; i++ {
+		require.NoError(t, cms.Add(configMap(fmt.Sprintf("cm-%d", i), fmt.Sprintf("uid-%d", i), "v")))
+		time.Sleep(2 * time.Millisecond)
+	}
+	time.Sleep(500 * time.Millisecond)
+	assert.LessOrEqual(t, int(sink.calls.Load()), 4, "at most two groups, each with its probe, before the first wait ends")
 }

@@ -3,6 +3,7 @@ package objects
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync/atomic"
 	"time"
 
@@ -28,6 +29,10 @@ const (
 	decorationBytes = 192
 	// groupBytes is the largest summed size of one group, under MaxPostBytes.
 	groupBytes = MaxPostBytes - envelopeReserve - 64<<10
+	// rejectsAllWaitInitial and rejectsAllWaitMax bound the sender's wait after the
+	// forwarder rejected a group and a heartbeat; the wait doubles while it keeps doing so.
+	rejectsAllWaitInitial = 5 * time.Second
+	rejectsAllWaitMax     = 5 * time.Minute
 	// warnsPerSecond and warnBurst rate-limit the per-object warning logs, so a forwarder
 	// outage on a large cluster does not flood the log.
 	warnsPerSecond = 1
@@ -59,8 +64,10 @@ type pendingVersion struct {
 // them with the kind's watch events; the network send happens here, outside every lock.
 type sender struct {
 	queue chan pendingSend
-	bytes *semaphore.Weighted
-	done  chan struct{}
+	// stopping is closed when stopSender begins.
+	stopping chan struct{}
+	bytes    *semaphore.Weighted
+	done     chan struct{}
 	// cancel ends the delivery of the queued sends, after drainTimeout once the queue is
 	// closed.
 	cancel context.CancelFunc
@@ -93,11 +100,12 @@ func (r *rateLimitedWarner) warn(entry *log.Entry, msg string) {
 func (w *Watcher) startSender() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &sender{
-		queue:  make(chan pendingSend, sendQueueItems),
-		bytes:  semaphore.NewWeighted(sendQueueBytes),
-		done:   make(chan struct{}),
-		cancel: cancel,
-		ctx:    ctx,
+		queue:    make(chan pendingSend, sendQueueItems),
+		stopping: make(chan struct{}),
+		bytes:    semaphore.NewWeighted(sendQueueBytes),
+		done:     make(chan struct{}),
+		cancel:   cancel,
+		ctx:      ctx,
 	}
 	w.sendMu.Lock()
 	w.sender = s
@@ -118,6 +126,7 @@ func (w *Watcher) stopSender() {
 	if s == nil {
 		return
 	}
+	close(s.stopping)
 	close(s.queue)
 	timer := time.AfterFunc(drainTimeout, s.cancel)
 	<-s.done
@@ -161,52 +170,98 @@ func (w *Watcher) submit(ctx context.Context, item pendingSend) error {
 // carries many objects.
 func (w *Watcher) runSender(s *sender) {
 	var next *pendingSend
+	rejectWait := rejectsAllWaitInitial
 	for {
-		var first pendingSend
-		if next != nil {
-			first, next = *next, nil
-		} else {
-			item, ok := <-s.queue
-			if !ok {
-				return
-			}
-			first = item
+		group, ok := s.nextGroup(&next)
+		if !ok {
+			return
 		}
-		group := []pendingSend{first}
-		records, size := len(first.recs), first.size
-	fill:
-		for records < MaxEventsPerPost {
-			select {
-			case item, ok := <-s.queue:
-				if !ok {
-					break fill
-				}
-				if records+len(item.recs) > MaxEventsPerPost || size+item.size > groupBytes {
-					next = &item
-					break fill
-				}
-				group = append(group, item)
-				records += len(item.recs)
-				size += item.size
-			default:
-				break fill
-			}
-		}
-		_ = w.deliver(s.ctx, group)
+		err := w.deliver(s.ctx, group)
 		for _, item := range group {
 			s.bytes.Release(min(int64(item.size), sendQueueBytes))
+		}
+		// A forwarder that rejects everything is not asked again at once.
+		if errors.Is(err, errForwarderRejectsAll) {
+			s.wait(jittered(rejectWait))
+			rejectWait = min(backoffFactor*rejectWait, rejectsAllWaitMax)
+		} else if err == nil {
+			rejectWait = rejectsAllWaitInitial
 		}
 	}
 }
 
-// deliver sends the records of group in one call and applies the result to each send. A
-// group the forwarder rejects for its content is split in halves and each half sent again,
-// so one object that is always rejected costs about log2(len(group)) extra sends, and the
-// others in its group are delivered. That one object is dropped: counted in
-// records_rejected_total, logged, and stored as sent, so it is not sent again until it
-// changes. Any other failure marks every send of the group unsynced, for the retry pass. It
+// nextGroup returns the next group: *next, or the next queued send, followed by the sends
+// already queued, up to MaxEventsPerPost records and groupBytes. A send that does not fit
+// is left in *next. It returns false once the queue is closed and empty.
+func (s *sender) nextGroup(next **pendingSend) ([]pendingSend, bool) {
+	var first pendingSend
+	if *next != nil {
+		first, *next = **next, nil
+	} else {
+		item, ok := <-s.queue
+		if !ok {
+			return nil, false
+		}
+		first = item
+	}
+	group := []pendingSend{first}
+	records, size := len(first.recs), first.size
+	for records < MaxEventsPerPost {
+		select {
+		case item, ok := <-s.queue:
+			if !ok {
+				return group, true
+			}
+			if records+len(item.recs) > MaxEventsPerPost || size+item.size > groupBytes {
+				*next = &item
+				return group, true
+			}
+			group = append(group, item)
+			records += len(item.recs)
+			size += item.size
+		default:
+			return group, true
+		}
+	}
+	return group, true
+}
+
+// wait waits for d, or less when the sender is stopping, so a stop drains the queue left at
+// once.
+func (s *sender) wait(d time.Duration) {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+	case <-s.stopping:
+	case <-s.ctx.Done():
+	}
+}
+
+// errForwarderRejectsAll reports that the forwarder rejected a known-good heartbeat too,
+// so a rejection says nothing about the objects: the endpoint or the forwarder is wrong.
+var errForwarderRejectsAll = errors.New("the forwarder rejects every request")
+
+// deliver sends the records of group in one call and applies the result to each send.
+//
+// When the forwarder rejects the group for its content, deliver first sends a heartbeat,
+// whose content is known to be valid. If that is rejected too, the forwarder rejects
+// everything (a wrong endpoint path, a forwarder without /v1/data, an auth change): every
+// send of the group is marked unsynced, nothing is stored as sent, forwarder_rejects_all
+// counts it, and deliver returns errForwarderRejectsAll so the sender backs off. If the
+// heartbeat is accepted, the group is split in halves and each half sent again, so one
+// object that is always rejected costs about log2(len(group)) extra sends, and the others
+// in its group are delivered. That one object is dropped: counted in records_rejected_total,
+// logged, and stored as sent, so it is not sent again until it changes.
+//
+// Any other failure marks every send of the group unsynced, for the retry pass. deliver
 // returns the error of a group of one.
 func (w *Watcher) deliver(ctx context.Context, group []pendingSend) error {
+	return w.deliverGroup(ctx, group, false)
+}
+
+// deliverGroup is deliver; probed is set once the forwarder accepted the heartbeat probe.
+func (w *Watcher) deliverGroup(ctx context.Context, group []pendingSend, probed bool) error {
 	var recs []Record
 	for _, item := range group {
 		recs = append(recs, item.recs...)
@@ -220,10 +275,16 @@ func (w *Watcher) deliver(ctx context.Context, group []pendingSend) error {
 			w.delivered(item)
 		}
 		return nil
+	case errors.Is(err, ErrRejected) && !probed:
+		if probeErr := w.probeForwarder(ctx); probeErr != nil {
+			err = probeErr
+			break
+		}
+		return w.deliverGroup(ctx, group, true)
 	case errors.Is(err, ErrRejected) && len(group) > 1:
 		mid := len(group) / 2
-		first := w.deliver(ctx, group[:mid])
-		return errors.Join(first, w.deliver(ctx, group[mid:]))
+		first := w.deliverGroup(ctx, group[:mid], true)
+		return errors.Join(first, w.deliverGroup(ctx, group[mid:], true))
 	case errors.Is(err, ErrRejected):
 		item := group[0]
 		metricRecordsRejected.Add(float64(len(item.recs)))
@@ -237,8 +298,27 @@ func (w *Watcher) deliver(ctx context.Context, group []pendingSend) error {
 		w.markUnsynced(ctx, item.uid, unsyncedObject{entry: item.entry, op: item.op, observedAt: item.observedAt})
 		w.clearPending(item)
 	}
-	if !canceled(ctx) {
-		w.warner.warn(log.WithError(err).WithField("objects", len(group)), "objects: sending to the forwarder failed; the objects are retried on the flush tick")
+	if canceled(ctx) {
+		return err
+	}
+	if errors.Is(err, errForwarderRejectsAll) {
+		metricForwarderRejectsAll.Inc()
+		w.warner.warn(log.WithError(err).WithFields(log.Fields{"objects": len(group), "endpoint": "agentEndpoint"}),
+			"objects: the forwarder rejects every request, a heartbeat included; check the forwarder sidecar and objectState.agentEndpoint. The objects are retried")
+		return err
+	}
+	w.warner.warn(log.WithError(err).WithField("objects", len(group)), "objects: sending to the forwarder failed; the objects are retried on the flush tick")
+	return err
+}
+
+// probeForwarder sends one running heartbeat. It returns nil when the forwarder accepts it,
+// errForwarderRejectsAll when the forwarder rejects it, and the send's error otherwise.
+func (w *Watcher) probeForwarder(ctx context.Context) error {
+	probeCtx, cancel := context.WithTimeout(ctx, heartbeatSendTimeout)
+	defer cancel()
+	err := w.sink.Send(probeCtx, []Record{w.HeartbeatRecord(w.now())})
+	if errors.Is(err, ErrRejected) {
+		return fmt.Errorf("%w: %w", errForwarderRejectsAll, err)
 	}
 	return err
 }

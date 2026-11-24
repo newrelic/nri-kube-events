@@ -56,6 +56,10 @@ var (
 		Name: metricsPrefix + "records_rejected_total",
 		Help: "Records dropped because the infrastructure agent forwarder rejected them with a 4xx status other than 408 or 429. Their object is not sent again until it changes.",
 	})
+	metricForwarderRejectsAll = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: metricsPrefix + "forwarder_rejects_all_total",
+		Help: "Groups the infrastructure agent forwarder rejected along with a known-good heartbeat: the forwarder or objectState.agentEndpoint is wrong. The objects are kept unsynced and retried.",
+	})
 	metricResends = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: metricsPrefix + "resends_total",
 		Help: "Unchanged objects re-sent because their last send was older than resendAfter.",
@@ -89,6 +93,7 @@ func objectsCollectors() []prometheus.Collector {
 		metricCarrierFailures,
 		metricResends,
 		metricRecordsRejected,
+		metricForwarderRejectsAll,
 	}
 }
 
