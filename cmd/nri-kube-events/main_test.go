@@ -245,21 +245,17 @@ func TestStartObjectStateFailuresDoNotStopTheProcess(t *testing.T) {
 	assert.False(t, exited.Load())
 }
 
-// With the carrier off, nothing starts and no nri_kube_events_objects_ family is registered,
-// in the default registry or in the one the carrier would use.
-func TestDisabledObjectStateRegistersNoMetrics(t *testing.T) {
+// No nri_kube_events_objects_ family is registered until startObjectState runs, in the
+// default registry or in the one the carrier uses. startObjectState registers them even
+// when its config is invalid and it starts nothing.
+func TestObjectStateMetricsRegisterOnlyWhenStarted(t *testing.T) {
 	r := freshObjectStateRegistry(t)
 	stop := make(chan struct{})
 	defer close(stop)
-	wg := &sync.WaitGroup{}
-	startObjectStateIfEnabled(ObjectStateConfig{ClusterName: "c", Namespace: "ns"}, nil, stop, wg)
-	wg.Wait()
 	assert.Empty(t, objectsFamilies(t, r))
 	assert.Empty(t, objectsFamilies(t, prometheus.DefaultGatherer))
 
-	// The same call with the carrier on registers the families there, even though its
-	// config is invalid and it starts nothing.
-	startObjectStateIfEnabled(ObjectStateConfig{Enabled: true}, nil, stop, wg)
+	startObjectState(ObjectStateConfig{Enabled: true}, nil, stop, &sync.WaitGroup{})
 	assert.Contains(t, objectsFamilies(t, r), "nri_kube_events_objects_carrier_failures_total")
 }
 
@@ -310,25 +306,4 @@ func TestFailedCarrierCoversNothing(t *testing.T) {
 	assert.False(t, coverage.Covers(schema.GroupResource{Resource: "pods"}))
 	close(stop)
 	wg.Wait()
-}
-
-// runReporting sends the failed heartbeat only when run returns while ctx is live.
-func TestRunReportingSendsFailedOnlyWhenRunEndsOnItsOwn(t *testing.T) {
-	var states []string
-	final := func(s string) { states = append(states, s) }
-	runErr := errors.New("watcher ended")
-
-	err := runReporting(context.Background(), func(context.Context) error { return runErr }, final)
-	assert.ErrorIs(t, err, runErr)
-	assert.Equal(t, []string{objects.CarrierStateFailed}, states)
-
-	states = nil
-	ctx, cancel := context.WithCancel(context.Background())
-	err = runReporting(ctx, func(ctx context.Context) error {
-		cancel()
-		<-ctx.Done()
-		return nil
-	}, final)
-	assert.NoError(t, err)
-	assert.Empty(t, states, "after a cancel the watcher sent its own stopped heartbeat")
 }

@@ -42,13 +42,12 @@ const (
 	// that does not answer delays the stop by at most this long.
 	finalHeartbeatTimeout = 5 * time.Second
 
-	// CarrierStateRunning, CarrierStateStopped and CarrierStateFailed are the heartbeat's
-	// carrier.state. Every heartbeat of a running watcher says running. The last heartbeat
-	// of a run says stopped when the run's context was canceled (the account flag turned
-	// off, or the process is shutting down), and failed when the run ended on its own.
+	// CarrierStateRunning and CarrierStateStopped are the heartbeat's carrier.state. Every
+	// heartbeat of a running watcher says running. The last heartbeat of a run says
+	// stopped; a run ends only when its context is canceled, because the account flag
+	// turned off or the process is shutting down.
 	CarrierStateRunning = "running"
 	CarrierStateStopped = "stopped"
-	CarrierStateFailed  = "failed"
 
 	crdGroup    = "apiextensions.k8s.io"
 	crdResource = "customresourcedefinitions"
@@ -136,7 +135,7 @@ type Watcher struct {
 	cfg Config
 	// getTimeout bounds the GET of one resend or retry; NewWatcher sets objectGetTimeout.
 	getTimeout time.Duration
-	// finalTimeout bounds SendFinalHeartbeat; NewWatcher sets finalHeartbeatTimeout.
+	// finalTimeout bounds sendStoppedHeartbeat; NewWatcher sets finalHeartbeatTimeout.
 	finalTimeout time.Duration
 
 	mu          sync.Mutex
@@ -261,7 +260,7 @@ func (w *Watcher) shutdown() error {
 	w.mu.Unlock()
 	w.reflectors.Wait()
 	w.background.Wait()
-	w.SendFinalHeartbeat(CarrierStateStopped)
+	w.sendStoppedHeartbeat()
 
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownFlushTimeout)
 	defer cancel()
@@ -926,12 +925,13 @@ func (w *Watcher) sendHeartbeat(ctx context.Context) {
 	}
 }
 
-// SendFinalHeartbeat sends the last heartbeat of a run, with carrier.state set to state and
-// carrier.stoppedAt to now. It runs within its own finalHeartbeatTimeout, never within the
+// sendStoppedHeartbeat sends the last heartbeat of a run, with carrier.state set to
+// CarrierStateStopped and carrier.stoppedAt to now. It runs within its own finalHeartbeatTimeout, never within the
 // run's context, which is already canceled. A failed send is logged and counted in
 // failedSends and nri_kube_events_objects_send_failures_total, and returns; it never
 // blocks the stop past the timeout.
-func (w *Watcher) SendFinalHeartbeat(state string) {
+func (w *Watcher) sendStoppedHeartbeat() {
+	state := CarrierStateStopped
 	ctx, cancel := context.WithTimeout(context.Background(), w.finalTimeout)
 	defer cancel()
 	now := w.now()

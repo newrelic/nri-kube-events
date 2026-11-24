@@ -130,14 +130,14 @@ func TestFailedFinalHeartbeatIsCountedAndDoesNotBlockTheStop(t *testing.T) {
 	assert.Equal(t, failedBefore+1, w.HeartbeatRecord(time.Now()).Attributes["failedSends"])
 }
 
-func TestSendFinalHeartbeatFailedState(t *testing.T) {
+func TestStoppedHeartbeatShape(t *testing.T) {
 	w, _, _, sink := newTestWatcher(t, testConfig(), nil)
 	at := time.Unix(1700000000, 0)
 	w.now = func() time.Time { return at }
-	w.SendFinalHeartbeat(CarrierStateFailed)
+	w.sendStoppedHeartbeat()
 	hbs := heartbeats(sink.records())
 	require.Len(t, hbs, 1)
-	assert.Equal(t, CarrierStateFailed, hbs[0].Attributes["carrier.state"])
+	assert.Equal(t, CarrierStateStopped, hbs[0].Attributes["carrier.state"])
 	assert.Equal(t, at.UnixMilli(), hbs[0].Attributes["carrier.stoppedAt"])
 	assert.Equal(t, at.Unix(), hbs[0].Attributes["timestamp"])
 }

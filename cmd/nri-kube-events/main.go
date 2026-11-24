@@ -138,7 +138,10 @@ func main() {
 
 	// The carrier starts after the Kubernetes Events and describe paths, and never blocks
 	// or stops them.
-	startObjectStateIfEnabled(cfg.ObjectState, coverage, stopChan, wg)
+	// With the carrier off nothing starts and no objects metric is registered.
+	if cfg.ObjectState.Enabled {
+		startObjectState(cfg.ObjectState, coverage, stopChan, wg)
+	}
 
 	// After the stop signal, main waits for every path to return; upstream exited with
 	// status 1 as soon as the Prometheus server shut down. The wait lets the carrier flush
@@ -205,15 +208,6 @@ func describeCoverage(captureDescribe bool, oc ObjectStateConfig) *objects.Cover
 		return nil
 	}
 	return objects.NewCoverage()
-}
-
-// startObjectStateIfEnabled starts the object-state carrier when oc enables it. With the
-// carrier off it starts nothing and registers no metric. A non-nil coverage receives the
-// resources the carrier collects.
-func startObjectStateIfEnabled(oc ObjectStateConfig, coverage *objects.Coverage, stopChan <-chan struct{}, wg *sync.WaitGroup) {
-	if oc.Enabled {
-		startObjectState(oc, coverage, stopChan, wg)
-	}
 }
 
 // startObjectState starts the object-state carrier in its own goroutine and returns at once.
@@ -384,8 +378,7 @@ func newObjectCarrier(ctx context.Context, oc ObjectStateConfig, coverage *objec
 func (c *objectCarrier) run(ctx context.Context) error {
 	// A Watcher runs once, so every run builds a new one over the same store.
 	runWatcher := func(ctx context.Context) error {
-		w := objects.NewWatcher(c.watcherConfig, c.dynamicClient, c.discoveryClient, c.store, c.sink, c.hmacKey)
-		return runReporting(ctx, w.Run, w.SendFinalHeartbeat)
+		return objects.NewWatcher(c.watcherConfig, c.dynamicClient, c.discoveryClient, c.store, c.sink, c.hmacKey).Run(ctx)
 	}
 	pollCtx, stopPoll := context.WithCancel(ctx)
 	polled := make(chan struct{})
@@ -396,19 +389,6 @@ func (c *objectCarrier) run(ctx context.Context) error {
 	err := objects.RunGated(ctx, c.poller, runWatcher)
 	stopPoll()
 	<-polled
-	return err
-}
-
-// runReporting calls run, and when run returns while ctx is live calls final with
-// objects.CarrierStateFailed. A watcher's Run that returns while its context is live has
-// failed, and its shutdown, which sends the stopped heartbeat, did not run. Run has no such
-// return today, so this guards a future one. After a canceled ctx the watcher has already
-// sent its stopped heartbeat, so runReporting sends nothing.
-func runReporting(ctx context.Context, run func(context.Context) error, final func(state string)) error {
-	err := run(ctx)
-	if ctx.Err() == nil {
-		final(objects.CarrierStateFailed)
-	}
 	return err
 }
 
