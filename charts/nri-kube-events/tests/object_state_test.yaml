@@ -273,3 +273,43 @@ tests:
           path: rules
           count: 3
         template: templates/clusterrole.yaml
+
+  - it: sets a memory request and limit when resources are unset
+    set:
+      licenseKey: us-whatever
+      cluster: a-cluster
+      objectState.enabled: true
+    template: templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources
+          value:
+            requests:
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+
+  - it: resources win over the object state memory default
+    set:
+      licenseKey: us-whatever
+      cluster: a-cluster
+      objectState.enabled: true
+      resources:
+        limits:
+          memory: 3Gi
+    template: templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources
+          value:
+            limits:
+              memory: 3Gi
+
+  - it: sets no memory default with object state off
+    set:
+      licenseKey: us-whatever
+      cluster: a-cluster
+    template: templates/deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].resources

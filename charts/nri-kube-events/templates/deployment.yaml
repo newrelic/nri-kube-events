@@ -51,6 +51,13 @@ spec:
           {{- if .Values.resources }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          {{- else if (.Values.objectState).enabled }}
+          {{- /* Object state bounds its own memory; see the objectState comment in values.yaml */}}
+          resources:
+            requests:
+              memory: 256Mi
+            limits:
+              memory: 1Gi
           {{- end }}
           args: ["-config", "/app/config/config.yaml", "-loglevel", "debug"]
           {{- if (.Values.objectState).enabled }}

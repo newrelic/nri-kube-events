@@ -17,8 +17,8 @@ import (
 // store, and a first send's LastSent falls in one of resendSpread slots of resendAfter.
 const resendSpread = 1440
 
-// objectGetTimeout bounds the GET of one resend or retry. Both hold the kind's reflector
-// store lock across the GET, so a GET that hangs would stall the kind's watch and every later
+// objectGetTimeout bounds the GET of one resend or retry. Both hold the kind's store lock
+// across the GET, so a GET that hangs would stall the kind's watch and every later
 // scan or retry pass.
 const objectGetTimeout = 30 * time.Second
 
@@ -164,9 +164,9 @@ func (w *Watcher) startResend(ctx context.Context) {
 
 // resendOne sends uid again as OpResync from the object as the apiserver serves it now. When
 // the apiserver no longer serves it, or serves a new object of the same name, it sends a
-// tombstone for uid. Like retryOne, it holds the reflector store lock of the object's kind
-// across its GET and its send, so a watch event that lands in between cannot be overwritten
-// by the older version the resend fetched. A watch event handled since the scan picked uid
+// tombstone for uid. Like retryOne, it holds the store lock of the object's kind across
+// its GET and until its send is queued, so a watch event that lands in between is queued
+// after it and cannot be overwritten by the older version the resend fetched. A watch event handled since the scan picked uid
 // has already sent the object, and then resendOne sends nothing. After a failed GET or send
 // the stored entry is unchanged, so the object stays due for the next scan.
 func (w *Watcher) resendOne(ctx context.Context, uid string) {
@@ -178,7 +178,7 @@ func (w *Watcher) resendOne(ctx context.Context, uid string) {
 	if err != nil {
 		return
 	}
-	s := w.reflectorStore(gvr)
+	s := w.kindStore(gvr)
 	if s == nil {
 		return
 	}

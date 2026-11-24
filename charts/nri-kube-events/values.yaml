@@ -115,8 +115,15 @@ objectState:
   #   alone changes some shard every minute, so expect up to about 0.3 GB a day written to etcd
   #   and about 0.6 GB a day if churn changes every shard on every flush. Every client that
   #   watches ConfigMaps cluster-wide receives each write.
-  # - Startup: the first list of every kind is held in memory at once. That peak is not
-  #   measured yet; set `resources.limits.memory` from the pod's observed peak.
+  # - Memory: the carrier lists at most 2 kinds at once, in pages of 100 objects (10 for
+  #   Secrets), and queues at most 32 MB of records, so its buffers stay under about 150 MB
+  #   whatever the cluster size. The hash store adds about 0.5 MB per 1,000 objects. The
+  #   describe scraper, which runs in the same container, caches every Pod, Node, Namespace,
+  #   Service, PersistentVolume(Claim), Deployment, DaemonSet, Job and CronJob, and that cache
+  #   grows with the cluster. These are estimates from the code, not measurements. With
+  #   object state enabled and `resources` unset, the chart requests 256Mi and limits the
+  #   container to 1Gi; on a large cluster, set `resources` from the pod's observed peak plus
+  #   the 150 MB the carrier can add during a list.
   #
   # The hash store ConfigMaps and the HMAC key Secret have fixed names, so enable object state
   # in at most one release per namespace.

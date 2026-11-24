@@ -190,7 +190,7 @@ func TestDueSkipsFreshAndUnwatchedEntries(t *testing.T) {
 	w, store, _ := newResendWatcher(t, 24*time.Hour)
 	now := time.Unix(1_700_000_000, 0)
 	old := now.Add(-48 * time.Hour).Unix()
-	// widgets have a reflector whose first list has not finished; secrets are not watched.
+	// widgets have a list-watch loop whose first list has not finished; secrets are not watched.
 	w.mu.Lock()
 	w.gvrs[widgetGVR] = &gvrState{kind: "Widget", cancel: func() {}, store: w.newObjectStore(context.Background(), widgetGVR)}
 	w.mu.Unlock()
@@ -372,7 +372,7 @@ func TestResendRechecksUnderKindLock(t *testing.T) {
 	w.now = func() time.Time { return now }
 	require.Equal(t, []string{"uid-a"}, w.dueForResend(now))
 
-	s := w.reflectorStore(cmGVR)
+	s := w.kindStore(cmGVR)
 	s.mu.Lock()
 	done := make(chan struct{})
 	go func() {
@@ -510,7 +510,7 @@ func TestResendGetTimesOut(t *testing.T) {
 	w.startResend(context.Background())
 	require.Eventually(t, func() bool { return !w.resendBusy.Load() }, 5*time.Second, 10*time.Millisecond, "the scan never ended")
 	w.background.Wait()
-	s := w.reflectorStore(cmGVR)
+	s := w.kindStore(cmGVR)
 	require.True(t, s.mu.TryLock(), "the kind's lock is still held")
 	s.mu.Unlock()
 	assert.Empty(t, sink.objectRecords())
@@ -536,7 +536,7 @@ func TestRetryGetTimesOut(t *testing.T) {
 	w.startRetry(ctx)
 	require.Eventually(t, func() bool { return !w.retryBusy.Load() }, 5*time.Second, 10*time.Millisecond, "the retry pass never ended")
 	w.background.Wait()
-	s := w.reflectorStore(cmGVR)
+	s := w.kindStore(cmGVR)
 	require.True(t, s.mu.TryLock(), "the kind's lock is still held")
 	s.mu.Unlock()
 	assert.Empty(t, sink.objectRecords())

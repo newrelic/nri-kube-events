@@ -16,12 +16,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/tools/cache"
 
 	"github.com/newrelic/nri-kube-events/pkg/accountflag"
 )
@@ -90,10 +87,10 @@ func (c Config) withDefaults() Config {
 
 // gvrState is the watcher's view of one watched kind.
 type gvrState struct {
-	// cancel stops the kind's reflector. It is nil for a kind tracked without one.
+	// cancel stops the kind's list-watch loop. It is nil for a kind tracked without one.
 	cancel context.CancelFunc
-	// store is the kind's reflector store. Its mu orders the kind's watch events, and a
-	// retry of one of the kind's objects takes it too. It is nil without a reflector.
+	// store receives the kind's list pages and watch events. Its mu orders them, and a
+	// retry of one of the kind's objects takes it too. It is nil without a list-watch loop.
 	store *objectStore
 	kind  string
 	// listed is set when the kind's first list reached the store.
@@ -104,9 +101,10 @@ type gvrState struct {
 	listFailing bool
 }
 
-// Watcher discovers every listable and watchable kind, watches each with a reflector, and
+// Watcher discovers every listable and watchable kind, lists and watches each, and
 // sends a record whenever an object's hash changes, a tombstone when an object goes, and a
-// heartbeat on a timer. The reflectors keep no objects; the Store keeps one Entry per uid.
+// heartbeat on a timer. It keeps no objects: a list is processed page by page, and the
+// Store keeps one Entry per uid.
 type Watcher struct {
 	dyn   dynamic.Interface
 	disc  discovery.DiscoveryInterface
@@ -116,6 +114,8 @@ type Watcher struct {
 
 	// rediscover asks Run for a discovery pass. It holds at most one pending request.
 	rediscover chan struct{}
+	// listSlots holds one token per kind being listed, at most listConcurrency.
+	listSlots chan struct{}
 	// afterRetryGet, when set, is called by a retry after it fetched an object and before
 	// it sends it. Tests use it to deliver a watch event at that point.
 	afterRetryGet func(uid string)
@@ -155,7 +155,7 @@ type Watcher struct {
 	// scanBudget.
 	catchUp int
 
-	// reflectors counts running reflector goroutines, so shutdown can wait for them.
+	// reflectors counts running list-watch loops, so shutdown can wait for them.
 	reflectors sync.WaitGroup
 	// background counts the heartbeat, retry and resend goroutines, so shutdown can wait for
 	// them.
@@ -197,6 +197,7 @@ func NewWatcher(cfg Config, dyn dynamic.Interface, disc discovery.DiscoveryInter
 		getTimeout:   objectGetTimeout,
 		finalTimeout: finalHeartbeatTimeout,
 		rediscover:   make(chan struct{}, 1),
+		listSlots:    make(chan struct{}, listConcurrency),
 		gvrs:         map[schema.GroupVersionResource]*gvrState{},
 		unsynced:     map[string]unsyncedObject{},
 		pending:      map[string]pendingVersion{},
@@ -255,7 +256,7 @@ func (w *Watcher) Run(ctx context.Context) error {
 	}
 }
 
-// shutdown clears the coverage, stops every watch, waits for the reflectors and the
+// shutdown clears the coverage, stops every watch, waits for the list-watch loops and the
 // background sends to return, sends the stopped heartbeat, and flushes the store. The
 // coverage is cleared first, so the describe path resumes while the watches still run, and
 // every change is sent by at least one of the two. The stopped heartbeat goes after every
@@ -383,40 +384,20 @@ func (w *Watcher) syncWatches(ctx context.Context) {
 	}
 }
 
-// startLocked starts the reflector of gvr. The caller holds w.mu.
+// startLocked starts the list-watch loop of gvr (runKind). The caller holds w.mu.
 func (w *Watcher) startLocked(ctx context.Context, gvr schema.GroupVersionResource, kind string) {
 	wctx, cancel := context.WithCancel(ctx)
 	store := w.newObjectStore(wctx, gvr)
 	w.gvrs[gvr] = &gvrState{kind: kind, cancel: cancel, store: store}
-	res := w.dyn.Resource(gvr)
-	lw := &cache.ListWatch{
-		ListWithContextFunc: func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {
-			list, err := res.List(ctx, opts)
-			if err != nil {
-				w.listFailed(gvr, err)
-				return nil, err
-			}
-			return list, nil
-		},
-		WatchFuncWithContext: func(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-			return res.Watch(ctx, opts)
-		},
-	}
-	r := cache.NewReflectorWithOptions(
-		cache.ToListWatcherWithWatchListSemantics(lw, w.dyn),
-		&unstructured.Unstructured{},
-		store,
-		cache.ReflectorOptions{Name: "objects " + GVRString(gvr)},
-	)
 	log.WithFields(log.Fields{"gvr": GVRString(gvr), "kind": kind}).Debug("objects: starting watch")
 	w.reflectors.Add(1)
 	go func() {
 		defer w.reflectors.Done()
-		r.RunWithContext(wctx)
+		w.runKind(wctx, gvr, store)
 	}()
 }
 
-// track records gvr as watched without starting a reflector.
+// track records gvr as watched without starting a list-watch loop.
 func (w *Watcher) track(gvr schema.GroupVersionResource, kind string) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -559,10 +540,11 @@ func (w *Watcher) startRetry(ctx context.Context) {
 // object is tombstoned. Each success removes the uid from the unsynced set.
 //
 // One pass retries at most maxRetryPerPass objects, oldest failure first. Each retry holds
-// the reflector store lock of the object's kind across its GET and its send, the same lock
-// that orders the kind's watch events. Without it, a watch event that lands between the
-// retry's GET and its send would be overwritten: a newer version by the older one the
-// retry fetched, or a delete by a live version that puts the uid back in the store.
+// the store lock of the object's kind across its GET and until its send is queued, the same
+// lock that orders the kind's watch events. The queue delivers in order, so a watch event
+// that lands after the GET is sent after the retry, and cannot be overwritten: a newer
+// version by the older one the retry fetched, or a delete by a live version that puts the
+// uid back in the store.
 func (w *Watcher) retryUnsynced(ctx context.Context) {
 	type pendingObject struct {
 		uid string
@@ -595,7 +577,7 @@ func (w *Watcher) retryUnsynced(ctx context.Context) {
 func (w *Watcher) retryOne(ctx context.Context, uid string, u unsyncedObject) {
 	gvr, gvrErr := ParseGVR(u.entry.GVR)
 	if gvrErr == nil {
-		if s := w.reflectorStore(gvr); s != nil {
+		if s := w.kindStore(gvr); s != nil {
 			s.mu.Lock()
 			defer s.mu.Unlock()
 		}
@@ -641,7 +623,7 @@ func (w *Watcher) retryOne(ctx context.Context, uid string, u unsyncedObject) {
 	}
 }
 
-// isListed reports whether gvr has a reflector whose first list succeeded.
+// isListed reports whether gvr has a list-watch loop whose first list succeeded.
 func (w *Watcher) isListed(gvr schema.GroupVersionResource) bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -649,8 +631,8 @@ func (w *Watcher) isListed(gvr schema.GroupVersionResource) bool {
 	return ok && st.cancel != nil && st.listed
 }
 
-// reflectorStore returns the reflector store of gvr, or nil when gvr has no reflector.
-func (w *Watcher) reflectorStore(gvr schema.GroupVersionResource) *objectStore {
+// kindStore returns the store of gvr's list-watch loop, or nil when gvr has none.
+func (w *Watcher) kindStore(gvr schema.GroupVersionResource) *objectStore {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	st, ok := w.gvrs[gvr]
@@ -967,13 +949,11 @@ func (w *Watcher) sendStoppedHeartbeat() {
 // carrier.kinds.pNNN parts, every watched kind whose list has succeeded, with the count of
 // its objects in the store; a kind with no objects is listed with 0. A core kind has no
 // group suffix, so Pod is "Pod" and Cluster-API's Cluster is "Cluster.cluster.x-k8s.io"
-// (see qualifiedKind); two groups that serve the same Kind name stay apart. carrier.failedKinds lists, sorted and comma-separated, the GVRs whose
-// most recent list failed; capList drops whole GVRs from the end to keep it within one
-// attribute. A kind whose first list never arrives can be missing from it: when the
-// reflector uses the watch-list stream, client-go retries a 429 or a refused connection
-// inside the stream and never calls the list function that marks the failure. A reader
-// should treat a watched kind that is in neither carrier.kinds nor carrier.failedKinds as
-// not collected. carrier.state is CarrierStateRunning and carrier.stoppedAt is 0.
+// (see qualifiedKind); two groups that serve the same Kind name stay apart.
+// carrier.failedKinds lists, sorted and comma-separated, the GVRs whose most recent list
+// failed; capList drops whole GVRs from the end to keep it within one attribute. A kind
+// whose first list is still running is in neither, and a reader should treat it as not
+// collected yet. carrier.state is CarrierStateRunning and carrier.stoppedAt is 0.
 // timestamp is Unix seconds. The other times are Unix milliseconds, 0 before they happen.
 func (w *Watcher) HeartbeatRecord(now time.Time) Record {
 	return w.heartbeatRecord(now, CarrierStateRunning, time.Time{})
@@ -1082,7 +1062,7 @@ func unixMilli(t time.Time) int64 {
 	return t.UnixMilli()
 }
 
-// objectStore is the reflector's store for one kind. It keeps no objects: every call goes
+// objectStore receives the list pages and watch events of one kind. It keeps no objects: every call goes
 // to the Watcher, which compares hashes with the hash store.
 type objectStore struct {
 	w   *Watcher
@@ -1093,8 +1073,6 @@ type objectStore struct {
 	// replaced is set after the kind's first list reached Replace.
 	replaced bool
 }
-
-var _ cache.Store = (*objectStore)(nil)
 
 func (w *Watcher) newObjectStore(ctx context.Context, gvr schema.GroupVersionResource) *objectStore {
 	return &objectStore{w: w, ctx: ctx, gvr: gvr}
@@ -1138,18 +1116,10 @@ func (s *objectStore) Update(obj any) error {
 	return nil
 }
 
-// Delete handles a watch DELETED event. A DeletedFinalStateUnknown without an object is
-// tombstoned from the stored identity of its namespace/name.
+// Delete handles a watch DELETED event.
 func (s *objectStore) Delete(obj any) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if d, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-		if d.Obj == nil {
-			s.tombstoneKey(d.Key)
-			return nil
-		}
-		obj = d.Obj
-	}
 	s.handle(OpDeleted, obj)
 	if u, ok := obj.(*unstructured.Unstructured); ok && isCRDResource(s.gvr) {
 		group, plural := crdTarget(u.Object)
@@ -1159,91 +1129,69 @@ func (s *objectStore) Delete(obj any) error {
 	return nil
 }
 
-func (s *objectStore) tombstoneKey(key string) {
-	namespace, name, err := cache.SplitMetaNamespaceKey(key)
-	if err != nil {
-		log.WithError(err).WithField("gvr", GVRString(s.gvr)).Warn("objects: unparseable delete key")
-		return
-	}
-	if s.w.isOwnStoreName(s.gvr, namespace, name) {
-		return
-	}
-	gvrString := GVRString(s.gvr)
-	entries := s.w.store.entriesWhere(func(e Entry) bool {
-		return e.GVR == gvrString && e.Namespace == namespace && e.Name == name
-	})
-	now := s.w.now()
-	for uid, e := range entries {
-		s.w.sendTombstone(s.ctx, uid, e, now)
-	}
+// listing is the state of one list of a kind while its pages arrive.
+type listing struct {
+	// listed holds the uids of the list; the carrier's own hash-store objects are left out,
+	// since they are never stored and Missing never names them.
+	listed map[string]struct{}
+	// names holds the names of the listed objects, kept only for the CRD kind.
+	names map[string]struct{}
+	first bool
 }
 
-// Replace handles a full list: the first one as OpInitial, later relists as OpAdded for
-// unknown uids and OpUpdated for known ones, so unchanged objects send nothing. Then every
-// stored uid of this kind that the list lacks gets a tombstone. A list that failed never
-// reaches Replace, so a kind that cannot be listed sends no deletes.
-func (s *objectStore) Replace(items []any, _ string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	// The carrier's own hash-store objects are left out of listed; they are never stored,
-	// so Missing never names them either.
-	listed := make(map[string]struct{}, len(items))
-	for _, item := range items {
-		if u, ok := item.(*unstructured.Unstructured); ok && !IsOwnStoreObject(s.w.cfg.Namespace, s.gvr, u.Object) {
-			listed[string(u.GetUID())] = struct{}{}
+// beginList starts a list of the kind. The caller holds s.mu until finishList.
+func (s *objectStore) beginList() *listing {
+	return &listing{listed: map[string]struct{}{}, names: map[string]struct{}{}, first: !s.replaced}
+}
+
+// listItem handles one listed object: as OpInitial in the kind's first list, and in a
+// later list as OpAdded for an unknown uid and OpUpdated for a known one, so an unchanged
+// object sends nothing. The caller holds s.mu.
+func (s *objectStore) listItem(l *listing, u *unstructured.Unstructured) {
+	uid := string(u.GetUID())
+	if !IsOwnStoreObject(s.w.cfg.Namespace, s.gvr, u.Object) {
+		l.listed[uid] = struct{}{}
+	}
+	if isCRDResource(s.gvr) {
+		l.names[u.GetName()] = struct{}{}
+	}
+	op := OpInitial
+	if !l.first {
+		op = OpAdded
+		if _, known := s.w.store.Get(uid); known {
+			op = OpUpdated
 		}
 	}
-	first := !s.replaced
-	for _, item := range items {
-		if s.ctx.Err() != nil {
-			return s.ctx.Err()
-		}
-		op := OpInitial
-		if !first {
-			op = OpAdded
-			if u, ok := item.(*unstructured.Unstructured); ok {
-				if _, known := s.w.store.Get(string(u.GetUID())); known {
-					op = OpUpdated
-				}
-			}
-		}
-		s.handle(op, item)
-	}
-	if s.ctx.Err() != nil {
-		return s.ctx.Err()
-	}
-	s.tombstoneMissing(items, listed)
+	s.handle(op, u)
+}
+
+// finishList ends a list that delivered every page: every stored uid of the kind that the
+// list lacks gets a tombstone, and the kind counts as listed. A list that failed never gets
+// here, so a kind that cannot be listed sends no deletes. The caller holds s.mu.
+func (s *objectStore) finishList(l *listing) {
+	s.tombstoneMissing(l)
 	s.replaced = true
 	s.w.markListed(s.gvr)
-	return nil
 }
 
-// tombstoneMissing sends a tombstone for every stored uid of the kind that a full list of
-// items lacks; listed holds the uids the list has. Every such object went while unobserved,
-// so the list is when the carrier observes the deletion. The caller holds s.mu.
-func (s *objectStore) tombstoneMissing(items []any, listed map[string]struct{}) {
+// tombstoneMissing sends a tombstone for every stored uid of the kind that the list l
+// lacks. Every such object went while unobserved, so the list is when the carrier observes
+// the deletion. The caller holds s.mu.
+func (s *objectStore) tombstoneMissing(l *listing) {
 	// A CRD deleted and recreated while the carrier was down is missing by uid but present
 	// by name. The recreated CRD serves the same group and plural, so the kind's own list
 	// tombstones its missing objects; forgetting them here would also tombstone the live
 	// objects the kind's watch has already stored.
-	listedNames := map[string]struct{}{}
-	if isCRDResource(s.gvr) {
-		for _, item := range items {
-			if u, ok := item.(*unstructured.Unstructured); ok {
-				listedNames[u.GetName()] = struct{}{}
-			}
-		}
-	}
 	gvrString := GVRString(s.gvr)
 	reconciled := s.w.now()
-	for _, uid := range s.w.store.Missing(gvrString, listed, true) {
+	for _, uid := range s.w.store.Missing(gvrString, l.listed, true) {
 		e, ok := s.w.store.Get(uid)
 		if !ok {
 			continue
 		}
 		s.w.sendTombstone(s.ctx, uid, e, reconciled)
 		if isCRDResource(s.gvr) {
-			if _, recreated := listedNames[e.Name]; recreated {
+			if _, recreated := l.names[e.Name]; recreated {
 				continue
 			}
 			group, plural := crdTargetFromName(e.Name)
@@ -1252,11 +1200,22 @@ func (s *objectStore) tombstoneMissing(items []any, listed map[string]struct{}) 
 	}
 }
 
-// The reflector reads nothing back from its store.
-func (s *objectStore) List() []any                                { return nil }
-func (s *objectStore) ListKeys() []string                         { return nil }
-func (s *objectStore) Get(any) (item any, exists bool, err error) { return nil, false, nil }
-func (s *objectStore) GetByKey(string) (any, bool, error)         { return nil, false, nil }
-func (s *objectStore) LastStoreSyncResourceVersion() string       { return "" }
-func (s *objectStore) Bookmark(string)                            {}
-func (s *objectStore) Resync() error                              { return nil }
+// Replace handles items as one complete list of the kind, as listKind does page by page.
+func (s *objectStore) Replace(items []any, _ string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	l := s.beginList()
+	for _, item := range items {
+		if s.ctx.Err() != nil {
+			return s.ctx.Err()
+		}
+		if u, ok := item.(*unstructured.Unstructured); ok {
+			s.listItem(l, u)
+		}
+	}
+	if s.ctx.Err() != nil {
+		return s.ctx.Err()
+	}
+	s.finishList(l)
+	return nil
+}

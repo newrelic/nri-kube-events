@@ -23,7 +23,6 @@ import (
 	discoveryfake "k8s.io/client-go/discovery/fake"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	k8stesting "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/cache"
 )
 
 const (
@@ -257,7 +256,7 @@ func runWatcher(t *testing.T, w *Watcher) func() error {
 }
 
 // waitForWatch waits until the fake dynamic client has seen a watch on gvr, so objects
-// created afterwards reach the reflector as watch events.
+// created afterwards reach the list-watch loop as watch events.
 func waitForWatch(t *testing.T, dyn *dynamicfake.FakeDynamicClient, gvr schema.GroupVersionResource) {
 	t.Helper()
 	require.Eventually(t, func() bool {
@@ -372,9 +371,9 @@ func TestDeleteSendsTombstoneAndForgets(t *testing.T) {
 	_, ok := store.Get("uid-a")
 	assert.False(t, ok)
 
-	// A final state the reflector lost carries no object: the stored identity names it.
+	// A relist that lacks an object tombstones it from its stored identity.
 	sink.reset()
-	require.NoError(t, s.Delete(cache.DeletedFinalStateUnknown{Key: "default/b"}))
+	require.NoError(t, s.Replace(nil, "2"))
 	recs = sink.records()
 	require.Len(t, recs, 1)
 	assert.Equal(t, "deleted", recs[0].Attributes["k8s.op"])
@@ -901,9 +900,6 @@ func TestOwnStoreObjectsSendNothingAndStoreNothing(t *testing.T) {
 			require.NoError(t, s.Add(o))
 			require.NoError(t, s.Update(changedData(o)))
 			require.NoError(t, s.Delete(o))
-			key := o.GetNamespace() + "/" + o.GetName()
-			require.NoError(t, s.Delete(cache.DeletedFinalStateUnknown{Key: key, Obj: o}))
-			require.NoError(t, s.Delete(cache.DeletedFinalStateUnknown{Key: key}))
 		}
 		// A relist that no longer holds the objects sends no tombstone.
 		require.NoError(t, s.Replace(nil, "4"))
@@ -1119,7 +1115,7 @@ func TestFailedTombstoneRetriedAsTombstone(t *testing.T) {
 	// A failed tombstone sent from the stored identity is retried the same way.
 	require.NoError(t, s.Replace([]any{configMap("b", "uid-b", "v1")}, "2"))
 	sink.setFail(true)
-	require.NoError(t, s.Delete(cache.DeletedFinalStateUnknown{Key: "default/b"}))
+	require.NoError(t, s.Replace(nil, "3"))
 	assert.Equal(t, 1, unsyncedObjects(w))
 	sink.setFail(false)
 	sink.reset()
@@ -1431,7 +1427,7 @@ func TestWatchDeleteTombstoneTimestamp(t *testing.T) {
 
 	w.now = func() time.Time { return deleted }
 	require.NoError(t, s.Delete(configMap("a", "uid-a", "v1")))
-	require.NoError(t, s.Delete(cache.DeletedFinalStateUnknown{Key: "default/b"}))
+	require.NoError(t, s.Delete(configMap("b", "uid-b", "v1")))
 	recs := sink.objectRecords()
 	require.Equal(t, []string{"deleted:uid-a", "deleted:uid-b"}, ops(recs))
 	for _, r := range recs {
@@ -1453,7 +1449,8 @@ func TestRetriedTombstoneKeepsObservedTime(t *testing.T) {
 			w.now = func() time.Time { return observed }
 			sink.setFail(true)
 			if lostState {
-				require.NoError(t, s.Delete(cache.DeletedFinalStateUnknown{Key: "default/a"}))
+				// A relist that lacks the object observes the deletion.
+				require.NoError(t, s.Replace(nil, "2"))
 			} else {
 				require.NoError(t, s.Delete(cm))
 			}
