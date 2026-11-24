@@ -95,10 +95,10 @@ func (c Config) withDefaults() Config {
 
 // gvrState is the watcher's view of one watched kind.
 type gvrState struct {
-	// cancel stops the kind's list-watch loop. It is nil for a kind tracked without one.
+	// cancel stops the kind's list-watch loop.
 	cancel context.CancelFunc
 	// store receives the kind's list pages and watch events. Its mu orders them, and a
-	// retry of one of the kind's objects takes it too. It is nil without a list-watch loop.
+	// retry of one of the kind's objects takes it too.
 	store *objectStore
 	kind  string
 	// listed is set when the kind's first list reached the store.
@@ -274,9 +274,7 @@ func (w *Watcher) shutdown() error {
 	w.stopped = true
 	w.cfg.Coverage.clear()
 	for _, st := range w.gvrs {
-		if st.cancel != nil {
-			st.cancel()
-		}
+		st.cancel()
 	}
 	w.mu.Unlock()
 	w.reflectors.Wait()
@@ -378,9 +376,7 @@ func (w *Watcher) syncWatches(ctx context.Context) {
 			continue
 		}
 		log.WithField("gvr", GVRString(gvr)).Info("objects: kind left discovery, stopping its watch")
-		if st.cancel != nil {
-			st.cancel()
-		}
+		st.cancel()
 		if !st.resolved {
 			removedPending = true
 		}
@@ -403,23 +399,6 @@ func (w *Watcher) startLocked(ctx context.Context, gvr schema.GroupVersionResour
 		defer w.reflectors.Done()
 		w.runKind(wctx, gvr, store)
 	}()
-}
-
-// track records gvr as watched without starting a list-watch loop.
-func (w *Watcher) track(gvr schema.GroupVersionResource, kind string) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	if _, ok := w.gvrs[gvr]; !ok {
-		w.gvrs[gvr] = &gvrState{kind: kind}
-	}
-}
-
-// watching reports whether gvr is watched.
-func (w *Watcher) watching(gvr schema.GroupVersionResource) bool {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	_, ok := w.gvrs[gvr]
-	return ok
 }
 
 func (w *Watcher) kindOf(gvr schema.GroupVersionResource) string {
@@ -609,6 +588,9 @@ func (w *Watcher) retryOne(ctx context.Context, uid string, u unsyncedObject) {
 		res = w.dyn.Resource(gvr).Namespace(u.entry.Namespace)
 	}
 	getCtx, cancel := context.WithTimeout(ctx, w.getTimeout)
+	// A quorum read, not one from the watch cache (resourceVersion "0"): a cached read can
+	// return a version older than one already sent, and this send would then give it a
+	// newer timestamp. The reads are few, at most Config.MaxResendsPerScan or maxRetryPerPass a pass.
 	obj, err := res.Get(getCtx, u.entry.Name, metav1.GetOptions{})
 	cancel()
 	if w.afterRetryGet != nil {
@@ -631,23 +613,14 @@ func (w *Watcher) retryOne(ctx context.Context, uid string, u unsyncedObject) {
 	}
 }
 
-// isListed reports whether gvr has a list-watch loop whose first list succeeded.
-func (w *Watcher) isListed(gvr schema.GroupVersionResource) bool {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	st, ok := w.gvrs[gvr]
-	return ok && st.cancel != nil && st.listed
-}
-
-// kindStore returns the store of gvr's list-watch loop, or nil when gvr has none.
+// kindStore returns the store of gvr's list-watch loop, or nil when gvr is not watched.
 func (w *Watcher) kindStore(gvr schema.GroupVersionResource) *objectStore {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	st, ok := w.gvrs[gvr]
-	if !ok || st.cancel == nil {
-		return nil
+	if st, ok := w.gvrs[gvr]; ok {
+		return st.store
 	}
-	return st.store
+	return nil
 }
 
 // stillUnsynced reports whether the unsynced record of uid is still u.
@@ -1192,7 +1165,7 @@ func (s *objectStore) tombstoneMissing(l *listing) {
 	// objects the kind's watch has already stored.
 	gvrString := GVRString(s.gvr)
 	reconciled := s.w.now()
-	for _, uid := range s.w.store.Missing(gvrString, l.listed, true) {
+	for _, uid := range s.w.store.Missing(gvrString, l.listed) {
 		e, ok := s.w.store.Get(uid)
 		if !ok {
 			continue

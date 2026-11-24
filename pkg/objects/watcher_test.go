@@ -1571,11 +1571,6 @@ func TestHandleForceSendsUnchangedObject(t *testing.T) {
 
 func TestIsListed(t *testing.T) {
 	w := watcherOnly(t, testConfig(), nil)
-	// A kind tracked without a reflector is never listed.
-	w.track(widgetGVR, "Widget")
-	require.NoError(t, w.newObjectStore(context.Background(), widgetGVR).Replace(nil, "1"))
-	assert.False(t, w.isListed(widgetGVR))
-
 	s := w.newObjectStore(context.Background(), cmGVR)
 	watchedConfigMaps(w, s)
 	assert.False(t, w.isListed(cmGVR), "before the first list")

@@ -630,14 +630,8 @@ func TestMissingReturnsStoredUidsNotListed(t *testing.T) {
 	s.Put("n1", Entry{GVR: "/v1/namespaces", Kind: "Namespace", Name: "x"})
 
 	listed := map[string]struct{}{"d2": {}}
-	assert.ElementsMatch(t, []string{"d1", "d3"}, s.Missing("apps/v1/deployments", listed, true))
-	assert.Empty(t, s.Missing("/v1/namespaces", map[string]struct{}{"n1": {}}, true))
-}
-
-func TestMissingSkipsKindWhoseListFailed(t *testing.T) {
-	s := NewStore(newClient(), storeNS)
-	s.Put("d1", testEntry(1))
-	assert.Empty(t, s.Missing("apps/v1/deployments", nil, false))
+	assert.ElementsMatch(t, []string{"d1", "d3"}, s.Missing("apps/v1/deployments", listed))
+	assert.Empty(t, s.Missing("/v1/namespaces", map[string]struct{}{"n1": {}}))
 }
 
 func TestHMACKeyCreatedOnceAndReused(t *testing.T) {

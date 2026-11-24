@@ -445,13 +445,10 @@ func (s *Store) entriesWhere(keep func(Entry) bool) map[string]Entry {
 	return out
 }
 
-// Missing returns the stored uids of kind gvr that are absent from listed, the uids of that
-// kind's initial list. When the list failed (listOK false) it returns nil, so a kind that
-// could not be listed emits no deletes.
-func (s *Store) Missing(gvr string, listed map[string]struct{}, listOK bool) []string {
-	if !listOK {
-		return nil
-	}
+// Missing returns the stored uids of kind gvr that are absent from listed, the uids of a
+// complete list of that kind. A list that failed never gets here, so a kind that could not
+// be listed emits no deletes.
+func (s *Store) Missing(gvr string, listed map[string]struct{}) []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var out []string

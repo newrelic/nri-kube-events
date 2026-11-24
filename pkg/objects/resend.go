@@ -93,7 +93,7 @@ func (w *Watcher) dueForResend(now time.Time) []string {
 	w.mu.Lock()
 	listed := map[string]bool{}
 	for gvr, st := range w.gvrs {
-		if st.cancel != nil && st.listed {
+		if st.listed {
 			listed[GVRString(gvr)] = true
 		}
 	}
@@ -196,6 +196,9 @@ func (w *Watcher) resendOne(ctx context.Context, uid string) {
 		res = w.dyn.Resource(gvr).Namespace(e.Namespace)
 	}
 	getCtx, cancel := context.WithTimeout(ctx, w.getTimeout)
+	// A quorum read, not one from the watch cache (resourceVersion "0"): a cached read can
+	// return a version older than one already sent, and this send would then give it a
+	// newer timestamp. The reads are few, at most Config.MaxResendsPerScan or maxRetryPerPass a pass.
 	obj, err := res.Get(getCtx, e.Name, metav1.GetOptions{})
 	cancel()
 	// A resend that finds the object gone, or its name taken by a new object, is when the

@@ -143,11 +143,6 @@ func (s *InfraSink) Send(ctx context.Context, recs []Record) error {
 	return nil
 }
 
-// payload is the SDK v3 JSON for one batch of recs.
-func (s *InfraSink) payload(recs []Record) ([]byte, error) {
-	return s.encode(s.decorate(recs))
-}
-
 // decorate returns copies of recs with the attributes the events sink adds to every event
 // (decorateAttrs in pkg/sinks/new_relic_infra.go). InfraSink posts these copies, so the
 // json.Marshal size of a decorated record is the size of the event it sends.
