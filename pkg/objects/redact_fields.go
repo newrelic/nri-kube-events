@@ -24,8 +24,9 @@ import (
 //     params), the value of an entry whose name looks like a credential or whose value
 //     looks like a token or key (tokenValue); an image tag or a replica count is kept;
 //   - inside a string that holds a multi-line YAML mapping or a JSON object, such as Helm
-//     values or a copy of a ConfigMap's data, the value of every key whose name looks like
-//     a credential and every scalar that looks like one; the text is written back with the
+//     values or a copy of a ConfigMap's data, every value under a top-level data,
+//     binaryData or stringData key, the value of every key whose name looks like a
+//     credential, and every scalar that looks like one; the text is written back with the
 //     rest kept;
 //   - every string under a field whose name looks like a credential (credentialName), at
 //     any depth outside metadata, and every string of a map or list under such a field;
@@ -418,6 +419,12 @@ func redactLastAppliedObject(raw string, key []byte) string {
 	if err := json.Unmarshal([]byte(raw), &applied); err != nil {
 		return redactedValue([]byte(raw), key)
 	}
+	if _, isObject := applied["kind"]; !isObject {
+		// JSON that is not a Kubernetes object, such as a copy of data, by the text rules.
+		if text, ok := redactStructuredText(raw, key); ok {
+			return text
+		}
+	}
 	s, err := serialize(Redact(applied, key))
 	if err != nil {
 		return redactedValue([]byte(raw), key)
@@ -461,6 +468,10 @@ func redactStructuredText(s string, key []byte) (string, bool) {
 			return "", false
 		}
 		for k, v := range obj {
+			if dataFields[k] {
+				obj[k] = redactAllStrings(v, key)
+				continue
+			}
 			obj[k] = redactTree(k, v, key, false)
 		}
 		out, err := serialize(obj)
@@ -476,7 +487,17 @@ func redactStructuredText(s string, key []byte) (string, bool) {
 	if yaml.Unmarshal([]byte(s), &doc) != nil || len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
 		return "", false
 	}
-	if !redactYAMLNode(doc.Content[0], key, false) {
+	top := doc.Content[0]
+	changed := false
+	for i := 0; i+1 < len(top.Content); i += 2 {
+		k, v := top.Content[i], top.Content[i+1]
+		if dataFields[k.Value] {
+			changed = markAllYAML(v, key) || changed
+		} else {
+			changed = redactYAMLNode(&yaml.Node{Kind: yaml.MappingNode, Content: []*yaml.Node{k, v}}, key, false) || changed
+		}
+	}
+	if !changed {
 		return s, true
 	}
 	out, err := yaml.Marshal(&doc)
@@ -523,4 +544,40 @@ func markYAMLScalar(n *yaml.Node, key []byte, redact bool) bool {
 	}
 	n.Value, n.Tag, n.Style = redactedValue([]byte(n.Value), key), "!!str", yaml.DoubleQuotedStyle
 	return true
+}
+
+// dataFields are the top-level keys of a text copy of a ConfigMap or Secret whose values
+// are all redacted, as the object's own data is.
+var dataFields = map[string]bool{"data": true, "binaryData": true, "stringData": true}
+
+// redactAllStrings replaces every string below v with a marker.
+func redactAllStrings(v any, key []byte) any {
+	switch t := v.(type) {
+	case string:
+		if t == "" || markerPattern.MatchString(t) {
+			return t
+		}
+		return redactedValue([]byte(t), key)
+	case map[string]any:
+		for k, val := range t {
+			t[k] = redactAllStrings(val, key)
+		}
+	case []any:
+		for i, val := range t {
+			t[i] = redactAllStrings(val, key)
+		}
+	}
+	return v
+}
+
+// markAllYAML replaces every scalar below n with a marker, and reports whether it did.
+func markAllYAML(n *yaml.Node, key []byte) bool {
+	if n.Kind == yaml.ScalarNode {
+		return markYAMLScalar(n, key, true)
+	}
+	changed := false
+	for _, c := range n.Content {
+		changed = markAllYAML(c, key) || changed
+	}
+	return changed
 }

@@ -642,6 +642,14 @@ func TestRedactSecondReviewCases(t *testing.T) {
 		}}}, key)
 		got := out["metadata"].(map[string]any)["annotations"].(map[string]any)["example.com/copy"].(string)
 		assert.NotContains(t, got, secretValue)
+		plainCopy := Redact(map[string]any{"apiVersion": "v1", "kind": "ConfigMap", "metadata": map[string]any{"name": "c", "annotations": map[string]any{
+			"example.com/copy": "data:\n  dsn: hunter2xyz\n",
+			"example.com/json": `{"data":{"dsn":"hunter2xyz"},"note":"kept"}`,
+		}}}, key)["metadata"].(map[string]any)["annotations"].(map[string]any)
+		assert.NotContains(t, plainCopy["example.com/copy"], secretValue, "every value under a data key")
+		assert.Contains(t, plainCopy["example.com/copy"], marked)
+		assert.NotContains(t, plainCopy["example.com/json"], secretValue)
+		assert.Contains(t, plainCopy["example.com/json"], `"note":"kept"`)
 	})
 	t.Run("JSON text value", func(t *testing.T) {
 		out := Redact(map[string]any{"apiVersion": "x/v1", "kind": "X", "metadata": map[string]any{"name": "x"},
