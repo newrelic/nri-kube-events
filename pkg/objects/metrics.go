@@ -48,6 +48,10 @@ var (
 		Name: metricsPrefix + "carrier_failures_total",
 		Help: "Failures that stopped the object-state carrier, by stage: config (not started), startup (retried with backoff) and run (restarted with backoff). Kubernetes Events collection keeps running.",
 	}, []string{"stage"})
+	metricRecordsRejected = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: metricsPrefix + "records_rejected_total",
+		Help: "Records dropped because the infrastructure agent forwarder rejected them with a 4xx status other than 408 or 429. Their object is not sent again until it changes.",
+	})
 	metricResends = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: metricsPrefix + "resends_total",
 		Help: "Unchanged objects re-sent because their last send was older than resendAfter.",
@@ -79,6 +83,7 @@ func objectsCollectors() []prometheus.Collector {
 		metricForwarderRejections,
 		metricCarrierFailures,
 		metricResends,
+		metricRecordsRejected,
 	}
 }
 

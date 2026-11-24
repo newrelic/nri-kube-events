@@ -119,6 +119,12 @@ type Watcher struct {
 	// afterRetryGet, when set, is called by a retry after it fetched an object and before
 	// it sends it. Tests use it to deliver a watch event at that point.
 	afterRetryGet func(uid string)
+	// pending, guarded by mu, holds the latest queued version of every uid with a send in
+	// the queue.
+	pending map[string]pendingVersion
+	// sender delivers the queued sends while Run runs; sendMu guards it.
+	sender *sender
+	warner *rateLimitedWarner
 
 	// mu guards gvrs, unsynced, startTime, lastFullList, failedSends, resyncCursor,
 	// catchUp and stopped.
@@ -138,7 +144,10 @@ type Watcher struct {
 	// finalTimeout bounds sendStoppedHeartbeat; NewWatcher sets finalHeartbeatTimeout.
 	finalTimeout time.Duration
 
-	mu          sync.Mutex
+	mu     sync.Mutex
+	sendMu sync.Mutex
+	// sendSeq, guarded by mu, numbers the queued sends.
+	sendSeq     uint64
 	failedSends int64
 	// resyncCursor is where the next resend scan starts; the heartbeat reports it.
 	resyncCursor uint64
@@ -190,6 +199,8 @@ func NewWatcher(cfg Config, dyn dynamic.Interface, disc discovery.DiscoveryInter
 		rediscover:   make(chan struct{}, 1),
 		gvrs:         map[schema.GroupVersionResource]*gvrState{},
 		unsynced:     map[string]unsyncedObject{},
+		pending:      map[string]pendingVersion{},
+		warner:       newWarner(),
 	}
 }
 
@@ -204,6 +215,7 @@ func (w *Watcher) Run(ctx context.Context) error {
 	w.mu.Lock()
 	w.startTime = w.now()
 	w.mu.Unlock()
+	w.startSender()
 
 	w.syncWatches(ctx)
 	w.startHeartbeat(ctx)
@@ -260,6 +272,7 @@ func (w *Watcher) shutdown() error {
 	w.mu.Unlock()
 	w.reflectors.Wait()
 	w.background.Wait()
+	w.stopSender()
 	w.sendStoppedHeartbeat()
 
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownFlushTimeout)
@@ -617,13 +630,13 @@ func (w *Watcher) retryOne(ctx context.Context, uid string, u unsyncedObject) {
 	case apierrors.IsNotFound(err):
 		w.sendTombstone(ctx, uid, w.tombstoneEntry(uid, u.entry), w.now())
 	case err != nil:
-		log.WithError(err).WithFields(log.Fields{"gvr": u.entry.GVR, "uid": uid}).Warn("objects: fetching unsynced object")
+		w.warner.warn(log.WithError(err).WithFields(log.Fields{"gvr": u.entry.GVR, "uid": uid}), "objects: fetching unsynced object")
 	case string(obj.GetUID()) != uid:
 		// The name now belongs to a new object, which its own watch sends.
 		w.sendTombstone(ctx, uid, w.tombstoneEntry(uid, u.entry), w.now())
 	default:
 		if err := w.HandleObject(ctx, gvr, u.op, obj.Object); err != nil {
-			log.WithError(err).WithFields(log.Fields{"gvr": u.entry.GVR, "uid": uid}).Warn("objects: retrying unsynced object")
+			w.warner.warn(log.WithError(err).WithFields(log.Fields{"gvr": u.entry.GVR, "uid": uid}), "objects: retrying unsynced object")
 		}
 	}
 }
@@ -694,16 +707,8 @@ func (w *Watcher) handle(ctx context.Context, gvr schema.GroupVersionResource, o
 	namespace, _ := meta["namespace"].(string)
 	name, _ := meta["name"].(string)
 
-	if op != OpDeleted && !force {
-		if old, ok := w.store.Get(uid); ok && old.Hash == hash {
-			if old.GVR != gvrString {
-				old.GVR = gvrString
-				w.store.Put(uid, old)
-			}
-			// NRDB already holds this version.
-			w.markSynced(uid)
-			return nil
-		}
+	if op != OpDeleted && !force && w.alreadySent(uid, hash, gvrString) {
+		return nil
 	}
 
 	now := w.now()
@@ -711,32 +716,51 @@ func (w *Watcher) handle(ctx context.Context, gvr schema.GroupVersionResource, o
 	if err != nil {
 		return fmt.Errorf("building records for %s %s: %w", gvrString, uid, err)
 	}
-	if err := w.sink.Send(ctx, recs); err != nil {
-		w.countFailedSend(ctx)
-		identity := Entry{GVR: gvrString, Kind: kind, Namespace: namespace, Name: name}
-		if op == OpDeleted {
-			identity = w.tombstoneEntry(uid, identity)
+	item := pendingSend{uid: uid, op: op, recs: recs, size: queuedSize(recs)}
+	if op == OpDeleted {
+		item.entry = w.tombstoneEntry(uid, Entry{GVR: gvrString, Kind: kind, Namespace: namespace, Name: name})
+		item.observedAt = now
+	} else {
+		// A first-ever send stores a LastSent spread across ResendAfter, so the objects of
+		// one startup come due for the resend spread out and not all at once.
+		lastSent := now.Unix()
+		if _, known := w.store.Get(uid); !known && w.cfg.ResendAfter > 0 {
+			lastSent = firstSentAt(uid, now, w.cfg.ResendAfter)
 		}
-		u := unsyncedObject{entry: identity, op: op}
-		if op == OpDeleted {
-			u.observedAt = now
-		}
-		w.markUnsynced(ctx, uid, u)
+		item.entry = Entry{GVR: gvrString, Kind: kind, Namespace: namespace, Name: name, Hash: hash, LastSent: lastSent}
+	}
+	if err := w.submit(ctx, item); err != nil {
 		return fmt.Errorf("sending %s %s: %w", gvrString, uid, err)
 	}
-	w.markSynced(uid)
-	if op == OpDeleted {
-		w.store.Delete(uid)
-		return nil
-	}
-	// A first-ever send stores a LastSent spread across ResendAfter, so the objects of one
-	// startup come due for the resend spread out and not all at once.
-	lastSent := now.Unix()
-	if _, known := w.store.Get(uid); !known && w.cfg.ResendAfter > 0 {
-		lastSent = firstSentAt(uid, now, w.cfg.ResendAfter)
-	}
-	w.store.Put(uid, Entry{GVR: gvrString, Kind: kind, Namespace: namespace, Name: name, Hash: hash, LastSent: lastSent})
 	return nil
+}
+
+// alreadySent reports whether the version of uid with hash needs no send: the queue holds
+// it, or, with nothing queued for uid, the store does, which means NRDB holds it. A stored
+// entry under another GVR string takes gvrString.
+func (w *Watcher) alreadySent(uid, hash, gvrString string) bool {
+	if p, queued := w.pendingOf(uid); queued {
+		return !p.deleted && p.hash == hash
+	}
+	old, ok := w.store.Get(uid)
+	if !ok || old.Hash != hash {
+		return false
+	}
+	if old.GVR != gvrString {
+		old.GVR = gvrString
+		w.store.Put(uid, old)
+	}
+	w.markSynced(uid)
+	return true
+}
+
+// queuedSize is the size recs take in the send queue and in a forwarder POST.
+func queuedSize(recs []Record) int {
+	n := 0
+	for _, r := range recs {
+		n += recordSize(r) + decorationBytes
+	}
+	return n
 }
 
 // prepareObject returns obj as the watcher sends it, and its hash: apiVersion and kind
@@ -843,19 +867,14 @@ func objectUID(obj map[string]any) string {
 	return uid
 }
 
-// sendTombstone sends the delete record of uid from its stored identity, with observedAt,
-// when the carrier saw the deletion, as its timestamp, and once sent forgets uid. A failed
+// sendTombstone queues the delete record of uid from its stored identity, with observedAt,
+// when the carrier saw the deletion, as its timestamp. Once sent, uid is forgotten. A failed
 // tombstone marks uid unsynced, to be sent again as a tombstone with the same observedAt.
 func (w *Watcher) sendTombstone(ctx context.Context, uid string, e Entry, observedAt time.Time) {
-	rec := Tombstone(uid, e, w.cfg.ClusterName, observedAt)
-	if err := w.sink.Send(ctx, []Record{rec}); err != nil {
-		w.countFailedSend(ctx)
-		w.markUnsynced(ctx, uid, unsyncedObject{entry: e, op: OpDeleted, observedAt: observedAt})
-		log.WithError(err).WithFields(log.Fields{"gvr": e.GVR, "kind": e.Kind, "uid": uid}).Warn("objects: sending tombstone")
-		return
-	}
-	w.markSynced(uid)
-	w.store.Delete(uid)
+	recs := []Record{Tombstone(uid, e, w.cfg.ClusterName, observedAt)}
+	item := pendingSend{uid: uid, op: OpDeleted, recs: recs, size: queuedSize(recs), entry: e, observedAt: observedAt}
+	// deliver logs a failed send and marks uid unsynced.
+	_ = w.submit(ctx, item)
 }
 
 // forgetCRDObjects tombstones every stored object of the custom resource group/plural, in
@@ -1088,7 +1107,7 @@ func (s *objectStore) handle(op Op, obj any) {
 		return
 	}
 	if err := s.w.HandleObject(s.ctx, s.gvr, op, u.Object); err != nil {
-		log.WithError(err).WithFields(log.Fields{"gvr": GVRString(s.gvr), "uid": string(u.GetUID()), "op": string(op)}).Warn("objects: handling object")
+		s.w.warner.warn(log.WithError(err).WithFields(log.Fields{"gvr": GVRString(s.gvr), "uid": string(u.GetUID()), "op": string(op)}), "objects: handling object")
 	}
 }
 

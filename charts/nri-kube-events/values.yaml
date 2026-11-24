@@ -149,9 +149,10 @@ objectState:
   enabled: false
   # -- Resend an unchanged object after this long. `"0"` turns the resend off.
   resendAfter: "24h"
-  # -- Upper bound on object records sent per second. On a 5,700-object test cluster the
-  # forwarder dropped no events at any rate from 100 to 3200, and the startup burst took about
-  # 4 s at both 1600 and 3200.
+  # -- Upper bound on object records sent per second. The carrier groups up to 500 records, or
+  # about 1 MB, into one POST to the forwarder sidecar, which is the forwarder's own batch
+  # limit, so 3200 is about 7 POSTs a second. The bound exists to keep the startup burst from
+  # filling the forwarder's event queue; lower it if the forwarder logs that its queue is full.
   maxRecordsPerSecond: 3200
 
 # -- Sets pod's priorityClassName. Can be configured also with `global.priorityClassName`

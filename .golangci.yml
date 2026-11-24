@@ -45,6 +45,7 @@ linters:
             - github.com/sethgrid/pester
             - github.com/sirupsen/logrus
             - github.com/stretchr/testify
+            - golang.org/x/sync/semaphore
             - golang.org/x/time/rate
             - gopkg.in/yaml.v3
             - k8s.io/api

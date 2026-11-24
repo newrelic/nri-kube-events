@@ -45,6 +45,11 @@ const (
 	defaultHTTPTimeout    = 60 * time.Second
 )
 
+// ErrRejected marks a send that the forwarder refused for its content, with a 4xx status
+// other than 408 or 429, or that could not be encoded. The sink does not retry it, because
+// the same body would be refused again.
+var ErrRejected = errors.New("rejected by the forwarder")
+
 // EntityName is the name of the entity that the records of cluster attach to.
 func EntityName(cluster string) string {
 	return "k8s:" + cluster + ":objectstate"
@@ -225,11 +230,13 @@ func recordSize(r Record) int {
 }
 
 // sendBatch waits for the rate limiter, then posts one batch of decorated records, retrying
-// every failure with exponential backoff until the summed waits would pass MaxBackoff.
+// every failure with exponential backoff until the summed waits would pass MaxBackoff. A
+// 4xx response other than 408 and 429, and a batch that cannot be encoded, return an error
+// wrapping ErrRejected at once.
 func (s *InfraSink) sendBatch(ctx context.Context, recs []Record) error {
 	body, err := s.encode(recs)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %w", ErrRejected, err)
 	}
 	if err := s.limiter.WaitN(ctx, len(recs)); err != nil {
 		return fmt.Errorf("rate limit: %w", err)
@@ -245,6 +252,9 @@ func (s *InfraSink) sendBatch(ctx context.Context, recs []Record) error {
 		}
 		if ctx.Err() != nil {
 			return fmt.Errorf("attempt %d: %w (last error: %w)", attempt, ctx.Err(), err)
+		}
+		if errors.Is(err, ErrRejected) {
+			return err
 		}
 		delay := min(wait, s.cfg.MaxBackoff)
 		if waited+delay > s.cfg.MaxBackoff {
@@ -286,5 +296,18 @@ func (s *InfraSink) post(ctx context.Context, body []byte) error {
 		return nil
 	}
 	metricForwarderRejections.WithLabelValues(strconv.Itoa(resp.StatusCode)).Inc()
-	return fmt.Errorf("status %d: %s", resp.StatusCode, strings.TrimSpace(string(snippet)))
+	err = fmt.Errorf("status %d: %s", resp.StatusCode, strings.TrimSpace(string(snippet)))
+	if retryable(resp.StatusCode) {
+		return err
+	}
+	return fmt.Errorf("%w: %w", ErrRejected, err)
+}
+
+// retryable reports whether a response with status code may succeed when sent again: a 5xx,
+// 408 Request Timeout, 429 Too Many Requests, or any status outside 4xx.
+func retryable(code int) bool {
+	if code == http.StatusRequestTimeout || code == http.StatusTooManyRequests {
+		return true
+	}
+	return code < http.StatusBadRequest || code >= http.StatusInternalServerError
 }

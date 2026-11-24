@@ -248,6 +248,24 @@ func TestSendRetries5xxThen204(t *testing.T) {
 	assert.Equal(t, 1.0, counterValue(t, metricForwarderRejections.WithLabelValues("503"))-before503)
 }
 
+// A 4xx other than 408 and 429 is not retried: the same body would be refused again.
+func TestSendDoesNotRetryRejection(t *testing.T) {
+	for _, status := range []int{http.StatusBadRequest, http.StatusRequestEntityTooLarge, http.StatusUnprocessableEntity} {
+		fwd := newFakeForwarder(t, status, http.StatusNoContent)
+		s := newTestSink(t, fwd.URL, "c1")
+		err := s.Send(context.Background(), []Record{rec("a")})
+		require.ErrorIs(t, err, ErrRejected, "status %d", status)
+		assert.Len(t, fwd.all(), 1, "status %d", status)
+	}
+}
+
+func TestSendRetries408And429(t *testing.T) {
+	fwd := newFakeForwarder(t, http.StatusRequestTimeout, http.StatusTooManyRequests, http.StatusNoContent)
+	s := newTestSink(t, fwd.URL, "c1")
+	require.NoError(t, s.Send(context.Background(), []Record{rec("a")}))
+	assert.Len(t, fwd.all(), 3)
+}
+
 // refuseFirst returns a connection-refused error on its first round trip and forwards
 // every later one.
 type refuseFirst struct {

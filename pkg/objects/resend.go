@@ -187,6 +187,10 @@ func (w *Watcher) resendOne(ctx context.Context, uid string) {
 	if e, ok = w.store.Get(uid); !ok || !w.isDue(e, w.now()) || w.isUnsynced(uid) {
 		return
 	}
+	if _, queued := w.pendingOf(uid); queued {
+		// The queued send stores a new LastSent once it is delivered.
+		return
+	}
 	var res dynamic.ResourceInterface = w.dyn.Resource(gvr)
 	if e.Namespace != "" {
 		res = w.dyn.Resource(gvr).Namespace(e.Namespace)
@@ -200,13 +204,13 @@ func (w *Watcher) resendOne(ctx context.Context, uid string) {
 	case apierrors.IsNotFound(err):
 		w.sendTombstone(ctx, uid, e, w.now())
 	case err != nil:
-		log.WithError(err).WithFields(log.Fields{"gvr": e.GVR, "uid": uid}).Warn("objects: fetching object to resend")
+		w.warner.warn(log.WithError(err).WithFields(log.Fields{"gvr": e.GVR, "uid": uid}), "objects: fetching object to resend")
 	case string(obj.GetUID()) != uid:
 		// The name now belongs to a new object, which its own watch sends.
 		w.sendTombstone(ctx, uid, e, w.now())
 	default:
 		if err := w.handle(ctx, gvr, OpResync, obj.Object, true); err != nil {
-			log.WithError(err).WithFields(log.Fields{"gvr": e.GVR, "uid": uid}).Warn("objects: resending object")
+			w.warner.warn(log.WithError(err).WithFields(log.Fields{"gvr": e.GVR, "uid": uid}), "objects: resending object")
 			return
 		}
 		metricResends.Inc()
