@@ -71,6 +71,11 @@ spec:
           volumeMounts:
             - name: config-volume
               mountPath: /app/config
+            {{- if (.Values.objectState).enabled }}
+            - name: integration-api-access
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
+            {{- end }}
         {{- if .Values.sinks.newRelicInfra }}
         - name: forwarder
           image: {{ include "nri-kube-events.compatibility.images.agent" . }}
@@ -113,8 +118,31 @@ spec:
       {{- if (.Values.objectState).enabled }}
       {{- /* Watch shutdown plus the hash-store flush */}}
       terminationGracePeriodSeconds: 90
+      {{- /* The ServiceAccount can read every Secret. Only the integration container gets its
+      token, through integration-api-access; the forwarder sidecar gets none. */}}
+      automountServiceAccountToken: false
       {{- end }}
       volumes:
+        {{- if (.Values.objectState).enabled }}
+        - name: integration-api-access
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 3607
+              - configMap:
+                  name: kube-root-ca.crt
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+              - downwardAPI:
+                  items:
+                    - path: namespace
+                      fieldRef:
+                        apiVersion: v1
+                        fieldPath: metadata.namespace
+        {{- end }}
         {{- if .Values.sinks.newRelicInfra }}
         - name: config
           configMap:

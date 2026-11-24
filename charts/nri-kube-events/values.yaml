@@ -130,7 +130,11 @@ objectState:
   #   the 150 MB the carrier can add during a list.
   #
   # The hash store ConfigMaps and the HMAC key Secret have fixed names, so enable object state
-  # in at most one release per namespace.
+  # in at most one release per namespace. The Role lets the carrier update and delete only
+  # those names; Kubernetes RBAC cannot limit create by name. The ServiceAccount can read every
+  # Secret, so with object state enabled the pod does not automount its token, and only the
+  # integration container gets one, through a projected volume; the forwarder sidecar does
+  # not.
   #
   # Redaction: before a record leaves the pod, the carrier replaces with a keyed hash marker
   # every Secret and ConfigMap value, every container env value, every string under a field

@@ -2,9 +2,12 @@ package objects
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand/v2"
+	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -98,7 +101,7 @@ func shardConfigMaps(t *testing.T, client *fake.Clientset) []corev1.ConfigMap {
 	require.NoError(t, err)
 	var out []corev1.ConfigMap
 	for _, cm := range l.Items {
-		if _, _, ok := parseShardName(cm.Name); ok {
+		if _, _, ok := parseShard(&cm); ok {
 			out = append(out, cm)
 		}
 	}
@@ -120,7 +123,7 @@ func generations(t *testing.T, client *fake.Clientset) map[int]int {
 	t.Helper()
 	out := map[int]int{}
 	for _, cm := range shardConfigMaps(t, client) {
-		g, _, _ := parseShardName(cm.Name)
+		g, _, _ := parseShard(&cm)
 		out[g]++
 	}
 	return out
@@ -191,7 +194,8 @@ func TestPutFlushLoadRoundTrip(t *testing.T) {
 
 	cms := shardConfigMaps(t, client)
 	require.Len(t, cms, 1)
-	assert.Equal(t, "nri-kube-events-hashes-g1-0", cms[0].Name)
+	assert.Equal(t, "nri-kube-events-hashes-a-0", cms[0].Name)
+	assert.Equal(t, "1", cms[0].Labels[generationLabelKey])
 	assert.Equal(t, "1", cms[0].Labels[generationLabelKey])
 	assert.Equal(t, "apps/v1/deployments|Deployment|ns|d-1|0000000000000001|1700000000001", cms[0].Data["uid-a"])
 	gen, shards := pointer(t, client)
@@ -448,13 +452,14 @@ func TestReshardCreateFailureKeepsOldGeneration(t *testing.T) {
 	// A crash here loses nothing that was persisted before the Flush.
 	requireAll(t, client, 4000, testUID, testEntry)
 
-	// The next Flush retries the reshard into a fresh generation 3, then deletes the
-	// partial generation 2 and generation 1.
+	// The next Flush reads the pointer, retries the reshard into a fresh generation in the
+	// slot the pointer does not name (generation 3 would share generation 1's slot, so it
+	// is 4), then deletes generation 1.
 	fail = false
 	require.NoError(t, s.Flush(ctx))
 	gen, shards = pointer(t, client)
-	assert.Equal(t, 3, gen)
-	assert.Equal(t, map[int]int{3: shards}, generations(t, client))
+	assert.Equal(t, 4, gen)
+	assert.Equal(t, map[int]int{4: shards}, generations(t, client))
 	requireAll(t, client, 12000, testUID, testEntry)
 	requireSettled(t, client)
 }
@@ -926,4 +931,77 @@ func (s *Store) takeDirtyPeek() int {
 		}
 	}
 	return first
+}
+
+// Shard names come from a finite set, so the chart's Role can list them: two slots by the
+// parity of the generation, and at most MaxShards indexes.
+func TestShardNamesAreFinite(t *testing.T) {
+	names := ShardNames()
+	assert.Len(t, names, 2*MaxShards)
+	assert.Contains(t, names, shardName(1, 0))
+	assert.Contains(t, names, shardName(2, MaxShards-1))
+	assert.Equal(t, shardName(1, 3), shardName(7, 3), "odd generations share a slot")
+	assert.NotEqual(t, shardName(1, 3), shardName(2, 3))
+	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: shardName(3, 2), Labels: map[string]string{generationLabelKey: "3"}}}
+	gen, i, ok := parseShard(cm)
+	assert.True(t, ok)
+	assert.Equal(t, 3, gen)
+	assert.Equal(t, 2, i)
+	cm.Labels[generationLabelKey] = "4"
+	_, _, ok = parseShard(cm)
+	assert.False(t, ok, "a generation label whose slot is not the name's")
+}
+
+// A reshard after one whose pointer write landed but reported an error reads the pointer
+// and writes into the other slot, never into the generation the pointer names.
+func TestReshardAfterLandedPointerWriteKeepsThePointedSlot(t *testing.T) {
+	ctx := context.Background()
+	client := newClient()
+	s := NewStore(client, storeNS)
+	require.NoError(t, s.Load(ctx))
+	for i := 0; i < 4000; i++ {
+		s.Put(testUID(i), testEntry(i))
+	}
+	require.NoError(t, s.Flush(ctx))
+	// The pointer update to generation 2 lands, then reports an error.
+	var once sync.Once
+	client.PrependReactor("update", "configmaps", func(a k8stesting.Action) (bool, runtime.Object, error) {
+		cm := a.(k8stesting.UpdateAction).GetObject().(*corev1.ConfigMap)
+		if cm.Name != pointerName {
+			return false, nil, nil
+		}
+		var err error
+		once.Do(func() {
+			_ = client.Tracker().Update(corev1.SchemeGroupVersion.WithResource("configmaps"), cm, storeNS)
+			err = errors.New("lost response")
+		})
+		if err != nil {
+			return true, nil, err
+		}
+		return false, nil, nil
+	})
+	for i := 4000; i < 12000; i++ {
+		s.Put(testUID(i), testEntry(i))
+	}
+	require.Error(t, s.Flush(ctx))
+	gen, _ := pointer(t, client)
+	require.Equal(t, 2, gen, "the pointer write landed")
+
+	require.NoError(t, s.Flush(ctx))
+	gen, shards := pointer(t, client)
+	assert.Equal(t, 3, gen, "the retry writes the slot of generation 1, not generation 2's")
+	assert.Equal(t, map[int]int{3: shards}, generations(t, client))
+	requireAll(t, client, 12000, testUID, testEntry)
+}
+
+// The chart's Role lists the shard names by template; it must agree with ShardNames.
+func TestChartRoleNamesEveryShard(t *testing.T) {
+	b, err := os.ReadFile("../../charts/nri-kube-events/templates/objects-role.yaml")
+	require.NoError(t, err)
+	role := string(b)
+	assert.Contains(t, role, fmt.Sprintf("range $i := until %d", MaxShards))
+	assert.Contains(t, role, `range $slot := list "`+slotOf(1)+`" "`+slotOf(2)+`"`)
+	assert.Contains(t, role, "- "+shardNamePrefix+"{{ $slot }}-{{ $i }}")
+	assert.Contains(t, role, "- "+pointerName)
+	assert.Contains(t, role, "- "+HMACSecretName)
 }

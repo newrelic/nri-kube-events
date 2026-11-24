@@ -156,25 +156,63 @@ tests:
           value: my-namespace
         documentIndex: 0
       - equal:
-          path: rules
+          path: rules[0]
           value:
-            - apiGroups:
-                - ""
-              resources:
-                - configmaps
-              verbs:
-                - get
-                - list
-                - create
-                - update
-                - delete
-            - apiGroups:
-                - ""
-              resources:
-                - secrets
-              verbs:
-                - get
-                - create
+            apiGroups:
+              - ""
+            resources:
+              - configmaps
+            verbs:
+              - create
+        documentIndex: 0
+      - equal:
+          path: rules[1].verbs
+          value:
+            - get
+            - update
+            - delete
+        documentIndex: 0
+      - lengthEqual:
+          path: rules[1].resourceNames
+          count: 257
+        documentIndex: 0
+      - contains:
+          path: rules[1].resourceNames
+          content: nri-kube-events-hashes-current
+        documentIndex: 0
+      - contains:
+          path: rules[1].resourceNames
+          content: nri-kube-events-hashes-a-0
+        documentIndex: 0
+      - contains:
+          path: rules[1].resourceNames
+          content: nri-kube-events-hashes-b-127
+        documentIndex: 0
+      - notContains:
+          path: rules[1].resourceNames
+          content: nri-kube-events-hashes-a-128
+        documentIndex: 0
+      - equal:
+          path: rules[2]
+          value:
+            apiGroups:
+              - ""
+            resources:
+              - secrets
+            verbs:
+              - create
+        documentIndex: 0
+      - equal:
+          path: rules[3]
+          value:
+            apiGroups:
+              - ""
+            resources:
+              - secrets
+            resourceNames:
+              - nri-kube-events-hmac
+            verbs:
+              - get
         documentIndex: 0
       - isKind:
           of: RoleBinding
@@ -313,3 +351,38 @@ tests:
     asserts:
       - notExists:
           path: spec.template.spec.containers[0].resources
+
+  - it: only the integration container gets the ServiceAccount token
+    set:
+      licenseKey: us-whatever
+      cluster: a-cluster
+      objectState.enabled: true
+    template: templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: integration-api-access
+            mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+            readOnly: true
+      - notContains:
+          path: spec.template.spec.containers[1].volumeMounts
+          content:
+            name: integration-api-access
+            mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+            readOnly: true
+      - equal:
+          path: spec.template.spec.volumes[0].projected.sources[0].serviceAccountToken.path
+          value: token
+
+  - it: the token is mounted as before with object state off
+    set:
+      licenseKey: us-whatever
+      cluster: a-cluster
+    template: templates/deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.automountServiceAccountToken

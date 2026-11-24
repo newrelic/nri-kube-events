@@ -27,8 +27,15 @@ const (
 	// for metadata.
 	maxShardBytes = 900_000
 
-	// Shard ConfigMaps are named nri-kube-events-hashes-g<gen>-<i>.
-	shardNamePrefix = "nri-kube-events-hashes-g"
+	// Shard ConfigMaps are named nri-kube-events-hashes-<slot>-<i>, where slot is a or b
+	// by the parity of the generation, which their generation label holds. Two slots and
+	// at most MaxShards shards keep the set of names finite, so the chart's Role can name
+	// every ConfigMap the carrier may update or delete.
+	shardNamePrefix = "nri-kube-events-hashes-"
+	// MaxShards is the most shards one generation holds: 640,000 objects at 5,000 per shard.
+	// A store that would need more is not written, and the carrier logs it; the objects are
+	// still sent, but a restart sends every one again.
+	MaxShards = 128
 	// pointerName is the ConfigMap naming the current generation and its shard count.
 	pointerName       = "nri-kube-events-hashes-current"
 	pointerGeneration = "generation"
@@ -77,7 +84,8 @@ type Store struct {
 	shards  int
 	// gen is the generation the pointer names; hasPointer reports whether the pointer
 	// ConfigMap exists. maxGen is the highest generation seen on the cluster or attempted
-	// by a reshard, so every reshard, retries included, writes a number never used before.
+	// by a reshard, so every reshard, retries included, writes a number never used before,
+	// in the slot the pointer does not name.
 	gen, maxGen int
 	hasPointer  bool
 	// rewrite is set when the entries must be written into a new generation: after a
@@ -85,6 +93,8 @@ type Store struct {
 	rewrite bool
 	// cleanup is set while shard ConfigMaps outside the current generation may exist.
 	cleanup bool
+	// verifyPointer is set after a failed reshard, whose pointer write may have landed.
+	verifyPointer bool
 }
 
 // NewStore returns an empty store with one shard. Call Load to read the stored entries.
@@ -104,23 +114,44 @@ func shardOf(uid string, shards int) int {
 	return int(h.Sum32() % uint32(shards)) //nolint:gosec // G115: shards is at least 1 and far below 2^32
 }
 
-func shardName(gen, i int) string {
-	return shardNamePrefix + strconv.Itoa(gen) + "-" + strconv.Itoa(i)
+// slotOf is the name slot of generation gen.
+func slotOf(gen int) string {
+	if gen%2 == 1 { //nolint:mnd // parity
+		return "a"
+	}
+	return "b"
 }
 
-// parseShardName returns the generation and index of a shard ConfigMap name.
-func parseShardName(name string) (gen, i int, ok bool) {
-	rest, found := strings.CutPrefix(name, shardNamePrefix)
+func shardName(gen, i int) string {
+	return shardNamePrefix + slotOf(gen) + "-" + strconv.Itoa(i)
+}
+
+// ShardNames returns every name a shard ConfigMap can have.
+func ShardNames() []string {
+	gens := []int{1, 2} // one generation of each slot
+	out := make([]string, 0, len(gens)*MaxShards)
+	for _, gen := range gens {
+		for i := 0; i < MaxShards; i++ {
+			out = append(out, shardName(gen, i))
+		}
+	}
+	return out
+}
+
+// parseShard returns the generation, from its label, and the index of a shard ConfigMap.
+// A name outside ShardNames, or a generation whose slot is not the name's, does not parse.
+func parseShard(cm *corev1.ConfigMap) (gen, i int, ok bool) {
+	rest, found := strings.CutPrefix(cm.Name, shardNamePrefix)
 	if !found {
 		return 0, 0, false
 	}
-	g, idx, found := strings.Cut(rest, "-")
+	slot, idx, found := strings.Cut(rest, "-")
 	if !found {
 		return 0, 0, false
 	}
-	gen, err1 := strconv.Atoi(g)
+	gen, err1 := strconv.Atoi(cm.Labels[generationLabelKey])
 	i, err2 := strconv.Atoi(idx)
-	if err1 != nil || err2 != nil || gen < 1 || i < 0 {
+	if err1 != nil || err2 != nil || gen < 1 || i < 0 || i >= MaxShards || slotOf(gen) != slot {
 		return 0, 0, false
 	}
 	return gen, i, true
@@ -157,14 +188,32 @@ func decodeEntry(v string) (Entry, bool) {
 	return Entry{GVR: f[0], Kind: f[1], Namespace: f[2], Name: f[3], Hash: f[4], LastSent: ts}, true
 }
 
+// readPointer reads the pointer and takes the generation it names as the one in use, so a
+// reshard after a failed one never writes into the slot the pointer names.
+func (s *Store) readPointer(ctx context.Context) error {
+	cm, err := s.client.CoreV1().ConfigMaps(s.namespace).Get(ctx, pointerName, metav1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("reading hash store pointer: %w", err)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.verifyPointer = false
+	if gen, _, ok := parsePointer(cm); err == nil && ok {
+		s.gen = gen
+		s.hasPointer = true
+		s.maxGen = max(s.maxGen, gen)
+	}
+	return nil
+}
+
 // shardCount is the smallest count of at least max(1, ceil(entries/5000)) at which no shard
 // passes 5,000 entries or 900,000 bytes.
 func shardCount(entries map[string]Entry) int {
 	n := max(1, (len(entries)+maxShardEntries-1)/maxShardEntries)
-	for overfull(groupEntries(entries, n)) {
+	for n < MaxShards && overfull(groupEntries(entries, n)) {
 		n++
 	}
-	return n
+	return min(n, MaxShards)
 }
 
 // Load replaces the store's contents with the stored entries. When the pointer names a
@@ -248,7 +297,7 @@ func splitStoreConfigMaps(items []corev1.ConfigMap) (*corev1.ConfigMap, map[int]
 			ptr = cm
 			continue
 		}
-		g, i, ok := parseShardName(cm.Name)
+		g, i, ok := parseShard(cm)
 		if !ok {
 			continue
 		}
@@ -460,12 +509,29 @@ func (s *Store) FlushBudget(ctx context.Context, budget int) (err error) {
 	}
 	groups := s.group(s.shards)
 	for overfull(groups) {
+		if s.shards == MaxShards {
+			n := len(s.entries)
+			s.mu.Unlock()
+			return fmt.Errorf("hash store of %d entries needs more than %d shards; not writing it", n, MaxShards)
+		}
 		s.shards++
 		s.rewrite = true
 		groups = s.group(s.shards)
 	}
 	if s.rewrite || !s.hasPointer {
+		if s.verifyPointer {
+			s.mu.Unlock()
+			if err := s.readPointer(ctx); err != nil {
+				return err
+			}
+			s.mu.Lock()
+		}
+		// The new generation goes in the slot the pointer does not name, so the generation
+		// in use is never written in place.
 		newGen := s.maxGen + 1
+		if s.hasPointer && slotOf(newGen) == slotOf(s.gen) {
+			newGen++
+		}
 		s.dirty = map[int]time.Time{}
 		s.rewrite = false
 		s.mu.Unlock()
@@ -546,6 +612,8 @@ func (s *Store) reshard(ctx context.Context, gen int, groups []map[string]string
 		s.mu.Lock()
 		s.rewrite = true
 		s.maxGen = max(s.maxGen, gen)
+		// The pointer write may have landed; the retry reads it before picking a slot.
+		s.verifyPointer = true
 		s.mu.Unlock()
 		return err
 	}
@@ -577,8 +645,8 @@ func (s *Store) deleteOldGenerations(ctx context.Context, gen, shards int) error
 	}
 	var firstErr error
 	for _, cm := range list.Items {
-		g, i, ok := parseShardName(cm.Name)
-		if !ok || (g == gen && i < shards) {
+		g, i, ok := parseShard(&cm)
+		if (ok && g == gen && i < shards) || cm.Name == pointerName || !strings.HasPrefix(cm.Name, shardNamePrefix) {
 			continue
 		}
 		err := cms.Delete(ctx, cm.Name, metav1.DeleteOptions{})
