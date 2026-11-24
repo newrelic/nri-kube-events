@@ -312,7 +312,7 @@ tests:
           count: 3
         template: templates/clusterrole.yaml
 
-  - it: sets a memory request and limit when resources are unset
+  - it: sets a memory request and no limit when resources are unset
     set:
       licenseKey: us-whatever
       cluster: a-cluster
@@ -324,8 +324,6 @@ tests:
           value:
             requests:
               memory: 256Mi
-            limits:
-              memory: 1Gi
 
   - it: resources win over the object state memory default
     set:

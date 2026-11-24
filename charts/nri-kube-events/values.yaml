@@ -125,9 +125,10 @@ objectState:
   #   describe scraper, which runs in the same container, caches every Pod, Node, Namespace,
   #   Service, PersistentVolume(Claim), Deployment, DaemonSet, Job and CronJob, and that cache
   #   grows with the cluster. These are estimates from the code, not measurements. With
-  #   object state enabled and `resources` unset, the chart requests 256Mi and limits the
-  #   container to 1Gi; on a large cluster, set `resources` from the pod's observed peak plus
-  #   the 150 MB the carrier can add during a list.
+  #   object state enabled and `resources` unset, the chart requests 256Mi and sets no limit,
+  #   as the chart does without object state, so turning object state on cannot make the pod
+  #   hit a limit it did not have. To set a limit, set `resources` from the pod's observed
+  #   peak with the account flag on, plus the 150 MB the carrier can add during a list.
   #
   # The hash store ConfigMaps and the HMAC key Secret have fixed names, so enable object state
   # in at most one release per namespace. The Role lets the carrier update and delete only

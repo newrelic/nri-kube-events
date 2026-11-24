@@ -52,12 +52,11 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           {{- else if (.Values.objectState).enabled }}
-          {{- /* Object state bounds its own memory; see the objectState comment in values.yaml */}}
+          {{- /* Object state bounds its own memory; see the objectState comment in values.yaml. No
+          limit: the describe scraper's cache in the same container grows with the cluster. */}}
           resources:
             requests:
               memory: 256Mi
-            limits:
-              memory: 1Gi
           {{- end }}
           args: ["-config", "/app/config/config.yaml", "-loglevel", "debug"]
           {{- if (.Values.objectState).enabled }}
