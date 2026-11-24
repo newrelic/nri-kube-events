@@ -1287,7 +1287,7 @@ func (s *blockingHeartbeatSink) Send(ctx context.Context, recs []Record) error {
 	return s.recordingSink.Send(ctx, recs)
 }
 
-// A heartbeat stuck on the Log API holds up neither the flush ticks nor a second heartbeat.
+// A heartbeat stuck on the forwarder holds up neither the flush ticks nor a second heartbeat.
 func TestHeartbeatDoesNotBlockRunLoop(t *testing.T) {
 	cfg := testConfig()
 	cfg.HeartbeatInterval = 10 * time.Millisecond

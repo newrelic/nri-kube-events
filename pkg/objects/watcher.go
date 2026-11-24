@@ -184,7 +184,7 @@ func NewWatcher(cfg Config, dyn dynamic.Interface, disc discovery.DiscoveryInter
 // more, and returns that flush's error. Run never loads the store: main loads it once, with
 // a startup deadline, and exits if that fails. Heartbeats and retries of failed sends run
 // in their own goroutines, as do the resend scans of unchanged objects while ResendAfter is
-// set, so the discovery and flush ticks never wait on the Log API.
+// set, so the discovery and flush ticks never wait on the forwarder.
 func (w *Watcher) Run(ctx context.Context) error {
 	w.dropOwnStoreEntries()
 	w.mu.Lock()
