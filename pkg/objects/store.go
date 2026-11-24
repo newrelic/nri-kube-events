@@ -73,10 +73,11 @@ type Store struct {
 	// dirty holds, per shard index changed since its last successful write, when it first
 	// changed.
 	dirty map[int]time.Time
+	// reshardLeft: see reshardGen.
+	reshardLeft map[int]bool
 	// historyStart is the pointer's history-start annotation, set by Load.
 	historyStart time.Time
-
-	namespace string
+	namespace    string
 
 	// flushMu serializes Load and Flush.
 	flushMu sync.Mutex
@@ -87,14 +88,21 @@ type Store struct {
 	// by a reshard, so every reshard, retries included, writes a number never used before,
 	// in the slot the pointer does not name.
 	gen, maxGen int
-	hasPointer  bool
+	// reshardGen is the generation a reshard in progress writes, 0 when none is; it has
+	// reshardShards shards, and reshardLeft holds those not written since they last
+	// changed. The pointer moves to it once reshardLeft is empty.
+	reshardGen    int
+	reshardShards int
+	hasPointer    bool
 	// rewrite is set when the entries must be written into a new generation: after a
-	// change of shard count, a failed reshard, or a Load that could not trust the layout.
+	// change of shard count, or a Load that could not trust the layout.
 	rewrite bool
 	// cleanup is set while shard ConfigMaps outside the current generation may exist.
 	cleanup bool
-	// verifyPointer is set after a failed reshard, whose pointer write may have landed.
+	// verifyPointer is set after a failed pointer write, which may have landed.
 	verifyPointer bool
+	// overCapacity is set while the store needs more than MaxShards shards.
+	overCapacity bool
 }
 
 // NewStore returns an empty store with one shard. Call Load to read the stored entries.
@@ -190,6 +198,12 @@ func (s *Store) readPointer(ctx context.Context) error {
 		s.gen = gen
 		s.hasPointer = true
 		s.maxGen = max(s.maxGen, gen)
+		if gen == s.reshardGen {
+			// The failed pointer write landed: the reshard is done.
+			s.reshardGen = 0
+			s.reshardLeft = nil
+			s.cleanup = true
+		}
 	}
 	return nil
 }
@@ -262,10 +276,14 @@ func (s *Store) Load(ctx context.Context) error {
 	s.dirty = map[int]time.Time{}
 	s.rewrite = relayout || (complete && shards != ptrShards)
 	s.hasPointer = ptr != nil
+	// The pointer's generation is the one in use even when it is incomplete, so a reshard
+	// never writes into the slot it names.
 	s.gen = 0
-	if complete {
+	if ptrOK {
 		s.gen = ptrGen
 	}
+	s.reshardGen = 0
+	s.reshardLeft = nil
 	s.maxGen = max(maxGen, ptrGen)
 	s.cleanup = cleanup
 	s.historyStart = historyStart
@@ -468,15 +486,14 @@ func (s *Store) Flush(ctx context.Context) error {
 // changed first before the others. With a positive budget it stops before a shard whose
 // write would take the bytes written in this call past budget, but always writes at least
 // one shard; the shards left stay dirty for the next call. A budget of 0 writes every
-// dirty shard. A reshard writes every shard whatever the budget.
+// dirty shard. A reshard keeps the same budget.
 //
 // With nothing changed it makes no API calls. If the shard count holds, it updates the
 // current generation's dirty shards in place, and a shard that fails stays dirty for the
-// next flush. If a shard would pass 5,000
-// entries or 900,000 bytes, Flush raises the count and reshards: it writes every shard of a
-// new generation, moves the pointer to it, and only then deletes the older generations. A
-// failure before the pointer moves leaves the old generation in use and untouched, and the
-// next Flush retries the reshard.
+// next flush. If a shard would pass 5,000 entries or 900,000 bytes, it raises the count
+// and reshards (see reshard): over one or more flushes it writes every shard of a new
+// generation, then moves the pointer to it, and only then deletes the older generations.
+// Until the pointer moves the old generation stays in use and untouched.
 func (s *Store) FlushBudget(ctx context.Context, budget int) (err error) {
 	s.flushMu.Lock()
 	defer s.flushMu.Unlock()
@@ -488,40 +505,38 @@ func (s *Store) FlushBudget(ctx context.Context, budget int) (err error) {
 
 	s.mu.Lock()
 	metricHashStoreEntries.Set(float64(len(s.entries)))
-	if len(s.dirty) == 0 && !s.rewrite && !s.cleanup {
+	if len(s.dirty) == 0 && !s.rewrite && !s.cleanup && !s.verifyPointer && s.reshardGen == 0 {
 		s.mu.Unlock()
 		return nil
 	}
-	groups := s.group(s.shards)
-	for overfull(groups) {
-		if s.shards == MaxShards {
-			n := len(s.entries)
-			s.mu.Unlock()
-			return fmt.Errorf("hash store of %d entries needs more than %d shards; not writing it", n, MaxShards)
-		}
-		s.shards++
-		s.rewrite = true
-		groups = s.group(s.shards)
-	}
-	if s.rewrite || !s.hasPointer {
-		if s.verifyPointer {
-			s.mu.Unlock()
-			if err := s.readPointer(ctx); err != nil {
-				return err
-			}
-			s.mu.Lock()
-		}
-		// The new generation goes in the slot the pointer does not name, so the generation
-		// in use is never written in place.
-		newGen := s.maxGen + 1
-		if s.hasPointer && slotOf(newGen) == slotOf(s.gen) {
-			newGen++
-		}
-		s.dirty = map[int]time.Time{}
-		s.rewrite = false
+	groups, err := s.layout()
+	if err != nil {
 		s.mu.Unlock()
-		return s.reshard(ctx, newGen, groups)
+		return err
 	}
+	if s.verifyPointer {
+		s.mu.Unlock()
+		if err := s.readPointer(ctx); err != nil {
+			return err
+		}
+		s.mu.Lock()
+	}
+	if s.reshardGen == 0 && (s.rewrite || !s.hasPointer) {
+		s.beginReshard()
+	}
+	if s.reshardGen != 0 {
+		gen := s.reshardGen
+		write := s.takeReshard(groups, budget)
+		s.mu.Unlock()
+		return s.reshard(ctx, gen, groups, write)
+	}
+	return s.writeInPlace(ctx, groups, budget)
+}
+
+// writeInPlace writes the dirty shards of the generation in use within budget, then
+// deletes leftover generations when cleanup is set. The caller holds s.mu, which
+// writeInPlace releases.
+func (s *Store) writeInPlace(ctx context.Context, groups []map[string]string, budget int) error {
 	gen := s.gen
 	write := s.takeDirty(groups, budget)
 	cleanup := s.cleanup
@@ -586,38 +601,127 @@ func (s *Store) takeDirty(groups []map[string]string, budget int) []dirtyShard {
 	return take
 }
 
-// reshard writes groups as generation gen, moves the pointer to it, and deletes every other
-// shard ConfigMap. It stops at the first failure.
-func (s *Store) reshard(ctx context.Context, gen int, groups []map[string]string) error {
-	// A failed pointer write may still have been applied (a timeout or a lost response), so
-	// the pointer can already name gen. The retry must never rewrite gen in place, so every
-	// failure retires gen: the retry writes gen+1, and gen is deleted only after a later
-	// pointer move succeeds.
-	fail := func(err error) error {
-		s.mu.Lock()
+// layout returns the entries grouped by shard, raising the shard count, and marking a
+// reshard, until no shard is overfull. A store that would need more than MaxShards shards
+// is refused with an error, an error log the first time, and the over-capacity gauge. The
+// caller holds s.mu.
+func (s *Store) layout() ([]map[string]string, error) {
+	groups := s.group(s.shards)
+	for overfull(groups) {
+		if s.shards == MaxShards {
+			n := len(s.entries)
+			if !s.overCapacity {
+				log.WithFields(log.Fields{"entries": n, "maxShards": MaxShards}).Error(
+					"objects: the hash store needs more shards than the chart's Role names; it is not written, so a restart sends every object again and cannot tombstone objects deleted while down")
+			}
+			s.overCapacity = true
+			metricHashStoreOverCapacity.Set(1)
+			return nil, fmt.Errorf("hash store of %d entries needs more than %d shards; not writing it", n, MaxShards)
+		}
+		s.shards++
 		s.rewrite = true
-		s.maxGen = max(s.maxGen, gen)
-		// The pointer write may have landed; the retry reads it before picking a slot.
+		groups = s.group(s.shards)
+	}
+	if s.overCapacity {
+		s.overCapacity = false
+		metricHashStoreOverCapacity.Set(0)
+	}
+	return groups, nil
+}
+
+// beginReshard starts a reshard into a new generation, in the slot the pointer does not
+// name, so the generation in use is never written in place. The caller holds s.mu.
+func (s *Store) beginReshard() {
+	newGen := s.maxGen + 1
+	if s.hasPointer && slotOf(newGen) == slotOf(s.gen) {
+		newGen++
+	}
+	s.maxGen = newGen
+	s.reshardGen = newGen
+	s.reshardShards = 0
+	s.rewrite = false
+}
+
+// takeReshard returns the shards of the reshard in progress that one flush writes within
+// budget bytes (at least one; all with a budget of 0), and removes them from reshardLeft.
+// A change of shard count since the reshard began starts its shards over; a shard changed
+// since it was written is written again. The caller holds s.mu.
+func (s *Store) takeReshard(groups []map[string]string, budget int) []int {
+	if s.reshardShards != len(groups) {
+		s.reshardShards = len(groups)
+		s.reshardLeft = make(map[int]bool, len(groups))
+		for i := range groups {
+			s.reshardLeft[i] = true
+		}
+	}
+	for i := range s.dirty {
+		s.reshardLeft[i] = true
+	}
+	s.dirty = map[int]time.Time{}
+	left := make([]int, 0, len(s.reshardLeft))
+	for i := range s.reshardLeft {
+		left = append(left, i)
+	}
+	sort.Ints(left)
+	var take []int
+	written := 0
+	for _, i := range left {
+		n := shardBytes(groups[i])
+		if budget > 0 && len(take) > 0 && written+n > budget {
+			break
+		}
+		take = append(take, i)
+		written += n
+		delete(s.reshardLeft, i)
+	}
+	return take
+}
+
+// reshard writes the shards write of generation gen, the reshard in progress, from groups.
+// Once every shard of gen is written it moves the pointer to gen and deletes the older
+// generations. Until then the pointer stays on the old generation, which is not written
+// any more: a crash in between leaves both, and the next Load merges them, newest copy of
+// each uid first. A shard that fails is written again at the next flush. A pointer write
+// that fails may still have landed, so the next flush reads the pointer before it
+// continues.
+func (s *Store) reshard(ctx context.Context, gen int, groups []map[string]string, write []int) error {
+	for k, i := range write {
+		// Create falls back to Update if a shard of gen already exists.
+		if err := s.writeShard(ctx, gen, i, groups[i], false); err != nil {
+			s.mu.Lock()
+			for _, j := range write[k:] {
+				s.reshardLeft[j] = true
+			}
+			s.mu.Unlock()
+			return err
+		}
+	}
+	s.mu.Lock()
+	done := len(s.reshardLeft) == 0 && len(s.dirty) == 0
+	s.mu.Unlock()
+	if !done {
+		return nil
+	}
+	if err := s.writePointer(ctx, gen, len(groups)); err != nil {
+		s.mu.Lock()
 		s.verifyPointer = true
 		s.mu.Unlock()
 		return err
 	}
-	// Create falls back to Update if a shard of gen already exists.
-	for i := range groups {
-		if err := s.writeShard(ctx, gen, i, groups[i], false); err != nil {
-			return fail(err)
-		}
-	}
-	if err := s.writePointer(ctx, gen, len(groups)); err != nil {
-		return fail(err)
-	}
+	s.finishReshard(gen)
+	return s.deleteOldGenerations(ctx, gen, len(groups))
+}
+
+// finishReshard makes gen, whose pointer write succeeded, the generation in use.
+func (s *Store) finishReshard(gen int) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.gen = gen
-	s.maxGen = gen
+	s.maxGen = max(s.maxGen, gen)
 	s.hasPointer = true
 	s.cleanup = true
-	s.mu.Unlock()
-	return s.deleteOldGenerations(ctx, gen, len(groups))
+	s.reshardGen = 0
+	s.reshardLeft = nil
 }
 
 // deleteOldGenerations deletes every shard ConfigMap outside generation gen or beyond its

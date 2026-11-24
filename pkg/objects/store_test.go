@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -452,14 +453,13 @@ func TestReshardCreateFailureKeepsOldGeneration(t *testing.T) {
 	// A crash here loses nothing that was persisted before the Flush.
 	requireAll(t, client, 4000, testUID, testEntry)
 
-	// The next Flush reads the pointer, retries the reshard into a fresh generation in the
-	// slot the pointer does not name (generation 3 would share generation 1's slot, so it
-	// is 4), then deletes generation 1.
+	// The next Flush writes the shards of generation 2 it has not written yet, moves the
+	// pointer, then deletes generation 1.
 	fail = false
 	require.NoError(t, s.Flush(ctx))
 	gen, shards = pointer(t, client)
-	assert.Equal(t, 4, gen)
-	assert.Equal(t, map[int]int{4: shards}, generations(t, client))
+	assert.Equal(t, 2, gen)
+	assert.Equal(t, map[int]int{2: shards}, generations(t, client))
 	requireAll(t, client, 12000, testUID, testEntry)
 	requireSettled(t, client)
 }
@@ -505,11 +505,12 @@ func TestCrashBeforePointerMoveRecoversViaMerge(t *testing.T) {
 		require.Equal(t, testEntry(i), got)
 	}
 
-	// Its first Flush rewrites into a generation above both, then removes them.
+	// Its first Flush rewrites into a generation above both, in the slot the pointer does
+	// not name (generation 3 shares generation 1's slot, so it is 4), then removes them.
 	require.NoError(t, r.Flush(ctx))
 	gen, shards := pointer(t, client)
-	assert.Equal(t, 3, gen)
-	assert.Equal(t, map[int]int{3: shards}, generations(t, client))
+	assert.Equal(t, 4, gen)
+	assert.Equal(t, map[int]int{4: shards}, generations(t, client))
 	requireSettled(t, client)
 }
 
@@ -946,8 +947,8 @@ func TestShardNamesAreFinite(t *testing.T) {
 	assert.False(t, ok, "a generation label whose slot is not the name's")
 }
 
-// A reshard after one whose pointer write landed but reported an error reads the pointer
-// and writes into the other slot, never into the generation the pointer names.
+// A reshard whose pointer write landed but reported an error is finished by the next flush,
+// which reads the pointer first.
 func TestReshardAfterLandedPointerWriteKeepsThePointedSlot(t *testing.T) {
 	ctx := context.Background()
 	client := newClient()
@@ -983,8 +984,8 @@ func TestReshardAfterLandedPointerWriteKeepsThePointedSlot(t *testing.T) {
 
 	require.NoError(t, s.Flush(ctx))
 	gen, shards := pointer(t, client)
-	assert.Equal(t, 3, gen, "the retry writes the slot of generation 1, not generation 2's")
-	assert.Equal(t, map[int]int{3: shards}, generations(t, client))
+	assert.Equal(t, 2, gen, "the next flush reads the pointer, finds the reshard done, and writes no generation into the slot it names")
+	assert.Equal(t, map[int]int{2: shards}, generations(t, client))
 	requireAll(t, client, 12000, testUID, testEntry)
 }
 
@@ -1019,4 +1020,66 @@ func TestHMACKeyFillsTheChartsEmptySecret(t *testing.T) {
 	k2, err := LoadOrCreateHMACKey(ctx, client, storeNS)
 	require.NoError(t, err)
 	assert.Equal(t, k1, k2)
+}
+
+// A reshard with a budget writes the new generation over several flushes, keeps the
+// pointer on the old one until every new shard is written, and loses nothing if the
+// process restarts in between.
+func TestReshardRespectsTheFlushBudget(t *testing.T) {
+	ctx := context.Background()
+	client := newClient()
+	s := NewStore(client, storeNS)
+	require.NoError(t, s.Load(ctx))
+	for i := 0; i < 4000; i++ {
+		s.Put(testUID(i), testEntry(i))
+	}
+	require.NoError(t, s.Flush(ctx))
+	for i := 4000; i < 12000; i++ {
+		s.Put(testUID(i), testEntry(i))
+	}
+
+	client.ClearActions()
+	require.NoError(t, s.FlushBudget(ctx, 1))
+	assert.Equal(t, 1, countActions(client, "create")+countActions(client, "update"), "one shard per flush at a tiny budget")
+	gen, _ := pointer(t, client)
+	assert.Equal(t, 1, gen, "the pointer waits for every new shard")
+
+	// A restart now merges the old generation and the new shard written so far.
+	r := NewStore(client, storeNS)
+	require.NoError(t, r.Load(ctx))
+	got, ok := r.Get(testUID(0))
+	require.True(t, ok)
+	assert.Equal(t, testEntry(0), got)
+
+	for flushes := 0; ; flushes++ {
+		require.Less(t, flushes, 10)
+		require.NoError(t, s.FlushBudget(ctx, 1))
+		if g, _ := pointer(t, client); g != 1 {
+			break
+		}
+	}
+	gen, shards := pointer(t, client)
+	assert.Equal(t, 2, gen)
+	assert.Equal(t, map[int]int{2: shards}, generations(t, client))
+	requireAll(t, client, 12000, testUID, testEntry)
+}
+
+// A store that needs more than MaxShards shards is not written; the gauge and an error log
+// say so once, and the flush returns an error every time.
+func TestStoreOverCapacityIsRefusedLoudly(t *testing.T) {
+	s := NewStore(newClient(), storeNS)
+	require.NoError(t, s.Load(context.Background()))
+	s.mu.Lock()
+	s.shards = MaxShards
+	for i := 0; i < MaxShards*maxShardEntries+1; i++ {
+		s.entries[testUID(i)] = Entry{Hash: "h"}
+	}
+	s.markDirty(0)
+	s.mu.Unlock()
+	err := s.Flush(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "more than 128 shards")
+	var m dto.Metric
+	require.NoError(t, metricHashStoreOverCapacity.Write(&m))
+	assert.Equal(t, 1.0, m.GetGauge().GetValue())
 }
