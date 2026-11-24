@@ -90,7 +90,7 @@ func TestSplitJoinRoundTrip(t *testing.T) {
 			parts := Split(s)
 			assert.Len(t, parts, c.parts)
 			assertParts(t, parts)
-			assert.Equal(t, s, Join(parts))
+			assert.Equal(t, s, join(parts))
 		})
 	}
 }
@@ -126,20 +126,20 @@ func TestSplitByteCapsMultibyteParts(t *testing.T) {
 	// A part of 4-byte runes ends at (MaxAttrBytes-len(Mark))/4 = 1023 runes, well short of Step.
 	assert.Greater(t, len(parts), (20_000+Step-1)/Step)
 	assertParts(t, parts)
-	assert.Equal(t, s, Join(parts))
+	assert.Equal(t, s, join(parts))
 
 	// A mixed alphabet, so the overlap check compares distinct runes.
 	s = multibyteText("é中😀a", 20_000)
 	parts = Split(s)
 	assertParts(t, parts)
-	assert.Equal(t, s, Join(parts))
+	assert.Equal(t, s, join(parts))
 }
 
 func TestSplitJoinRoundTripMultibyte(t *testing.T) {
 	s := multibyteText("日本語😀🚀a", 20000)
 	parts := Split(s)
 	assertParts(t, parts)
-	assert.Equal(t, s, Join(parts))
+	assert.Equal(t, s, join(parts))
 }
 
 func TestOverlapCoversBoundaryTerm(t *testing.T) {
@@ -274,7 +274,7 @@ func TestBuildRecordsSmallObject(t *testing.T) {
 	// The part holds compact JSON with HTML escaping off and managedFields kept.
 	p0, ok := a["object.p000"].(string)
 	require.True(t, ok)
-	text := Join([]string{p0})
+	text := join([]string{p0})
 	assert.Contains(t, text, `"note":"<b>&</b>"`)
 	assert.Contains(t, text, `"managedFields"`)
 	assert.False(t, strings.HasSuffix(text, "\n"))
@@ -296,7 +296,7 @@ func TestBuildRecordsBodyIsTheRawObject(t *testing.T) {
 	a := recs[0].Attributes
 	text, err := serialize(obj)
 	require.NoError(t, err)
-	assert.Equal(t, text, Join([]string{a["object.p000"].(string)}))
+	assert.Equal(t, text, join([]string{a["object.p000"].(string)}))
 	assert.Contains(t, text, `"reconciledAt"`)
 	gen, ok := number(obj["metadata"].(map[string]any)["generation"])
 	require.True(t, ok)
@@ -607,7 +607,7 @@ func assertRecordsRebuild(t *testing.T, obj map[string]any, recs []Record) {
 		assert.LessOrEqual(t, n, PartsPerRecord)
 	}
 	require.Len(t, parts, nparts)
-	joined := Join(parts)
+	joined := join(parts)
 	assert.Equal(t, text, joined)
 	sum := sha256.Sum256([]byte(joined))
 	assert.Equal(t, hex.EncodeToString(sum[:]), recs[0].Attributes["object.sha256"])
@@ -727,4 +727,23 @@ func keys(m map[string]any) []string {
 		out = append(out, k)
 	}
 	return out
+}
+
+// join rebuilds the string that Split cut: it strips Mark from every part and drops the
+// first Overlap runes of every part after the first.
+func join(parts []string) string {
+	var b strings.Builder
+	for i, p := range parts {
+		p = strings.TrimPrefix(p, Mark)
+		if i > 0 {
+			r := []rune(p)
+			if len(r) > Overlap {
+				p = string(r[Overlap:])
+			} else {
+				p = ""
+			}
+		}
+		b.WriteString(p)
+	}
+	return b.String()
 }

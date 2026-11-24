@@ -83,7 +83,7 @@ func ParseGVR(s string) (schema.GroupVersionResource, error) {
 //
 // The overlap is at most Overlap*utf8.UTFMax = 1,024 bytes, and part 0 holds at least
 // (MaxAttrBytes-len(Mark))/utf8.UTFMax = 1,023 runes, so every later part can start
-// Overlap runes back and Join can drop exactly Overlap runes from it.
+// Overlap runes back and a reader can drop exactly Overlap runes from it to rejoin the parts.
 func Split(s string) []string {
 	r := []rune(s)
 	var parts []string
@@ -109,25 +109,6 @@ func Split(s string) []string {
 		end = next
 	}
 	return parts
-}
-
-// Join rebuilds the string that Split cut: it strips Mark from every part and drops the
-// first Overlap runes of every part after the first.
-func Join(parts []string) string {
-	var b strings.Builder
-	for i, p := range parts {
-		p = strings.TrimPrefix(p, Mark)
-		if i > 0 {
-			r := []rune(p)
-			if len(r) > Overlap {
-				p = string(r[Overlap:])
-			} else {
-				p = ""
-			}
-		}
-		b.WriteString(p)
-	}
-	return b.String()
 }
 
 // serialize writes obj as compact JSON without HTML escaping and without a trailing newline.

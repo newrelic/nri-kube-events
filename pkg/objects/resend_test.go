@@ -57,7 +57,7 @@ func byOrder(uids []string) []string {
 // storeConfigMapA stores ConfigMap default/a, uid-a, value v1 as sent at lastSent, with the
 // hash the watcher computes for it.
 func storeConfigMapA(store *Store, lastSent time.Time) {
-	_, hash := PrepareObject(cmGVR, "ConfigMap", configMap("a", "uid-a", "v1").Object, watcherKey)
+	_, hash := prepareObject(cmGVR, "ConfigMap", configMap("a", "uid-a", "v1").Object, watcherKey)
 	store.Put("uid-a", Entry{GVR: "/v1/configmaps", Kind: "ConfigMap", Namespace: "default", Name: "a", Hash: hash, LastSent: lastSent.Unix()})
 }
 

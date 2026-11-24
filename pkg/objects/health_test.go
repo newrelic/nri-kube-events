@@ -100,7 +100,7 @@ func TestNodeMemoryPressureFalseIsHealthy(t *testing.T) {
 }
 
 func TestProviderInstalledIsNotNegative(t *testing.T) {
-	assert.False(t, IsNegativeCondition("ProviderInstalled"))
+	assert.False(t, isNegativeCondition("ProviderInstalled"))
 	h := ComputeHealth(withConditions("Provider", cond("ProviderInstalled", "True", "")))
 	assert.Empty(t, h.ConditionsUnhealthy)
 	assert.False(t, h.Unhealthy)
@@ -116,7 +116,7 @@ func TestIsNegativeCondition(t *testing.T) {
 		"Dangling",
 	}
 	for _, typ := range negative {
-		assert.True(t, IsNegativeCondition(typ), typ)
+		assert.True(t, isNegativeCondition(typ), typ)
 	}
 	positive := []string{
 		"Ready", "Available", "Progressing", "ProviderInstalled", "Initialized",
@@ -124,7 +124,7 @@ func TestIsNegativeCondition(t *testing.T) {
 		"Unfailed", "Errored", "ErrorsResolved", "",
 	}
 	for _, typ := range positive {
-		assert.False(t, IsNegativeCondition(typ), typ)
+		assert.False(t, isNegativeCondition(typ), typ)
 	}
 }
 

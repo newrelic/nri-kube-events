@@ -491,20 +491,6 @@ func TestEventsResourceNotWatched(t *testing.T) {
 	}, found)
 }
 
-func TestSkippedResourceNotWatched(t *testing.T) {
-	disc := newTestDiscovery(coreList(
-		cmResource(),
-		metav1.APIResource{Name: "secrets", Kind: "Secret", Namespaced: true, Verbs: watchVerbs},
-	))
-	cfg := testConfig()
-	cfg.Skip = map[schema.GroupVersionResource]bool{secretsGVR: true}
-	w := watcherOnly(t, cfg, disc)
-
-	found, _, err := w.discover()
-	require.NoError(t, err)
-	assert.Equal(t, map[schema.GroupVersionResource]string{cmGVR: "ConfigMap"}, found)
-}
-
 func TestNewCRDGetsWatchAfterRediscovery(t *testing.T) {
 	disc := newTestDiscovery(coreList(cmResource()), crdList())
 	w, dyn, store, sink := newTestWatcher(t, testConfig(), disc)
@@ -616,8 +602,9 @@ func TestHeartbeatRecordShape(t *testing.T) {
 		"carrier.failedKindCount": 1,
 		"carrier.failedKinds":     "/v1/secrets",
 		"carrier.unsyncedObjects": 0,
-		"carrier.accountFlag":     AccountFlagNotRequired,
-		"carrier.resyncCursor":    "0000000000000000",
+		// testConfig sets no AccountFlag.
+		"carrier.accountFlag":  "unknown",
+		"carrier.resyncCursor": "0000000000000000",
 		// The store was never loaded, so its history has no start yet.
 		"carrier.historyStart": int64(0),
 		// testConfig leaves the resend off.
@@ -634,7 +621,7 @@ func TestHeartbeatRecordShape(t *testing.T) {
 	// A relist that fails again counts the kind once more.
 	w.listFailed(secretGVR, errors.New("forbidden"))
 	assert.Equal(t, 1, w.HeartbeatRecord(now).Attributes["carrier.failedKindCount"])
-	assert.Equal(t, []string{GVRString(secretGVR)}, w.FailedGVRs())
+	assert.Equal(t, GVRString(secretGVR), w.HeartbeatRecord(now).Attributes["carrier.failedKinds"])
 }
 
 func TestHeartbeatPublishesResendAfterSeconds(t *testing.T) {
@@ -754,7 +741,7 @@ func TestHeartbeatKindsSplitIntoParts(t *testing.T) {
 		parts = append(parts, p)
 	}
 	require.Greater(t, len(parts), 1)
-	assert.Equal(t, want.String(), Join(parts))
+	assert.Equal(t, want.String(), join(parts))
 	assert.Equal(t, 400, hb.Attributes["carrier.kindCount"])
 }
 
@@ -1356,10 +1343,10 @@ func TestHeartbeatNewAttributes(t *testing.T) {
 	assert.Equal(t, "0000000000000abc", w.HeartbeatRecord(time.Now()).Attributes["carrier.resyncCursor"])
 }
 
-func TestHeartbeatAccountFlagDefaultsToNotRequired(t *testing.T) {
+func TestHeartbeatAccountFlagWithoutASourceIsUnknown(t *testing.T) {
 	w := watcherOnly(t, testConfig(), nil)
 	h := w.HeartbeatRecord(time.Now())
-	assert.Equal(t, "not_required", h.Attributes["carrier.accountFlag"])
+	assert.Equal(t, "unknown", h.Attributes["carrier.accountFlag"])
 	// No kind failed its list.
 	assert.Equal(t, "", h.Attributes["carrier.failedKinds"])
 }
@@ -1550,7 +1537,7 @@ func TestPrepareObjectMatchesHandleObject(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			w, _, store, _ := newTestWatcher(t, testConfig(), nil)
-			red, hash := PrepareObject(tc.gvr, w.kindOf(tc.gvr), tc.obj, watcherKey)
+			red, hash := prepareObject(tc.gvr, w.kindOf(tc.gvr), tc.obj, watcherKey)
 			require.NoError(t, w.HandleObject(context.Background(), tc.gvr, OpInitial, tc.obj))
 			e, ok := store.Get(tc.uid)
 			require.True(t, ok)
@@ -1573,15 +1560,6 @@ func TestIsOwnStoreObjectNeedsCarrierNamespace(t *testing.T) {
 	assert.False(t, IsOwnStoreObject("other", cmGVR, pointerObj))
 	assert.False(t, IsOwnStoreObject("", cmGVR, pointerObj))
 	assert.False(t, IsOwnStoreObject(testNS, widgetGVR, pointerObj))
-}
-
-func TestDiscoverMatchesWatcherDiscover(t *testing.T) {
-	disc := newTestDiscovery(coreList(cmResource(), secretResource()), widgetList())
-	skip := map[schema.GroupVersionResource]bool{secretsGVR: true}
-	found, failed, err := Discover(disc, skip)
-	require.NoError(t, err)
-	assert.Empty(t, failed)
-	assert.Equal(t, map[schema.GroupVersionResource]string{cmGVR: "ConfigMap", widgetGVR: "Widget"}, found)
 }
 
 func TestHandleForceSendsUnchangedObject(t *testing.T) {

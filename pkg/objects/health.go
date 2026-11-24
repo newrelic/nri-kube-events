@@ -88,8 +88,8 @@ var completedReadiness = map[string]bool{
 	"PodReadyToStartContainers": true,
 }
 
-// IsNegativeCondition reports whether a True status of conditionType means a problem.
-func IsNegativeCondition(conditionType string) bool {
+// isNegativeCondition reports whether a True status of conditionType means a problem.
+func isNegativeCondition(conditionType string) bool {
 	if conditionType == "" {
 		return false
 	}
@@ -134,7 +134,7 @@ func conditionIsBad(typ, status string) bool {
 	if neutralTypes[strings.ToLower(typ)] || transientTypes[strings.ToLower(typ)] {
 		return false
 	}
-	if IsNegativeCondition(typ) {
+	if isNegativeCondition(typ) {
 		return status == "" || status == "True"
 	}
 	return status == "False" || status == "Unknown"

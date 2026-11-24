@@ -22,6 +22,8 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
+
+	"github.com/newrelic/nri-kube-events/pkg/accountflag"
 )
 
 const (
@@ -29,10 +31,6 @@ const (
 	DefaultHeartbeatInterval = 60 * time.Second
 	DefaultFlushInterval     = 30 * time.Second
 	DefaultResendInterval    = time.Minute
-
-	// AccountFlagNotRequired is the heartbeat's carrier.accountFlag when Config.AccountFlag
-	// is nil. The carrier in nri-kube-events always sets it; tests and tools leave it nil.
-	AccountFlagNotRequired = "not_required"
 
 	// discoveryRetry is how soon a discovery that failed outright is tried again.
 	discoveryRetry = 10 * time.Second
@@ -58,11 +56,8 @@ const (
 
 // Config configures a Watcher. A zero interval takes its default.
 type Config struct {
-	// Skip lists resources the watcher never watches. The objects-estimate tool skips
-	// Secrets so that no Secret value reaches the machine it runs on.
-	Skip map[schema.GroupVersionResource]bool
 	// AccountFlag reports the account collection flag for the heartbeat's
-	// carrier.accountFlag. Nil reports AccountFlagNotRequired.
+	// carrier.accountFlag. Nil reports unknown.
 	AccountFlag func() string
 	// Coverage, when set, records the resources this watcher collects, for the describe
 	// path to skip. The watcher clears it when it stops.
@@ -283,16 +278,11 @@ func (w *Watcher) triggerRediscovery() {
 	}
 }
 
-// discover runs Discover with the watcher's discovery client and skip list.
-func (w *Watcher) discover() (map[schema.GroupVersionResource]string, map[string]struct{}, error) {
-	return Discover(w.disc, w.cfg.Skip)
-}
-
-// Discover returns every resource with the list and watch verbs, in the version its group
-// prefers, mapped to its kind. Subresources, both events resources and the resources in
-// skip are left out. When some groups fail discovery, it returns the others and names the
-// failed groups.
-func Discover(disc discovery.DiscoveryInterface, skip map[schema.GroupVersionResource]bool) (found map[schema.GroupVersionResource]string, failedGroups map[string]struct{}, err error) {
+// discover returns every resource with the list and watch verbs, in the version its group
+// prefers, mapped to its kind. Subresources and both events resources are left out. When
+// some groups fail discovery, it returns the others and names the failed groups.
+func (w *Watcher) discover() (found map[schema.GroupVersionResource]string, failedGroups map[string]struct{}, err error) {
+	disc := w.disc
 	lists, err := discovery.ServerPreferredResources(disc)
 	failed := map[string]struct{}{}
 	if err != nil {
@@ -320,9 +310,6 @@ func Discover(disc discovery.DiscoveryInterface, skip map[schema.GroupVersionRes
 				continue
 			}
 			if r.Name == "events" && (gv.Group == "" || gv.Group == "events.k8s.io") {
-				continue
-			}
-			if skip[gv.WithResource(r.Name)] {
 				continue
 			}
 			found[gv.WithResource(r.Name)] = r.Kind
@@ -458,20 +445,6 @@ func (w *Watcher) listFailed(gvr schema.GroupVersionResource, err error) {
 		log.WithError(err).WithField("gvr", GVRString(gvr)).Warn("objects: list failed; the kind sends no deletes until a list succeeds")
 	}
 	w.resolveLocked(st)
-}
-
-// FailedGVRs returns, sorted, the watched resources whose most recent list failed.
-func (w *Watcher) FailedGVRs() []string {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	var out []string
-	for gvr, st := range w.gvrs {
-		if st.listFailing {
-			out = append(out, GVRString(gvr))
-		}
-	}
-	sort.Strings(out)
-	return out
 }
 
 // markListed marks gvr as listed: its kind joins the heartbeat's kinds, and, until the
@@ -711,7 +684,7 @@ func (w *Watcher) handle(ctx context.Context, gvr schema.GroupVersionResource, o
 		}
 		return nil
 	}
-	red, hash := PrepareObject(gvr, w.kindOf(gvr), obj, w.key)
+	red, hash := prepareObject(gvr, w.kindOf(gvr), obj, w.key)
 	meta, _ := red["metadata"].(map[string]any)
 	uid, _ := meta["uid"].(string)
 	if uid == "" {
@@ -767,11 +740,11 @@ func (w *Watcher) handle(ctx context.Context, gvr schema.GroupVersionResource, o
 	return nil
 }
 
-// PrepareObject returns obj as the watcher sends it, and its hash: apiVersion and kind
+// prepareObject returns obj as the watcher sends it, and its hash: apiVersion and kind
 // filled in where obj lacks them (kind is the kind discovery reports for gvr, and may be
 // empty), then redacted. Every object of core v1 secrets is redacted as a Secret, because
 // a watch object can lack its own kind field. obj itself is never modified.
-func PrepareObject(gvr schema.GroupVersionResource, kind string, obj map[string]any, hmacKey []byte) (redacted map[string]any, hash string) {
+func prepareObject(gvr schema.GroupVersionResource, kind string, obj map[string]any, hmacKey []byte) (redacted map[string]any, hash string) {
 	typed := withTypeMeta(gvr, kind, obj)
 	if gvr == secretsGVR {
 		redacted = RedactSecret(typed, hmacKey)
@@ -1005,7 +978,7 @@ func (w *Watcher) heartbeatRecord(now time.Time, state string, stoppedAt time.Ti
 	sort.Strings(failedGVRs)
 	failedList, _ := capList(failedGVRs)
 
-	accountFlag := AccountFlagNotRequired
+	accountFlag := accountflag.Unknown.String()
 	if w.cfg.AccountFlag != nil {
 		accountFlag = w.cfg.AccountFlag()
 	}
