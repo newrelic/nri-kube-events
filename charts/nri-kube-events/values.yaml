@@ -99,6 +99,94 @@ scrapers:
   events:
     enabled: true
 
+# -- Object state: watch every kind that can be listed and watched, except Events, and send each object's state as an `InfrastructureEvent`
+# through the forwarder sidecar, so `sinks.newRelicInfra` must stay enabled. Each custom attribute
+# set through `customAttributes` or `global.customAttributes` uses one of the 254 attributes NRDB
+# keeps per event on every object record, and the largest record already uses about 150. Keep
+# custom attributes under about 50, and never name one `clusterName`.
+# @default -- See `values.yaml`
+objectState:
+  # Cost per 1,000 objects in the cluster. These are estimates from the code, not measurements;
+  # the `nri_kube_events_objects_hash_store_bytes_written_total` metric and the pod's RSS give
+  # the real values.
+  # - Hash store: about 220 bytes per object in the shard ConfigMaps, so about 220 KB, and
+  #   about 0.5 MB of memory.
+  # - Hash store writes: a flush every 60 s rewrites the changed shards whole, oldest change
+  #   first, and writes at most about 1 MB per flush, so writes to etcd stay under about 1.4 GB
+  #   a day whatever the cluster size (16 KB/s). A small store writes far less. On a
+  #   200,000-object store (about 44 MB in 49 shards) every changed shard is written within
+  #   about 45 minutes; a restart in between sends the objects of the shards not yet written
+  #   again, and loses nothing. When the store grows past a shard boundary it is resharded
+  #   into the other name slot within the same budget, about one shard per flush, so a
+  #   200,000-object store reshards in about 45 minutes however much it changes meanwhile
+  #   (`..._hash_store_reshard_shards_left` shows the progress). Above about 640,000 objects (128 shards) the store is not written at all: the
+  #   carrier logs an error, sets `..._hash_store_over_capacity` to 1, and a restart then
+  #   sends every object again. The `nri_kube_events_objects_hash_store_bytes_written_total`
+  #   and `..._hash_store_dirty_shards` metrics show the actual load. Every client that
+  #   watches ConfigMaps cluster-wide receives each write.
+  # - Memory: the carrier lists at most 2 kinds at once, in pages of 100 objects (10 for
+  #   Secrets), and queues at most 32 MB of records, so its buffers stay under about 150 MB
+  #   whatever the cluster size. The hash store adds about 0.5 MB per 1,000 objects. The
+  #   describe scraper, which runs in the same container, caches every Pod, Node, Namespace,
+  #   Service, PersistentVolume(Claim), Deployment, DaemonSet, Job and CronJob, and that cache
+  #   grows with the cluster. These are estimates from the code, not measurements. With
+  #   object state enabled and `resources` unset, the chart requests 256Mi and sets no limit,
+  #   as the chart does without object state, so turning object state on cannot make the pod
+  #   hit a limit it did not have. To set a limit, set `resources` from the pod's observed
+  #   peak with the account flag on, plus the 150 MB the carrier can add during a list.
+  #
+  # The hash store ConfigMaps and the HMAC key Secret have fixed names, so enable object state
+  # in at most one release per namespace. The Role lets the carrier update and delete only
+  # those names; Kubernetes RBAC cannot limit create by name. The chart creates the HMAC key
+  # Secret without data and the carrier fills it on its first start, so the carrier cannot
+  # create Secrets. A GitOps tool that compares the live Secret with the chart sees the key
+  # the carrier added; ignore differences in that Secret's data. A forced replace of the
+  # Secret (`helm upgrade --force`, Argo CD `Replace=true`, or deleting it) clears the key:
+  # the next start generates a new one, logs a warning, counts
+  # `nri_kube_events_objects_redaction_key_replaced_total`, and, because every redaction
+  # marker changes, sends every object with a redacted value once more. With `rbac.create=false`,
+  # grant the same rules the chart's objects Role holds (templates/objects-role.yaml). The ServiceAccount can read every
+  # Secret, so with object state enabled the pod does not automount its token, and only the
+  # integration container gets one, through a projected volume; the forwarder sidecar does
+  # not.
+  #
+  # Redaction: before a record leaves the pod, the carrier replaces with a keyed hash marker
+  # every Secret and ConfigMap value, every container env value, every string under a field
+  # whose name looks like a credential, every string that looks like a private key, token,
+  # access key or URL with a password, and the same in annotations. Keys, env names and
+  # references are kept. A credential in an ordinary-looking field, such as a container
+  # argument, is not detected.
+  #
+  # Describe scraper: with `scrapers.descriptions.enabled` on, the describe scraper stops sending
+  # `<Kind>.Description` events for a kind once the carrier has listed and sent it, and resumes
+  # when the carrier stops collecting it: the account flag turns off, the carrier stops or fails,
+  # or the kind's list fails. On resume it describes every cached object of the kind once. The
+  # carrier collects all 10 kinds the describe scraper watches, so while it runs no description
+  # is sent: no event per object change and none per object every `resyncPeriod`. No
+  # `<Kind>.Description` history is written for that time, and none is backfilled.
+
+  # -- Enable object state. The deployment then runs one replica with the `Recreate` strategy and a
+  # 90 s termination grace period, the ClusterRole gets get, list and watch on every resource
+  # (Secrets included), and a Role grants ConfigMap and Secret writes in the release namespace.
+  # With `rbac.create=false` the chart renders none of that RBAC, and you grant it yourself.
+  # This value only installs the carrier. Collection is switched at run time by the account flag
+  # `Infra_Agent/k8s_object_state_enabled`, which is off by default: while it is off the carrier
+  # sends nothing and the describe scraper runs as before, and turning it off is the rollback;
+  # it stops collection at the next poll. When the flag turns on while the pod runs, the
+  # carrier starts after two polls in a row read it on (about 60 s), and at most once every
+  # 5 minutes; a pod that starts with the flag on starts at the first poll.
+  # This value cannot be a runtime flag, because what it installs cannot change at run time: the
+  # cluster-wide get, list and watch on every resource, Secrets included, and the one-replica
+  # `Recreate` strategy. A flag cannot grant or revoke RBAC or change the deployment strategy.
+  enabled: false
+  # -- Resend an unchanged object after this long. `"0"` turns the resend off.
+  resendAfter: "24h"
+  # -- Upper bound on object records sent per second. The carrier groups up to 500 records, or
+  # about 1 MB, into one POST to the forwarder sidecar, which is the forwarder's own batch
+  # limit, so 3200 is about 7 POSTs a second. The bound exists to keep the startup burst from
+  # filling the forwarder's event queue; lower it if the forwarder logs that its queue is full.
+  maxRecordsPerSecond: 3200
+
 # -- Sets pod's priorityClassName. Can be configured also with `global.priorityClassName`
 priorityClassName: ""
 # -- (bool) Sets pod's hostNetwork. Can be configured also with `global.hostNetwork`

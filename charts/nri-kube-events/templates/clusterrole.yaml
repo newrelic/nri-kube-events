@@ -39,4 +39,14 @@ rules:
   - get
   - watch
   - list
+{{- if (.Values.objectState).enabled }}
+- apiGroups:
+  - "*"
+  resources:
+  - "*"
+  verbs:
+  - get
+  - list
+  - watch
+{{- end }}
 {{- end -}}

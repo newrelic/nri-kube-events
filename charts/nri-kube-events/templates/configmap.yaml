@@ -21,3 +21,18 @@ data:
     captureDescribe: {{ .Values.scrapers.descriptions.enabled }}
     describeRefresh: {{ .Values.scrapers.descriptions.resyncPeriod | default "24h" }}
     captureEvents: {{ .Values.scrapers.events.enabled }}
+    {{- if (.Values.objectState).enabled }}
+    {{- if not .Values.sinks.newRelicInfra }}
+    {{- fail "objectState.enabled requires sinks.newRelicInfra" }}
+    {{- end }}
+    objectState:
+      enabled: true
+      resendAfter: {{ .Values.objectState.resendAfter | quote }}
+      maxRecordsPerSecond: {{ .Values.objectState.maxRecordsPerSecond }}
+      clusterName: {{ include "newrelic.common.cluster" . }}
+      namespace: {{ .Release.Namespace }}
+      agentEndpoint: http://localhost:8001/v1/data
+      nrStaging: {{ include "newrelic.common.nrStaging.value" . }}
+      fedramp: {{ include "newrelic.common.fedramp.enabled.value" . }}
+      proxy: {{ include "newrelic.common.proxy" . | quote }}
+    {{- end }}

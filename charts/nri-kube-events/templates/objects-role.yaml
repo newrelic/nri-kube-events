@@ -1,0 +1,65 @@
+{{- if and .Values.rbac.create (.Values.objectState).enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    {{- include "newrelic.common.labels" . | nindent 4 }}
+  name: {{ include "newrelic.common.naming.fullname" . }}-objects
+  namespace: {{ .Release.Namespace }}
+rules:
+# The hash store creates its pointer and shard ConfigMaps, and finds them by label. Kubernetes
+# RBAC cannot limit create or list by name. The ClusterRole grants list too; the Role repeats
+# it so it is enough on its own for the hash store.
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - list
+# It updates and deletes only its own ConfigMaps: the pointer and every shard name, two
+# slots of objects.MaxShards (128) shards each (pkg/objects/store.go).
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  resourceNames:
+  - nri-kube-events-hashes-current
+  {{- range $slot := list "a" "b" }}
+  {{- range $i := until 128 }}
+  - nri-kube-events-hashes-{{ $slot }}-{{ $i }}
+  {{- end }}
+  {{- end }}
+  verbs:
+  - get
+  - update
+  - delete
+# The chart creates the HMAC key Secret without data (objects-hmac-secret.yaml); the carrier
+# fills it on its first start and reads it on every start. It cannot create Secrets, so it
+# cannot mint a ServiceAccount token Secret for another ServiceAccount in the namespace.
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  resourceNames:
+  - nri-kube-events-hmac
+  verbs:
+  - get
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    {{- include "newrelic.common.labels" . | nindent 4 }}
+  name: {{ include "newrelic.common.naming.fullname" . }}-objects
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "newrelic.common.naming.fullname" . }}-objects
+subjects:
+- kind: ServiceAccount
+  name: {{ include "newrelic.common.serviceAccount.name" . }}
+  namespace: {{ .Release.Namespace }}
+{{- end }}

@@ -1,0 +1,36 @@
+suite: default values render the same manifests as upstream main
+templates:
+  - templates/agent-configmap.yaml
+  - templates/clusterrole.yaml
+  - templates/clusterrolebinding.yaml
+  - templates/configmap.yaml
+  - templates/deployment.yaml
+  - templates/secret.yaml
+  - templates/serviceaccount.yaml
+release:
+  name: my-release
+  namespace: my-namespace
+tests:
+  - it: renders defaults
+    set:
+      licenseKey: us-whatever
+      cluster: a-cluster
+    asserts:
+      - matchSnapshot: {}
+
+  - it: renders with hostNetwork
+    set:
+      licenseKey: us-whatever
+      cluster: a-cluster
+      hostNetwork: true
+    asserts:
+      - matchSnapshot: {}
+
+  - it: renders with staging and fedramp
+    set:
+      licenseKey: us-whatever
+      cluster: a-cluster
+      global.nrStaging: true
+      global.fedramp.enabled: true
+    asserts:
+      - matchSnapshot: {}
