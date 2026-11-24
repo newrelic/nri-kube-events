@@ -26,7 +26,7 @@ var (
 	})
 	metricObjects = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: metricsPrefix + "objects",
-		Help: "Objects in the hash store per watched kind whose list succeeded, as of the last heartbeat.",
+		Help: "Objects in the hash store per watched kind whose list succeeded, as of the last heartbeat. kind is Kind.group, or Kind alone for the core group.",
 	}, []string{"kind"})
 	metricHashStoreEntries = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: metricsPrefix + "hash_store_entries",

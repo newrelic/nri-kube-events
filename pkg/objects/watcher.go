@@ -944,10 +944,11 @@ func (w *Watcher) sendStoppedHeartbeat() {
 }
 
 // HeartbeatRecord builds the carrier heartbeat and sets the objects gauge from the same
-// counts. carrier.kinds lists, as sorted
-// "Kind=count," pairs cut by Split into carrier.kinds.pNNN parts, every watched kind whose
-// list has succeeded, with the count of its objects in the store; a kind with no objects
-// is listed with 0. carrier.failedKinds lists, sorted and comma-separated, the GVRs whose
+// counts. carrier.kinds lists, as sorted "Kind.group=count," pairs cut by Split into
+// carrier.kinds.pNNN parts, every watched kind whose list has succeeded, with the count of
+// its objects in the store; a kind with no objects is listed with 0. A core kind has no
+// group suffix, so Pod is "Pod" and Cluster-API's Cluster is "Cluster.cluster.x-k8s.io"
+// (see qualifiedKind); two groups that serve the same Kind name stay apart. carrier.failedKinds lists, sorted and comma-separated, the GVRs whose
 // most recent list failed; capList drops whole GVRs from the end to keep it within one
 // attribute. A kind whose first list never arrives can be missing from it: when the
 // reflector uses the watch-list stream, client-go retries a 429 or a refused connection
@@ -967,7 +968,7 @@ func (w *Watcher) heartbeatRecord(now time.Time, state string, stoppedAt time.Ti
 	var failedGVRs []string
 	for gvr, st := range w.gvrs {
 		if st.listed {
-			kindOfGVR[GVRString(gvr)] = st.kind
+			kindOfGVR[GVRString(gvr)] = qualifiedKind(gvr, st.kind)
 		}
 		if st.listFailing {
 			failedGVRs = append(failedGVRs, GVRString(gvr))
@@ -1044,6 +1045,15 @@ func (w *Watcher) heartbeatRecord(now time.Time, state string, stoppedAt time.Ti
 		Category:   Category,
 		Attributes: attrs,
 	}
+}
+
+// qualifiedKind returns kind followed by "." and gvr's group, or kind alone for the core
+// group. The heartbeat's carrier.kinds and the objects gauge's kind label use it.
+func qualifiedKind(gvr schema.GroupVersionResource, kind string) string {
+	if gvr.Group == "" {
+		return kind
+	}
+	return kind + "." + gvr.Group
 }
 
 func unixMilli(t time.Time) int64 {

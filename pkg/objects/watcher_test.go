@@ -597,7 +597,7 @@ func TestHeartbeatRecordShape(t *testing.T) {
 		"lastFullListTime":   start.Add(time.Second).UnixMilli(),
 		"failedSends":        int64(0),
 		"carrier.kindCount":  2,
-		"carrier.kinds.p000": "~ConfigMap=2,Widget=0,",
+		"carrier.kinds.p000": "~ConfigMap=2,Widget.example.com=0,",
 		// The secrets list failed: the carrier is partial.
 		"carrier.failedKindCount": 1,
 		"carrier.failedKinds":     "/v1/secrets",
@@ -729,7 +729,7 @@ func TestHeartbeatKindsSplitIntoParts(t *testing.T) {
 	sorted := append([]string(nil), kinds...)
 	sort.Strings(sorted)
 	for _, k := range sorted {
-		want.WriteString(k + "=0,")
+		want.WriteString(k + ".g=0,")
 	}
 	hb := w.HeartbeatRecord(time.Now())
 	var parts []string
@@ -1613,4 +1613,21 @@ func TestConfigResendDefaults(t *testing.T) {
 	w := NewWatcher(Config{ClusterName: "c", ResendInterval: time.Second}, newDynamic(), newTestDiscovery(), NewStore(newClient(), testNS), &recordingSink{}, watcherKey)
 	assert.Equal(t, time.Second, w.cfg.ResendInterval)
 	assert.Zero(t, w.cfg.ResendAfter, "ResendAfter takes no default")
+}
+
+// Two groups that serve the same Kind name are counted apart.
+func TestHeartbeatKindsKeepGroupsApart(t *testing.T) {
+	w, _, store, _ := newTestWatcher(t, testConfig(), nil)
+	require.NoError(t, store.Load(context.Background()))
+	ctx := context.Background()
+	capi := schema.GroupVersionResource{Group: "cluster.x-k8s.io", Version: "v1beta1", Resource: "clusters"}
+	cnpg := schema.GroupVersionResource{Group: "postgresql.cnpg.io", Version: "v1", Resource: "clusters"}
+	for _, gvr := range []schema.GroupVersionResource{capi, cnpg} {
+		w.track(gvr, "Cluster")
+	}
+	require.NoError(t, w.newObjectStore(ctx, capi).Replace(nil, "1"))
+	markFailing(w, cnpg)
+	hb := w.HeartbeatRecord(time.Now())
+	assert.Equal(t, "~Cluster.cluster.x-k8s.io=0,", hb.Attributes["carrier.kinds.p000"])
+	assert.Equal(t, "postgresql.cnpg.io/v1/clusters", hb.Attributes["carrier.failedKinds"])
 }
