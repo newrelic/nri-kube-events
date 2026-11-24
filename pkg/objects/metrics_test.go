@@ -78,6 +78,7 @@ func TestRegisterMetricsOnlyWhenCalled(t *testing.T) {
 		"nri_kube_events_objects_hash_store_reshard_shards_left",
 		"nri_kube_events_objects_objects",
 		"nri_kube_events_objects_records_rejected_total",
+		"nri_kube_events_objects_redaction_key_replaced_total",
 		"nri_kube_events_objects_records_sent_total",
 		"nri_kube_events_objects_resends_total",
 		"nri_kube_events_objects_send_failures_total",

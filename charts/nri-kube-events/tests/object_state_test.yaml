@@ -399,6 +399,9 @@ tests:
           value: my-namespace
       - notExists:
           path: data
+      - equal:
+          path: metadata.annotations["helm.sh/resource-policy"]
+          value: keep
 
   - it: no HMAC key Secret with object state off
     set:

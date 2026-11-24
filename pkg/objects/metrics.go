@@ -68,6 +68,10 @@ var (
 		Name: metricsPrefix + "forwarder_rejects_all_total",
 		Help: "Groups the infrastructure agent forwarder rejected along with a known-good heartbeat: the forwarder or objectState.agentEndpoint is wrong. The objects are kept unsynced and retried.",
 	})
+	metricRedactionKeyReplaced = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: metricsPrefix + "redaction_key_replaced_total",
+		Help: "Starts that generated a new redaction key while the hash store existed: the key Secret was replaced or emptied, and every object with a redacted value is sent once more.",
+	})
 	metricResends = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: metricsPrefix + "resends_total",
 		Help: "Unchanged objects re-sent because their last send was older than resendAfter.",
@@ -104,6 +108,7 @@ func objectsCollectors() []prometheus.Collector {
 		metricResends,
 		metricRecordsRejected,
 		metricForwarderRejectsAll,
+		metricRedactionKeyReplaced,
 	}
 }
 

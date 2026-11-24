@@ -893,6 +893,10 @@ func upsert(ctx context.Context, cms configMapWriter, cm *corev1.ConfigMap, exis
 // right to create Secrets; the first start fills it with 32 random bytes by an update. If
 // the Secret is absent, as in an install without the chart, it is created. If another
 // writer fills or creates it first, that key is used.
+//
+// A new key while the hash store already exists means the old key was lost, for example
+// because a forced sync replaced the Secret: every redaction marker changes, so every
+// object with a redacted value is sent once more. newKeyGenerated logs that and counts it.
 func LoadOrCreateHMACKey(ctx context.Context, client kubernetes.Interface, namespace string) ([]byte, error) {
 	secrets := client.CoreV1().Secrets(namespace)
 	sec, err := secrets.Get(ctx, HMACSecretName, metav1.GetOptions{})
@@ -900,7 +904,11 @@ func LoadOrCreateHMACKey(ctx context.Context, client kubernetes.Interface, names
 	case err == nil && len(sec.Data[HMACSecretKey]) > 0:
 		return keyFromSecret(sec)
 	case err == nil:
-		return fillHMACKey(ctx, secrets, sec)
+		key, fillErr := fillHMACKey(ctx, secrets, sec)
+		if fillErr == nil {
+			newKeyGenerated(ctx, client, namespace)
+		}
+		return key, fillErr
 	case !apierrors.IsNotFound(err):
 		return nil, fmt.Errorf("reading secret %s: %w", HMACSecretName, err)
 	}
@@ -919,6 +927,7 @@ func LoadOrCreateHMACKey(ctx context.Context, client kubernetes.Interface, names
 		Data: map[string][]byte{HMACSecretKey: key},
 	}, metav1.CreateOptions{})
 	if err == nil {
+		newKeyGenerated(ctx, client, namespace)
 		return key, nil
 	}
 	if !apierrors.IsAlreadyExists(err) {
@@ -932,6 +941,19 @@ func LoadOrCreateHMACKey(ctx context.Context, client kubernetes.Interface, names
 		return fillHMACKey(ctx, secrets, sec)
 	}
 	return keyFromSecret(sec)
+}
+
+// newKeyGenerated logs a new redaction key. When the hash store already holds data, the key
+// replaced a lost one: it logs a warning and counts redaction_key_replaced_total.
+func newKeyGenerated(ctx context.Context, client kubernetes.Interface, namespace string) {
+	list, err := client.CoreV1().ConfigMaps(namespace).List(ctx,
+		metav1.ListOptions{LabelSelector: storeLabelKey + "=" + storeLabelValue, Limit: 1})
+	if err != nil || len(list.Items) == 0 {
+		log.Info("objects: generated the redaction key")
+		return
+	}
+	metricRedactionKeyReplaced.Inc()
+	log.Warn("objects: generated a new redaction key although the hash store exists; the old key was lost (the key Secret was replaced or emptied), so every redaction marker changes and every object with a redacted value is sent once more")
 }
 
 // fillHMACKey writes a new key into sec, an existing Secret without one, and returns it. An

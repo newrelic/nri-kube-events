@@ -140,7 +140,11 @@ objectState:
   # those names; Kubernetes RBAC cannot limit create by name. The chart creates the HMAC key
   # Secret without data and the carrier fills it on its first start, so the carrier cannot
   # create Secrets. A GitOps tool that compares the live Secret with the chart sees the key
-  # the carrier added; ignore differences in that Secret's data. With `rbac.create=false`,
+  # the carrier added; ignore differences in that Secret's data. A forced replace of the
+  # Secret (`helm upgrade --force`, Argo CD `Replace=true`, or deleting it) clears the key:
+  # the next start generates a new one, logs a warning, counts
+  # `nri_kube_events_objects_redaction_key_replaced_total`, and, because every redaction
+  # marker changes, sends every object with a redacted value once more. With `rbac.create=false`,
   # grant the same rules the chart's objects Role holds (templates/objects-role.yaml). The ServiceAccount can read every
   # Secret, so with object state enabled the pod does not automount its token, and only the
   # integration container gets one, through a projected volume; the forwarder sidecar does

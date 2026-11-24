@@ -1149,3 +1149,23 @@ func TestReshardOfALargeChangingStoreFinishes(t *testing.T) {
 		require.Equal(t, ls, got.LastSent, uid(i))
 	}
 }
+
+// A key generated while the hash store exists replaced a lost key; it is counted. A key
+// generated on a first install is not.
+func TestReplacedRedactionKeyIsCounted(t *testing.T) {
+	ctx := context.Background()
+	empty := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: HMACSecretName, Namespace: storeNS}}
+	before := counterValue(t, metricRedactionKeyReplaced)
+	_, err := LoadOrCreateHMACKey(ctx, newClient(empty.DeepCopy()), storeNS)
+	require.NoError(t, err)
+	assert.Equal(t, before, counterValue(t, metricRedactionKeyReplaced), "a first install")
+
+	client := newClient(empty.DeepCopy())
+	s := NewStore(client, storeNS)
+	require.NoError(t, s.Load(ctx))
+	s.Put(testUID(1), testEntry(1))
+	require.NoError(t, s.Flush(ctx))
+	_, err = LoadOrCreateHMACKey(ctx, client, storeNS)
+	require.NoError(t, err)
+	assert.Equal(t, before+1, counterValue(t, metricRedactionKeyReplaced), "the Secret was emptied while the store existed")
+}
