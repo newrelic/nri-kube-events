@@ -1083,3 +1083,69 @@ func TestStoreOverCapacityIsRefusedLoudly(t *testing.T) {
 	require.NoError(t, metricHashStoreOverCapacity.Write(&m))
 	assert.Equal(t, 1.0, m.GetGauge().GetValue())
 }
+
+// A reshard of a 200,000-object store that keeps changing, at the daily resend's rate of
+// about 139 objects a minute, ends within about one flush per shard, as the review's store
+// simulation measured it; then the changes made after a shard was written are written in
+// place, and every entry is stored.
+func TestReshardOfALargeChangingStoreFinishes(t *testing.T) {
+	if testing.Short() {
+		t.Skip("writes 200,000 entries")
+	}
+	ctx := context.Background()
+	client := newClient()
+	s := NewStore(client, storeNS)
+	require.NoError(t, s.Load(ctx))
+	const n, churn = 200_000, 139
+	entry := func(i int, lastSent int64) Entry {
+		return Entry{GVR: "apps/v1/replicasets", Kind: "ReplicaSet", Namespace: "team-namespace-x",
+			Name: fmt.Sprintf("service-name-%d-7d9f8c6b5", i), Hash: "0123456789abcdef", LastSent: lastSent}
+	}
+	uid := func(i int) string { return fmt.Sprintf("%08x-0000-4000-8000-%012x", i, i) }
+	for i := 0; i < n; i++ {
+		s.Put(uid(i), entry(i, 1_700_000_000))
+	}
+	rng := rand.New(rand.NewPCG(1, 2)) //nolint:gosec // a repeatable test sequence
+	last := map[int]int64{}
+	moved := 0
+	for flush := 1; flush <= 70 && moved == 0; flush++ {
+		for k := 0; k < churn; k++ {
+			i := rng.IntN(n)
+			last[i] = int64(1_700_000_000 + flush)
+			s.Put(uid(i), entry(i, last[i]))
+		}
+		require.NoError(t, s.FlushBudget(ctx, flushBudgetBytes))
+		if _, err := client.CoreV1().ConfigMaps(storeNS).Get(ctx, pointerName, metav1.GetOptions{}); err == nil {
+			moved = flush
+		}
+	}
+	s.mu.Lock()
+	shards := s.shards
+	s.mu.Unlock()
+	require.Positive(t, moved, "the pointer moved")
+	t.Logf("%d shards; the pointer moved at flush %d", shards, moved)
+	assert.LessOrEqual(t, moved, shards+2, "about one flush per shard")
+	var m dto.Metric
+	require.NoError(t, metricHashStoreReshardLeft.Write(&m))
+	assert.Zero(t, m.GetGauge().GetValue())
+
+	// The changes made after their shard was written follow in place within the budget.
+	for flushes := 0; ; flushes++ {
+		s.mu.Lock()
+		dirty := len(s.dirty)
+		s.mu.Unlock()
+		if dirty == 0 {
+			break
+		}
+		require.Less(t, flushes, shards)
+		require.NoError(t, s.FlushBudget(ctx, flushBudgetBytes))
+	}
+	r := NewStore(client, storeNS)
+	require.NoError(t, r.Load(ctx))
+	assert.Equal(t, n, r.Len())
+	for i, ls := range last {
+		got, ok := r.Get(uid(i))
+		require.True(t, ok)
+		require.Equal(t, ls, got.LastSent, uid(i))
+	}
+}

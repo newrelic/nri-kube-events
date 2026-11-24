@@ -40,6 +40,10 @@ var (
 		Name: metricsPrefix + "hash_store_dirty_shards",
 		Help: "Hash store shards changed since their last write, as of the last flush. A flush writes at most about 1 MB, so on a large store some shards wait for later flushes.",
 	})
+	metricHashStoreReshardLeft = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: metricsPrefix + "hash_store_reshard_shards_left",
+		Help: "Shards of the hash store reshard in progress not written yet; 0 when no reshard runs. A flush writes about 1 MB, so it falls by about one shard per flush.",
+	})
 	metricHashStoreOverCapacity = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: metricsPrefix + "hash_store_over_capacity",
 		Help: "1 while the hash store needs more shards than it may write (MaxShards, about 640,000 objects), so it is not persisted; 0 otherwise.",
@@ -94,6 +98,7 @@ func objectsCollectors() []prometheus.Collector {
 		metricHashStoreBytesWritten,
 		metricHashStoreDirtyShards,
 		metricHashStoreOverCapacity,
+		metricHashStoreReshardLeft,
 		metricForwarderRejections,
 		metricCarrierFailures,
 		metricResends,

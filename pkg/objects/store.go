@@ -73,8 +73,8 @@ type Store struct {
 	// dirty holds, per shard index changed since its last successful write, when it first
 	// changed.
 	dirty map[int]time.Time
-	// reshardLeft: see reshardGen.
-	reshardLeft map[int]bool
+	// reshardLeft: see reshardGen. It maps each shard to when it first needed writing.
+	reshardLeft map[int]time.Time
 	// historyStart is the pointer's history-start annotation, set by Load.
 	historyStart time.Time
 	namespace    string
@@ -89,8 +89,9 @@ type Store struct {
 	// in the slot the pointer does not name.
 	gen, maxGen int
 	// reshardGen is the generation a reshard in progress writes, 0 when none is; it has
-	// reshardShards shards, and reshardLeft holds those not written since they last
-	// changed. The pointer moves to it once reshardLeft is empty.
+	// reshardShards shards, and reshardLeft holds those not written yet. A shard that
+	// changes after it was written goes to dirty, and is written in place once the pointer
+	// has moved. The pointer moves to it once reshardLeft is empty.
 	reshardGen    int
 	reshardShards int
 	hasPointer    bool
@@ -643,37 +644,57 @@ func (s *Store) beginReshard() {
 }
 
 // takeReshard returns the shards of the reshard in progress that one flush writes within
-// budget bytes (at least one; all with a budget of 0), and removes them from reshardLeft.
-// A change of shard count since the reshard began starts its shards over; a shard changed
-// since it was written is written again. The caller holds s.mu.
-func (s *Store) takeReshard(groups []map[string]string, budget int) []int {
+// budget bytes (at least one; all with a budget of 0), oldest first, and removes them from
+// reshardLeft. A change of shard count since the reshard began starts its shards over. A
+// change to a shard that is still left only moves its time earlier; a change to a shard
+// already written stays in dirty, so every flush shrinks reshardLeft and the reshard ends
+// within about one flush per shard however much the store changes. The caller holds s.mu.
+func (s *Store) takeReshard(groups []map[string]string, budget int) []dirtyShard {
 	if s.reshardShards != len(groups) {
+		now := time.Now()
 		s.reshardShards = len(groups)
-		s.reshardLeft = make(map[int]bool, len(groups))
+		s.reshardLeft = make(map[int]time.Time, len(groups))
 		for i := range groups {
-			s.reshardLeft[i] = true
+			s.reshardLeft[i] = now
+		}
+		for i, since := range s.dirty {
+			if since.Before(now) && i < len(groups) {
+				s.reshardLeft[i] = since
+			}
+		}
+		s.dirty = map[int]time.Time{}
+	}
+	for i, since := range s.dirty {
+		if left, ok := s.reshardLeft[i]; ok {
+			if since.Before(left) {
+				s.reshardLeft[i] = since
+			}
+			delete(s.dirty, i)
 		}
 	}
-	for i := range s.dirty {
-		s.reshardLeft[i] = true
+	left := make([]dirtyShard, 0, len(s.reshardLeft))
+	for i, since := range s.reshardLeft {
+		left = append(left, dirtyShard{shard: i, since: since})
 	}
-	s.dirty = map[int]time.Time{}
-	left := make([]int, 0, len(s.reshardLeft))
-	for i := range s.reshardLeft {
-		left = append(left, i)
-	}
-	sort.Ints(left)
-	var take []int
+	sort.Slice(left, func(a, b int) bool {
+		if !left[a].since.Equal(left[b].since) {
+			return left[a].since.Before(left[b].since)
+		}
+		return left[a].shard < left[b].shard
+	})
+	var take []dirtyShard
 	written := 0
-	for _, i := range left {
-		n := shardBytes(groups[i])
+	for _, d := range left {
+		n := shardBytes(groups[d.shard])
 		if budget > 0 && len(take) > 0 && written+n > budget {
 			break
 		}
-		take = append(take, i)
+		take = append(take, d)
 		written += n
-		delete(s.reshardLeft, i)
+		delete(s.reshardLeft, d.shard)
 	}
+	metricHashStoreReshardLeft.Set(float64(len(s.reshardLeft)))
+	metricHashStoreDirtyShards.Set(float64(len(s.dirty)))
 	return take
 }
 
@@ -684,20 +705,21 @@ func (s *Store) takeReshard(groups []map[string]string, budget int) []int {
 // each uid first. A shard that fails is written again at the next flush. A pointer write
 // that fails may still have landed, so the next flush reads the pointer before it
 // continues.
-func (s *Store) reshard(ctx context.Context, gen int, groups []map[string]string, write []int) error {
-	for k, i := range write {
+func (s *Store) reshard(ctx context.Context, gen int, groups []map[string]string, write []dirtyShard) error {
+	for k, d := range write {
 		// Create falls back to Update if a shard of gen already exists.
-		if err := s.writeShard(ctx, gen, i, groups[i], false); err != nil {
+		if err := s.writeShard(ctx, gen, d.shard, groups[d.shard], false); err != nil {
 			s.mu.Lock()
-			for _, j := range write[k:] {
-				s.reshardLeft[j] = true
+			for _, again := range write[k:] {
+				s.reshardLeft[again.shard] = again.since
 			}
+			metricHashStoreReshardLeft.Set(float64(len(s.reshardLeft)))
 			s.mu.Unlock()
 			return err
 		}
 	}
 	s.mu.Lock()
-	done := len(s.reshardLeft) == 0 && len(s.dirty) == 0
+	done := len(s.reshardLeft) == 0
 	s.mu.Unlock()
 	if !done {
 		return nil
@@ -722,6 +744,7 @@ func (s *Store) finishReshard(gen int) {
 	s.cleanup = true
 	s.reshardGen = 0
 	s.reshardLeft = nil
+	metricHashStoreReshardLeft.Set(0)
 }
 
 // deleteOldGenerations deletes every shard ConfigMap outside generation gen or beyond its

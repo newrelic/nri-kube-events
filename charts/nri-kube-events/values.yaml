@@ -117,8 +117,9 @@ objectState:
   #   200,000-object store (about 44 MB in 49 shards) every changed shard is written within
   #   about 45 minutes; a restart in between sends the objects of the shards not yet written
   #   again, and loses nothing. When the store grows past a shard boundary it is resharded
-  #   into the other name slot within the same budget, so a reshard is spread over several
-  #   flushes. Above about 640,000 objects (128 shards) the store is not written at all: the
+  #   into the other name slot within the same budget, about one shard per flush, so a
+  #   200,000-object store reshards in about 45 minutes however much it changes meanwhile
+  #   (`..._hash_store_reshard_shards_left` shows the progress). Above about 640,000 objects (128 shards) the store is not written at all: the
   #   carrier logs an error, sets `..._hash_store_over_capacity` to 1, and a restart then
   #   sends every object again. The `nri_kube_events_objects_hash_store_bytes_written_total`
   #   and `..._hash_store_dirty_shards` metrics show the actual load. Every client that
