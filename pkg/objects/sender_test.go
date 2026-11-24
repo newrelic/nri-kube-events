@@ -267,3 +267,15 @@ func TestSenderBacksOffWhileTheForwarderRejectsEverything(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 	assert.LessOrEqual(t, int(sink.calls.Load()), 4, "at most two groups, each with its probe, before the first wait ends")
 }
+
+// The forwarder probe resends the last heartbeat unchanged; it does not build a new one.
+func TestForwarderProbeResendsTheLastHeartbeat(t *testing.T) {
+	sink := &rejectAllSink{}
+	store := NewStore(newClient(), testNS)
+	w := NewWatcher(testConfig(), newDynamic(), newTestDiscovery(coreList(cmResource())), store, sink, watcherKey)
+	built := w.HeartbeatRecord(time.Unix(1700000000, 0))
+	w.now = func() time.Time { return time.Unix(1800000000, 0) }
+	probe := w.probeRecord()
+	assert.Equal(t, built, probe)
+	assert.EqualValues(t, 1700000000, probe.Attributes["timestamp"], "the old timestamp, so it is never the newest heartbeat")
+}

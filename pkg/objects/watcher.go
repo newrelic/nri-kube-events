@@ -132,7 +132,9 @@ type Watcher struct {
 	pending map[string]pendingVersion
 	// sender delivers the queued sends while Run runs; sendMu guards it.
 	sender *sender
-	warner *rateLimitedWarner
+	// lastHeartbeat, guarded by mu, is the last heartbeat built; the forwarder probe resends it.
+	lastHeartbeat *Record
+	warner        *rateLimitedWarner
 
 	// mu guards gvrs, unsynced, startTime, lastFullList, failedSends, resyncCursor,
 	// catchUp and stopped.
@@ -1021,11 +1023,28 @@ func (w *Watcher) heartbeatRecord(now time.Time, state string, stoppedAt time.Ti
 	for i, p := range Split(b.String()) {
 		attrs[fmt.Sprintf("carrier.kinds.p%03d", i)] = p
 	}
-	return Record{
+	rec := Record{
 		Summary:    fmt.Sprintf("carrier heartbeat: %d kinds", len(kinds)),
 		Category:   Category,
 		Attributes: attrs,
 	}
+	w.mu.Lock()
+	w.lastHeartbeat = &rec
+	w.mu.Unlock()
+	return rec
+}
+
+// probeRecord returns the last heartbeat built, unchanged, timestamp included, so a probe
+// costs no scan of the store and a reader that takes the newest heartbeat is not misled.
+// Before the first heartbeat it builds one.
+func (w *Watcher) probeRecord() Record {
+	w.mu.Lock()
+	last := w.lastHeartbeat
+	w.mu.Unlock()
+	if last != nil {
+		return *last
+	}
+	return w.HeartbeatRecord(w.now())
 }
 
 // qualifiedKind returns kind followed by "." and gvr's group, or kind alone for the core

@@ -244,8 +244,8 @@ var errForwarderRejectsAll = errors.New("the forwarder rejects every request")
 
 // deliver sends the records of group in one call and applies the result to each send.
 //
-// When the forwarder rejects the group for its content, deliver first sends a heartbeat,
-// whose content is known to be valid. If that is rejected too, the forwarder rejects
+// When the forwarder rejects the group for its content, deliver first sends the last
+// heartbeat again, whose content is known to be valid; that costs no scan of the store. If that is rejected too, the forwarder rejects
 // everything (a wrong endpoint path, a forwarder without /v1/data, an auth change): every
 // send of the group is marked unsynced, nothing is stored as sent, forwarder_rejects_all
 // counts it, and deliver returns errForwarderRejectsAll so the sender backs off. If the
@@ -311,12 +311,13 @@ func (w *Watcher) deliverGroup(ctx context.Context, group []pendingSend, probed 
 	return err
 }
 
-// probeForwarder sends one running heartbeat. It returns nil when the forwarder accepts it,
-// errForwarderRejectsAll when the forwarder rejects it, and the send's error otherwise.
+// probeForwarder sends the last heartbeat again, unchanged (probeRecord). It returns nil when
+// the forwarder accepts it, errForwarderRejectsAll when the forwarder rejects it, and the
+// send's error otherwise.
 func (w *Watcher) probeForwarder(ctx context.Context) error {
 	probeCtx, cancel := context.WithTimeout(ctx, heartbeatSendTimeout)
 	defer cancel()
-	err := w.sink.Send(probeCtx, []Record{w.HeartbeatRecord(w.now())})
+	err := w.sink.Send(probeCtx, []Record{w.probeRecord()})
 	if errors.Is(err, ErrRejected) {
 		return fmt.Errorf("%w: %w", errForwarderRejectsAll, err)
 	}
