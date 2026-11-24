@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/newrelic/nri-kube-events/pkg/accountflag"
 )
@@ -140,4 +141,35 @@ func TestStoppedHeartbeatShape(t *testing.T) {
 	assert.Equal(t, CarrierStateStopped, hbs[0].Attributes["carrier.state"])
 	assert.Equal(t, at.UnixMilli(), hbs[0].Attributes["carrier.stoppedAt"])
 	assert.Equal(t, at.Unix(), hbs[0].Attributes["timestamp"])
+}
+
+// blockingDiscovery holds discovery until release is closed.
+type blockingDiscovery struct {
+	*testDiscovery
+	release chan struct{}
+}
+
+func (d *blockingDiscovery) ServerGroups() (*metav1.APIGroupList, error) {
+	<-d.release
+	return d.testDiscovery.ServerGroups()
+}
+
+func (d *blockingDiscovery) ServerGroupsWithContext(ctx context.Context) (*metav1.APIGroupList, error) {
+	<-d.release
+	return d.testDiscovery.ServerGroupsWithContext(ctx)
+}
+
+// A run sends its first running heartbeat before discovery finishes.
+func TestRunSendsARunningHeartbeatBeforeDiscovery(t *testing.T) {
+	disc := &blockingDiscovery{testDiscovery: newTestDiscovery(coreList(cmResource())), release: make(chan struct{})}
+	store := NewStore(newClient(), testNS)
+	sink := &recordingSink{}
+	w := NewWatcher(testConfig(), newDynamic(), disc, store, sink, watcherKey)
+	stop := runWatcher(t, w)
+	require.Eventually(t, func() bool {
+		hbs := heartbeats(sink.records())
+		return len(hbs) == 1 && hbs[0].Attributes["carrier.state"] == CarrierStateRunning
+	}, 5*time.Second, 5*time.Millisecond)
+	close(disc.release)
+	require.NoError(t, stop())
 }

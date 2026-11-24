@@ -344,9 +344,9 @@ func withStartDelay(t *testing.T, d time.Duration) *atomic.Int32 {
 	return &calls
 }
 
-// A run starts only after the start delay, at the first start and after every off-to-on
-// flip.
-func TestRunGatedWaitsTheStartDelay(t *testing.T) {
+// A run starts at once when the flag is already on, as after a pod restart, and only after
+// the start delay when the flag turns on at run time.
+func TestRunGatedWaitsTheStartDelayOnlyAfterAFlip(t *testing.T) {
 	calls := withStartDelay(t, 150*time.Millisecond)
 	var starts atomic.Int32
 	run := func(ctx context.Context) error {
@@ -357,8 +357,9 @@ func TestRunGatedWaitsTheStartDelay(t *testing.T) {
 	flag := newFakeFlag(accountflag.On)
 	began := time.Now()
 	g := startGated(t, flag, run)
-	require.Eventually(t, func() bool { return starts.Load() == 1 }, 5*time.Second, 5*time.Millisecond)
-	assert.GreaterOrEqual(t, time.Since(began), 150*time.Millisecond)
+	require.Eventually(t, func() bool { return starts.Load() == 1 }, 5*time.Second, time.Millisecond)
+	assert.Less(t, time.Since(began), 150*time.Millisecond, "no delay with the flag already on")
+	assert.Zero(t, calls.Load())
 
 	flag.set(accountflag.Off)
 	time.Sleep(20 * time.Millisecond)
@@ -366,7 +367,27 @@ func TestRunGatedWaitsTheStartDelay(t *testing.T) {
 	flag.set(accountflag.On)
 	require.Eventually(t, func() bool { return starts.Load() == 2 }, 5*time.Second, 5*time.Millisecond)
 	assert.GreaterOrEqual(t, time.Since(began), 150*time.Millisecond)
-	assert.Equal(t, int32(2), calls.Load(), "a delay per start")
+	assert.Equal(t, int32(1), calls.Load(), "one delay, for the start after the flip")
+	require.NoError(t, stopGated(t, g))
+}
+
+// A flag that turns on after RunGated saw it off waits the delay, as New Relic turning the
+// flag on for every cluster of an account at once.
+func TestRunGatedWaitsWhenTheFlagTurnsOnLater(t *testing.T) {
+	withStartDelay(t, 150*time.Millisecond)
+	var starts atomic.Int32
+	run := func(ctx context.Context) error {
+		starts.Add(1)
+		<-ctx.Done()
+		return nil
+	}
+	flag := newFakeFlag(accountflag.Off)
+	g := startGated(t, flag, run)
+	time.Sleep(20 * time.Millisecond)
+	began := time.Now()
+	flag.set(accountflag.On)
+	require.Eventually(t, func() bool { return starts.Load() == 1 }, 5*time.Second, 5*time.Millisecond)
+	assert.GreaterOrEqual(t, time.Since(began), 150*time.Millisecond)
 	require.NoError(t, stopGated(t, g))
 }
 
@@ -379,8 +400,10 @@ func TestRunGatedCancelsAPendingStart(t *testing.T) {
 		<-ctx.Done()
 		return nil
 	}
-	flag := newFakeFlag(accountflag.On)
+	flag := newFakeFlag(accountflag.Off)
 	g := startGated(t, flag, run)
+	time.Sleep(20 * time.Millisecond)
+	flag.set(accountflag.On)
 	time.Sleep(50 * time.Millisecond)
 	flag.set(accountflag.Off)
 	time.Sleep(400 * time.Millisecond)

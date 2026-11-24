@@ -226,8 +226,9 @@ func (w *Watcher) Run(ctx context.Context) error {
 	w.mu.Unlock()
 	w.startSender()
 
-	w.syncWatches(ctx)
+	// The first heartbeat goes out before discovery, so a reader sees the new run at once.
 	w.startHeartbeat(ctx)
+	w.syncWatches(ctx)
 
 	discoveryT := time.NewTicker(w.cfg.DiscoveryInterval)
 	defer discoveryT.Stop()

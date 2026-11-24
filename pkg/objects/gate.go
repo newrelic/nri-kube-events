@@ -41,9 +41,13 @@ var errRunExited = errors.New("objects: watcher returned while the account flag 
 // cancels that context and waits for run to return before it looks at the state again, so
 // two runs never overlap and never write the hash store together. When the state returns
 // to On it calls run again; run builds a fresh Watcher over the same Store, so its first
-// list sends the objects that changed while off and tombstones the ones that went. Every
-// start, the first one included, waits a random startDelay of up to maxStartDelay first; a
-// flag that leaves On during the wait cancels the start.
+// list sends the objects that changed while off and tombstones the ones that went.
+//
+// A start after this RunGated has seen the flag Off, which is New Relic turning the flag on
+// at run time, waits a random startDelay of up to maxStartDelay first; a flag that leaves
+// On during the wait cancels the start. A start with the flag already On when RunGated
+// begins, after a pod restart or a carrier retry, does not wait, so the new watcher's
+// running heartbeat follows the old pod's stopped one at once.
 //
 // RunGated returns after ctx is canceled and the running run, if any, has returned, with
 // that run's error. A run that returns while ctx is live and the flag is On makes RunGated
@@ -94,13 +98,21 @@ type gate struct {
 	// startTimer fires when a start that waits out its startDelay may run; it is nil while
 	// no start waits.
 	startTimer *time.Timer
+	// seenOff is set once the flag was Off; only a start after that waits.
+	seenOff bool
 }
 
 // reconcile schedules a start when the flag is on and nothing runs or waits, cancels a
 // waiting start when the flag is not on, and stops a running run when the flag is not on.
 func (g *gate) reconcile() {
 	state := g.flag.State()
+	if state == accountflag.Off {
+		g.seenOff = true
+	}
 	switch {
+	case state == accountflag.On && g.active == nil && g.startTimer == nil && !g.seenOff:
+		log.WithField("state", state.String()).Info("objects: account flag is on, starting the watcher")
+		g.active = startRun(g.ctx, g.run)
 	case state == accountflag.On && g.active == nil && g.startTimer == nil:
 		d := startDelay()
 		log.WithFields(log.Fields{"state": state.String(), "delay": d.String()}).Info("objects: account flag is on, starting the watcher after a random delay")
