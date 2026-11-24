@@ -1391,10 +1391,7 @@ func TestHeartbeatFailedKindsCapped(t *testing.T) {
 	assert.Equal(t, 400, h.Attributes["carrier.failedKindCount"])
 }
 
-var (
-	applicationsGVR  = schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
-	scaledObjectsGVR = schema.GroupVersionResource{Group: "keda.sh", Version: "v1alpha1", Resource: "scaledobjects"}
-)
+var applicationsGVR = schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
 
 // withUID returns obj with metadata.uid set.
 func withUID(obj map[string]any, uid string) map[string]any {
@@ -1412,9 +1409,6 @@ func TestNoiseOnlyChangeSendsNothing(t *testing.T) {
 		{name: "argo application refresh", gvr: applicationsGVR, obj: argoApp, change: func(o map[string]any) {
 			o["status"].(map[string]any)["reconciledAt"] = "2026-11-17T10:03:00Z"
 			o["metadata"].(map[string]any)["generation"] = int64(8)
-		}},
-		{name: "keda recommendation annotation", gvr: scaledObjectsGVR, obj: scaledObject, change: func(o map[string]any) {
-			o["metadata"].(map[string]any)["annotations"].(map[string]any)[kedaRecommendationAnnotation] = `[{"t":"2026-11-17T10:05:00Z","v":55}]`
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

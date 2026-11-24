@@ -206,27 +206,6 @@ func argoApp() map[string]any {
 	}
 }
 
-func scaledObject() map[string]any {
-	return map[string]any{
-		"apiVersion": "keda.sh/v1alpha1",
-		"kind":       "ScaledObject",
-		"metadata": map[string]any{
-			"name":      "web",
-			"namespace": "default",
-			"annotations": map[string]any{
-				"clm10-keda-scaler/cpuutilizationtarget.recommendation.history": `[{"t":"2026-11-17T10:00:00Z","v":60}]`,
-				"example.com/owner": "team-a",
-			},
-		},
-		"spec": map[string]any{
-			"scaleTargetRef": map[string]any{"name": "web"},
-		},
-		"status": map[string]any{
-			"lastActiveTime": "2026-11-17T10:00:00Z",
-		},
-	}
-}
-
 func TestArgoApplicationRefreshIgnored(t *testing.T) {
 	a := argoApp()
 	b := argoApp()
@@ -267,31 +246,11 @@ func TestReconciledAtKeptForOtherGroups(t *testing.T) {
 	assert.NotEqual(t, Hash(a), Hash(b))
 }
 
-func TestKedaRecommendationAnnotationIgnored(t *testing.T) {
-	base := Hash(scaledObject())
-
-	rec := scaledObject()
-	rec["metadata"].(map[string]any)["annotations"].(map[string]any)["clm10-keda-scaler/cpuutilizationtarget.recommendation.history"] = `[{"t":"2026-11-17T10:05:00Z","v":65}]`
-	assert.Equal(t, base, Hash(rec), "recommendation annotation change")
-
-	other := scaledObject()
-	other["metadata"].(map[string]any)["annotations"].(map[string]any)["example.com/owner"] = "team-b"
-	assert.NotEqual(t, base, Hash(other), "other annotation change")
-
-	active := scaledObject()
-	active["status"].(map[string]any)["lastActiveTime"] = "2026-11-17T10:05:00Z"
-	assert.NotEqual(t, base, Hash(active), "status.lastActiveTime change")
-}
-
 func TestNoiseRemovalDoesNotMutateInput(t *testing.T) {
 	app := argoApp()
-	so := scaledObject()
 	appBefore := deepCopy(app)
-	soBefore := deepCopy(so)
 
 	_ = Normalize(app)
-	_ = Normalize(so)
 
 	assert.Equal(t, appBefore, app)
-	assert.Equal(t, soBefore, so)
 }

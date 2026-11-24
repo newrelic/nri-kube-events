@@ -20,26 +20,16 @@ const leaseGroup = "coordination.k8s.io"
 // and metadata.generation are dropped.
 const argoGroup = "argoproj.io"
 
-// kedaGroup is the API group of the KEDA ScaledObject kind whose recommendation
-// annotation is dropped.
-const kedaGroup = "keda.sh"
-
-// kedaRecommendationAnnotation is the recommendation history clm10-keda-scaler writes on
-// ScaledObjects. It changes far more often than the scaler's configuration.
-const kedaRecommendationAnnotation = "clm10-keda-scaler/cpuutilizationtarget.recommendation.history"
-
 // Normalize returns a deep copy of obj without the fields that change on every heartbeat
 // or write but carry no state: metadata.managedFields, metadata.resourceVersion, the
 // leader-election annotation, lastHeartbeatTime in every status.conditions entry,
-// spec.renewTime of a coordination.k8s.io Lease, status.reconciledAt and
-// metadata.generation of an argoproj.io Application, and the
-// clm10-keda-scaler/cpuutilizationtarget.recommendation.history annotation of a keda.sh
-// ScaledObject. The input is never modified.
+// spec.renewTime of a coordination.k8s.io Lease, and status.reconciledAt and
+// metadata.generation of an argoproj.io Application. The input is never modified.
 //
-// The Argo CD and KEDA fields come from an ingest measurement on a staging cluster: every
-// Argo CD refresh changes only reconciledAt and generation, and most ScaledObject changes
-// touch only the recommendation annotation. Dropping generation means a record can show an older
-// generation than the live Application until its next real change or the next resend.
+// An Argo CD refresh that finds nothing to change still writes reconciledAt and bumps
+// generation, so without this rule every refresh would resend every Application. Dropping
+// generation means a record can show an older generation than the live Application until
+// its next real change or the next resend.
 func Normalize(obj map[string]any) map[string]any {
 	out, _ := deepCopy(obj).(map[string]any)
 	if out == nil {
@@ -76,14 +66,6 @@ func Normalize(obj map[string]any) map[string]any {
 		}
 		if meta, ok := out["metadata"].(map[string]any); ok {
 			delete(meta, "generation")
-		}
-	}
-
-	if isKind(out, kedaGroup, "ScaledObject") {
-		if meta, ok := out["metadata"].(map[string]any); ok {
-			if ann, ok := meta["annotations"].(map[string]any); ok {
-				delete(ann, kedaRecommendationAnnotation)
-			}
 		}
 	}
 

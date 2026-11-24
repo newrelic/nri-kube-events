@@ -8,9 +8,9 @@ import (
 const (
 	// PartChars is the most runes one part attribute holds, the mark included.
 	PartChars = 4094
-	// Mark prefixes every part, so no part is valid JSON. The New Relic Log API parses an
-	// attribute whose value is valid JSON into flattened attributes and drops the string;
-	// whether InfrastructureEvent ingest does the same is not verified, so the mark stays.
+	// Mark prefixes every part, so no part is valid JSON and every ingest path keeps the
+	// part as one string attribute. Some New Relic ingest paths parse a string attribute
+	// whose value is valid JSON into flattened attributes and drop the string.
 	Mark = "~"
 	// Overlap is how many runes consecutive parts share, so a search term up to Overlap
 	// runes long sits whole inside at least one part.
