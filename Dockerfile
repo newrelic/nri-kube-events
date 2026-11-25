@@ -28,7 +28,8 @@ RUN go build \
 FROM alpine:3.24.4
 WORKDIR /app
 
-RUN apk add --no-cache --upgrade \
+RUN apk upgrade --no-cache \
+    && apk add --no-cache --upgrade \
     tini ca-certificates \
     && addgroup -g 2000 nri-kube-events \
     && adduser -D -H -u 1000 -G nri-kube-events nri-kube-events
